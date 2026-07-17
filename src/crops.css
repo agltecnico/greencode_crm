@@ -472,3 +472,99 @@
   .lg\:col-span-2 { grid-column: span 2; }
   .lg\:col-span-3 { grid-column: span 3; }
 }
+
+
+/* TV Mode Styles */
+.tv-mode {
+  background-color: #0f172a;
+  min-height: 100vh;
+  width: 100vw;
+  padding: 3rem;
+  box-sizing: border-box;
+}
+
+.tv-mode .crops-module {
+  max-width: 100% !important;
+}
+
+.tv-mode .tasks-header h2 {
+  font-size: 3rem;
+  background: linear-gradient(135deg, #34d399, #38bdf8);
+  -webkit-background-clip: text;
+}
+
+.tv-mode .tasks-header p {
+  color: #94a3b8;
+  font-size: 1.25rem;
+}
+
+.tv-mode .time-filters {
+  background: #1e293b;
+  border-color: #334155;
+  transform: scale(1.2);
+  transform-origin: right center;
+}
+
+.tv-mode .time-filter-btn.active {
+  background: #38bdf8;
+  box-shadow: 0 4px 15px rgba(56, 189, 248, 0.4);
+}
+
+.tv-mode .time-filter-btn {
+  color: #64748b;
+}
+
+.tv-mode .task-day-group {
+  background: #1e293b;
+  border-color: #334155;
+}
+
+.tv-mode .task-day-group.is-today {
+  background: linear-gradient(to bottom right, #1e293b, #064e3b);
+  border-color: #10b981;
+}
+
+.tv-mode .task-day-title {
+  color: #e2e8f0;
+  font-size: 1.5rem;
+}
+
+.tv-mode .task-day-group.is-today .task-day-title {
+  color: #34d399;
+}
+
+.tv-mode .task-card {
+  background: #0f172a;
+  border-color: #334155;
+}
+
+.tv-mode .task-card.move { background: linear-gradient(135deg, #0f172a, #0c4a6e); border-color: #0284c7; }
+.tv-mode .task-card.harvest { background: linear-gradient(135deg, #0f172a, #064e3b); border-color: #059669; }
+.tv-mode .task-card.plant { background: linear-gradient(135deg, #0f172a, #451a03); border-color: #d97706; }
+.tv-mode .task-card.soak { background: linear-gradient(135deg, #0f172a, #312e81); border-color: #4f46e5; }
+
+.tv-mode .task-content h4 {
+  color: #f8fafc;
+  font-size: 1.4rem;
+}
+
+.tv-mode .task-content p {
+  color: #94a3b8;
+  font-size: 1.1rem;
+}
+
+.tv-mode .climate-widget {
+  background: #1e293b;
+  border-color: #334155;
+}
+
+.tv-mode .climate-widget-header h3 {
+  color: #f8fafc;
+  font-size: 1.5rem;
+}
+
+.tv-mode .climate-input {
+  background: #0f172a;
+  color: #f8fafc;
+  border-color: #475569;
+}

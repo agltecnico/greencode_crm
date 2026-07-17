@@ -352,7 +352,18 @@ export default function Crops() {
       </div>
 
       <div style={{ animation: 'fadeIn 0.3s ease' }}>
-        {activeTab === 'tareas' && <EmployeeTasks />}
+        {activeTab === 'tareas' && (
+          <div>
+            <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '-4rem', position: 'relative', zIndex: 50 }}>
+              <button 
+                onClick={() => window.open('/tv', '_blank')} 
+                style={{ background: '#0ea5e9', color: 'white', border: 'none', padding: '0.75rem 1.5rem', borderRadius: '12px', fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer', boxShadow: '0 4px 12px rgba(14, 165, 233, 0.3)' }}>
+                🖥️ Lanzar en Modo TV
+              </button>
+            </div>
+            <EmployeeTasks />
+          </div>
+        )}
         {activeTab === 'catalogo' && renderCatalogo()}
         {activeTab === 'inventario' && renderInventario()}
         {activeTab === 'lotes' && renderLotes()}

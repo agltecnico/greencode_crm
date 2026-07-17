@@ -8,6 +8,7 @@ import DeliveryNotes from './pages/DeliveryNotes';
 import Invoices from './pages/Invoices';
 import Expenses from './pages/Expenses';
 import Crops from './pages/Crops';
+import TvDashboard from './pages/TvDashboard';
 import DriverView from './pages/DriverView';
 import PublicTicket from './pages/PublicTicket';
 import './App.css';
@@ -27,6 +28,7 @@ function App() {
       </Route>
 
       {/* Rutas sin Layout (Pantalla completa) */}
+      <Route path="/tv" element={<TvDashboard />} />
       <Route path="/repartidor" element={<DriverView />} />
       <Route path="/ticket/:id" element={<PublicTicket />} />
       </Routes>
