@@ -235,51 +235,24 @@ export default function Supplies() {
   );
 
   return (
-    <div className="crops-module" style={{ paddingBottom: '5rem', maxWidth: '1400px', margin: '0 auto', paddingTop: '1rem' }}>
-      <button onClick={() => navigate('/')} style={{ background: 'transparent', border: '1px solid var(--crop-border)', color: 'var(--crop-text-main)', padding: '0.5rem 1rem', borderRadius: '8px', fontWeight: 'bold', cursor: 'pointer', marginBottom: '1rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-        <span>←</span> Volver al Hub
-      </button>
-      
-      <div className="crops-tabs-container">
-        {[
-          { id: 'tareas', label: 'Dashboard de Tareas', icon: '🎯' },
-          { id: 'lotes', label: 'Invernadero Activo', icon: '🪴' },
-          { id: 'cosechas', label: 'Envasado y Sanidad', icon: '🔪' },
-          { id: 'planificador', label: 'Planificador Inverso', icon: '🗓️' },
-          { id: 'inventario', label: 'Compras y Stock', icon: '📦' },
-          { id: 'catalogo', label: 'Catálogo Semillas', icon: '🧬' }
-        ].map(tab => (
-          <button 
-            key={tab.id}
-            onClick={() => setActiveTab(tab.id)}
-            className={`crops-tab \${activeTab === tab.id ? 'active' : ''}`}
-          >
-            <span className="crops-tab-icon">{tab.icon}</span> 
-            {tab.label}
-          </button>
-        ))}
+    <div className="admin-page-container" style={{ padding: '2rem' }}>
+      <div style={{ display: 'flex', gap: '1rem', marginBottom: '2rem' }}>
+        <button 
+            onClick={() => setActiveTab('catalogo')}
+            style={{ padding: '0.75rem 1.5rem', borderRadius: '8px', border: 'none', background: activeTab === 'catalogo' ? '#10b981' : '#e2e8f0', color: activeTab === 'catalogo' ? 'white' : '#64748b', fontWeight: 'bold', cursor: 'pointer' }}>
+            🧬 Catálogo de Variedades
+        </button>
+        <button 
+            onClick={() => setActiveTab('inventario')}
+            style={{ padding: '0.75rem 1.5rem', borderRadius: '8px', border: 'none', background: activeTab === 'inventario' ? '#10b981' : '#e2e8f0', color: activeTab === 'inventario' ? 'white' : '#64748b', fontWeight: 'bold', cursor: 'pointer' }}>
+            📦 Registro de Compras y Stock
+        </button>
       </div>
 
-      <div style={{ animation: 'fadeIn 0.3s ease' }}>
-        {activeTab === 'tareas' && (
-          <div>
-            <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '-4rem', position: 'relative', zIndex: 50 }}>
-              <button 
-                onClick={() => window.open('/tv', '_blank')} 
-                style={{ background: '#0ea5e9', color: 'white', border: 'none', padding: '0.75rem 1.5rem', borderRadius: '12px', fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer', boxShadow: '0 4px 12px rgba(14, 165, 233, 0.3)' }}>
-                🖥️ Lanzar en Modo TV
-              </button>
-            </div>
-            <EmployeeTasks />
-          </div>
-        )}
+      <div className="crops-module" style={{ animation: 'fadeIn 0.3s ease' }}>
         {activeTab === 'catalogo' && renderCatalogo()}
         {activeTab === 'inventario' && renderInventario()}
-        {activeTab === 'lotes' && renderLotes()}
-        {activeTab === 'cosechas' && renderCosechas()}
-        {activeTab === 'planificador' && renderPlanificador()}
       </div>
-      
     </div>
   );
 }
