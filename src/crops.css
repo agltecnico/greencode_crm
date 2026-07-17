@@ -18,9 +18,17 @@
 }
 
 /* Premium Tabs */
+.crops-tabs-container::-webkit-scrollbar {
+  display: none;
+}
+
 .crops-tabs-container {
   display: flex;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
+  overflow-x: auto;
+  overflow-y: hidden;
+  -ms-overflow-style: none;
+  scrollbar-width: none;
   gap: 0.5rem;
   background: var(--crop-surface);
   padding: 0.75rem;
@@ -35,6 +43,8 @@
 
 .crops-tab {
   flex: 1;
+  flex-shrink: 0;
+  white-space: nowrap;
   min-width: fit-content;
   display: flex;
   align-items: center;
