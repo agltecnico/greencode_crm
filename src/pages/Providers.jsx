@@ -5,12 +5,12 @@ import { usePagination } from '../hooks/usePagination';
 export default function Providers() {
   const { providers, addProvider, deleteProvider } = useData();
   const [searchTerm, setSearchTerm] = useState('');
-  const [newProvider, setNewProvider] = useState({ name: '', contactInfo: '' });
+  const [newProvider, setNewProvider] = useState({ name: '', contact: '', phone: '', email: '' });
 
   const handleAdd = e => { 
     e.preventDefault(); 
     addProvider(newProvider); 
-    setNewProvider({name:'', contactInfo:''}); 
+    setNewProvider({name:'', contact:'', phone:'', email:''}); 
   };
 
   const filteredProviders = providers?.filter(p => p.name.toLowerCase().includes(searchTerm.toLowerCase())) || [];
@@ -37,13 +37,21 @@ export default function Providers() {
       <div className="card" style={{ marginBottom: '2rem' }}>
         <h3 className="font-bold mb-4">Añadir Nuevo Proveedor</h3>
         <form onSubmit={handleAdd} style={{ display: 'flex', gap: '1rem', alignItems: 'flex-end', flexWrap: 'wrap' }}>
-          <div style={{ flex: '1 1 250px' }}>
+          <div style={{ flex: '1 1 200px' }}>
             <label className="form-label">Nombre del Proveedor</label>
             <input required type="text" className="form-control" value={newProvider.name} onChange={e => setNewProvider({...newProvider, name: e.target.value})} />
           </div>
-          <div style={{ flex: '1 1 250px' }}>
-            <label className="form-label">Contacto (Email / Tel)</label>
-            <input type="text" className="form-control" value={newProvider.contactInfo} onChange={e => setNewProvider({...newProvider, contactInfo: e.target.value})} />
+          <div style={{ flex: '1 1 200px' }}>
+            <label className="form-label">Persona de Contacto</label>
+            <input type="text" className="form-control" value={newProvider.contact} onChange={e => setNewProvider({...newProvider, contact: e.target.value})} />
+          </div>
+          <div style={{ flex: '1 1 150px' }}>
+            <label className="form-label">Teléfono</label>
+            <input type="text" className="form-control" value={newProvider.phone} onChange={e => setNewProvider({...newProvider, phone: e.target.value})} />
+          </div>
+          <div style={{ flex: '1 1 200px' }}>
+            <label className="form-label">Email</label>
+            <input type="email" className="form-control" value={newProvider.email} onChange={e => setNewProvider({...newProvider, email: e.target.value})} />
           </div>
           <button type="submit" className="btn btn-primary" style={{ height: '42px' }}>Guardar Proveedor</button>
         </form>
@@ -54,7 +62,9 @@ export default function Providers() {
           <thead>
             <tr>
               <th>Nombre del Proveedor</th>
-              <th>Información de Contacto</th>
+              <th>Contacto</th>
+              <th>Teléfono</th>
+              <th>Email</th>
               <th>Acciones</th>
             </tr>
           </thead>
@@ -62,14 +72,16 @@ export default function Providers() {
             {currentData.map(p => (
               <tr key={p.id}>
                 <td className="font-bold">{p.name}</td>
-                <td>{p.contactInfo || '-'}</td>
+                <td>{p.contact || '-'}</td>
+                <td>{p.phone || '-'}</td>
+                <td>{p.email || '-'}</td>
                 <td>
                   <button className="btn btn-danger" style={{ padding: '0.3rem 0.6rem', fontSize: '0.8rem', background: 'transparent', color: '#ef4444', border: '1px solid #ef4444' }} onClick={() => deleteProvider(p.id)}>Borrar</button>
                 </td>
               </tr>
             ))}
             {currentData.length === 0 && (
-              <tr><td colSpan="3" style={{ textAlign: 'center', padding: '3rem', color: '#94a3b8' }}>No hay proveedores registrados.</td></tr>
+              <tr><td colSpan="5" style={{ textAlign: 'center', padding: '3rem', color: '#94a3b8' }}>No hay proveedores registrados.</td></tr>
             )}
           </tbody>
         </table>
