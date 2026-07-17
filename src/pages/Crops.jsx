@@ -350,6 +350,14 @@ export default function Crops() {
             <p style={{ fontSize: '1rem' }}>Rutinas automáticas</p>
           </div>
         </button>
+
+        <button onClick={() => setActiveTab('historial')} className="hub-card" style={{ border: 'none', width: '100%' }}>
+          <div className="hub-card-icon" style={{ fontSize: '3.5rem' }}>📖</div>
+          <div className="hub-card-text">
+            <h2 style={{ fontSize: '1.5rem' }}>Historial</h2>
+            <p style={{ fontSize: '1rem' }}>Registros pasados</p>
+          </div>
+        </button>
       </div>
     </div>
   );
@@ -469,6 +477,7 @@ export default function Crops() {
         {activeTab === 'lotes' && renderLotes()}
         {activeTab === 'cosechas' && renderCosechas()}
         {activeTab === 'planificador' && renderPlanificador()}
+        {activeTab === 'historial' && renderHistorial()}
         {activeTab === 'pedidos' && renderPedidos()}
       </div>
       
