@@ -126,6 +126,20 @@ export default function Supplies() {
   const containers = articles?.filter(a => a.type === 'ENVASE') || [];
   const selectedArticleType = newStockEntry.articleId ? articles?.find(a => a.id === newStockEntry.articleId)?.type : null;
 
+  const getLiveCosts = (formData) => {
+    if (!formData) return { totalTray: 0, perKg: 0 };
+    const sCost = getAverageUnitCost(formData.seedId, formData.providerId) * Number(formData.seedGrams || 0);
+    const subCost = getAverageUnitCost(formData.substrateId, formData.providerId) * Number(formData.substrateLiters || 0);
+    const cCost = getAverageUnitCost(formData.containerId, formData.providerId) * 1;
+    const totalTray = sCost + subCost + cCost;
+    const expKg = Number(formData.expectedYieldGrams || 0) / 1000;
+    const perKg = expKg > 0 ? totalTray / expKg : 0;
+    return { totalTray, perKg };
+  };
+
+  const newTypeCosts = getLiveCosts(newType);
+  const editTypeCosts = getLiveCosts(editedCropType);
+
   // Modal Styles
   const modalOverlayStyle = { position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 50 };
   const modalCardStyle = { width: '100%', maxWidth: '700px', margin: '20px', maxHeight: '90vh', overflowY: 'auto', backgroundColor: '#fff', padding: '2rem', borderRadius: '8px', border: '1px solid var(--color-border)' };
@@ -428,6 +442,18 @@ export default function Supplies() {
                             <input type="number" step="1" min="0" className="form-control" value={editedCropType.expectedYieldGrams} onChange={e => setEditedCropType({...editedCropType, expectedYieldGrams: Number(e.target.value)})} />
                           </div>
                         </div>
+
+                        <div style={{ marginTop: '1rem', padding: '1rem', background: '#fff', borderRadius: '6px', border: '1px solid #cbd5e1', display: 'flex', justifyContent: 'space-around' }}>
+                          <div style={{ textAlign: 'center' }}>
+                            <p className="text-muted" style={{ fontSize: '0.8rem', margin: 0 }}>Coste por Bandeja</p>
+                            <p className="font-bold text-amber-600 text-xl" style={{ margin: 0 }}>{editTypeCosts.totalTray.toFixed(2)} €</p>
+                          </div>
+                          <div style={{ textAlign: 'center' }}>
+                            <p className="text-muted" style={{ fontSize: '0.8rem', margin: 0 }}>Coste por Kg</p>
+                            <p className="font-bold text-emerald-600 text-xl" style={{ margin: 0 }}>{editTypeCosts.perKg > 0 ? editTypeCosts.perKg.toFixed(2) : '-'} €</p>
+                          </div>
+                        </div>
+
                         <div style={{ marginTop: '1rem', display: 'flex', gap: '0.5rem', justifyContent: 'flex-end' }}>
                           <button className="btn btn-primary" onClick={() => { updateCropType(c.id, editedCropType); setEditingCropTypeId(null); }}>Guardar Ficha</button>
                           <button className="btn btn-secondary" onClick={() => setEditingCropTypeId(null)}>Cancelar</button>
@@ -625,6 +651,17 @@ export default function Supplies() {
                 <div>
                   <label className="form-label">⚖️ Rendimiento Esperado (Gramos por Bandeja)</label>
                   <input required type="number" step="1" min="0" className="form-control" value={newType.expectedYieldGrams} onChange={e => setNewType({...newType, expectedYieldGrams: Number(e.target.value)})} />
+                </div>
+              </div>
+
+              <div style={{ gridColumn: 'span 2', padding: '1.25rem', background: '#f8fafc', borderRadius: '8px', border: '1px solid #e2e8f0', display: 'flex', justifyContent: 'space-around' }}>
+                <div style={{ textAlign: 'center' }}>
+                  <p className="text-muted" style={{ fontSize: '0.9rem', margin: 0 }}>Coste Directo por Bandeja</p>
+                  <p className="font-bold text-amber-600 text-2xl" style={{ margin: 0 }}>{newTypeCosts.totalTray.toFixed(2)} €</p>
+                </div>
+                <div style={{ textAlign: 'center' }}>
+                  <p className="text-muted" style={{ fontSize: '0.9rem', margin: 0 }}>Coste de Producción por Kg</p>
+                  <p className="font-bold text-emerald-600 text-2xl" style={{ margin: 0 }}>{newTypeCosts.perKg > 0 ? newTypeCosts.perKg.toFixed(2) : '-'} €</p>
                 </div>
               </div>
 
