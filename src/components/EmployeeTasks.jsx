@@ -3,7 +3,7 @@ import { useData } from '../context/DataContext';
 import '../crops.css';
 
 export default function EmployeeTasks() {
-  const { harvestTargets, crops, seeds, products, dailyLogs, addDailyLog } = useData();
+  const { harvestTargets, crops, seeds, cropTypes, dailyLogs, addDailyLog } = useData();
   const [timeFilter, setTimeFilter] = useState(1);
 
   const activeCrops = crops?.filter(c => c.status !== 'HARVESTED' && c.status !== 'DISCARDED') || [];
@@ -74,45 +74,37 @@ export default function EmployeeTasks() {
       }
     });
 
-    harvestTargets?.forEach(target => {
-      const product = products?.find(p => p.id === target.productId);
-      if(!product) return;
+    harvestTargets?.forEach(routine => {
+      // En el planificador directo, productId guarda el cropTypeId
+      const cType = cropTypes?.find(ct => ct.id === routine.productId);
+      if(!cType) return;
+      const seed = seeds?.find(s => s.id === cType.seedId);
+      if(!seed) return;
 
-      const recipeSeedsList = product.recipeSeeds?.length > 0 ? product.recipeSeeds : [{ seedId: target.productId }];
+      if(routine.targetDayOfWeek === targetDayOfWeek) {
+        tasksForDate.push({
+          type: 'plant',
+          title: `Plantar ${cType.name}`,
+          desc: `Rutina semanal: ${routine.tuppersCount} bandejas`,
+          icon: '🪴',
+          className: 'plant'
+        });
+      }
       
-      recipeSeedsList.forEach(rs => {
-        const seed = seeds?.find(s => s.id === rs.seedId);
-        if(!seed) return;
-
-        const totalCycleDays = (seed.soakingHours > 0 ? 1 : 0) + Number(seed.germinationDays) + Number(seed.darknessDays) + Number(seed.lightDays);
+      if(seed.soakingHours > 0) {
+        let soakingDay = routine.targetDayOfWeek - 1;
+        if(soakingDay < 0) soakingDay += 7;
         
-        let plantingDay = target.targetDayOfWeek - totalCycleDays;
-        while(plantingDay < 0) plantingDay += 7;
-
-        if(plantingDay === targetDayOfWeek) {
+        if(soakingDay === targetDayOfWeek) {
           tasksForDate.push({
-            type: 'plant',
-            title: `Plantar ${seed.name}`,
-            desc: `Para el objetivo de ${product.name} (Cosecha: Día ${target.targetDayOfWeek})`,
-            icon: '🪴',
-            className: 'plant'
+            type: 'soak',
+            title: `Poner a remojo ${seed.name}`,
+            desc: `${seed.soakingHours}h de remojo para las ${routine.tuppersCount} bandejas de mañana.`,
+            icon: '💧',
+            className: 'soak'
           });
         }
-        
-        if(seed.soakingHours > 0) {
-          let soakingDay = plantingDay - 1;
-          if(soakingDay < 0) soakingDay += 7;
-          if(soakingDay === targetDayOfWeek) {
-            tasksForDate.push({
-              type: 'soak',
-              title: `Poner a remojo ${seed.name}`,
-              desc: `${seed.soakingHours}h requeridas. Plantar al día siguiente.`,
-              icon: '💧',
-              className: 'soak'
-            });
-          }
-        }
-      });
+      }
     });
 
     if (tasksForDate.length > 0 || isToday) {

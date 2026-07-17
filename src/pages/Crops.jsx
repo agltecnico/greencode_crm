@@ -27,7 +27,7 @@ export default function Crops() {
   const [isHarvestModalOpen, setIsHarvestModalOpen] = useState(false);
 
   const [newCrop, setNewCrop] = useState({ cropTypeId: '', traysCount: 1, selectedSeedBatchId: '' });
-  const [newTarget, setNewTarget] = useState({ targetDayOfWeek: 1, productId: '', tuppersCount: 10 });
+  const [newTarget, setNewTarget] = useState({ targetDayOfWeek: 1, productId: '', tuppersCount: 1 });
   const [newHarvest, setNewHarvest] = useState({ productId: '', tuppersCount: 1, selectedCropIds: [] });
 
   // Computed properties for seed availability
@@ -576,19 +576,17 @@ export default function Crops() {
   const renderPlanificador = () => (
     <div>
       <div style={{ background: 'linear-gradient(135deg, #f0fdf4, #ccfbf1)', border: '1px solid #99f6e4', padding: '2rem', borderRadius: '20px', marginBottom: '2rem' }}>
-        <h2 style={{ margin: '0 0 0.5rem 0', fontSize: '1.8rem', fontWeight: 900, color: '#065f46' }}>Planificador Inverso Automático</h2>
+        <h2 style={{ margin: '0 0 0.5rem 0', fontSize: '1.8rem', fontWeight: 900, color: '#065f46' }}>Planificador Semanal de Siembra</h2>
         <p style={{ margin: 0, color: '#047857', fontSize: '1.1rem', fontWeight: 500, lineHeight: 1.5 }}>
-          Dinos qué producto final quieres envasar y qué día de la semana. El sistema calculará automáticamente 
-          qué día hay que plantar cada semilla basándose en su receta, y colocará las tareas correspondientes 
-          en el Dashboard para que no tengas que pensar en fechas.
+          Define qué variedades vas a sembrar cada día de la semana para mantener tu ritmo de producción. El sistema generará automáticamente las tareas de Siembra y te avisará un día antes si la semilla requiere remojo.
         </p>
       </div>
 
       <div className="premium-card" style={{ marginBottom: '2rem' }}>
         <form onSubmit={handleAddHarvestTarget} style={{ display: 'flex', gap: '1rem', alignItems: 'flex-end', flexWrap: 'wrap' }}>
           <div style={{ flex: '1', minWidth: '200px' }}>
-            <label className="premium-label">Día de Cosecha Objetivo</label>
-            <select className="premium-input" value={newTarget.targetDayOfWeek} onChange={e=>setNewTarget({...newTarget, targetDayOfWeek: e.target.value})}>
+            <label className="premium-label">Día de Siembra</label>
+            <select className="premium-input" value={newTarget.targetDayOfWeek} onChange={e=>setNewTarget({...newTarget, targetDayOfWeek: Number(e.target.value)})}>
               <option value="1">Lunes</option>
               <option value="2">Martes</option>
               <option value="3">Miércoles</option>
@@ -599,39 +597,42 @@ export default function Crops() {
             </select>
           </div>
           <div style={{ flex: '2', minWidth: '250px' }}>
-            <label className="premium-label">Producto a Envasar</label>
+            <label className="premium-label">Variedad a Cultivar</label>
             <select className="premium-input" required value={newTarget.productId} onChange={e=>setNewTarget({...newTarget, productId: e.target.value})}>
-              <option value="">-- Seleccionar --</option>
-              {products?.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+              <option value="">-- Seleccionar Variedad --</option>
+              {cropTypes?.map(ct => <option key={ct.id} value={ct.id}>{ct.name}</option>)}
             </select>
           </div>
           <div style={{ flex: '1', minWidth: '150px' }}>
-            <label className="premium-label">Tuppers Deseados</label>
-            <input type="number" className="premium-input" required min="1" value={newTarget.tuppersCount} onChange={e=>setNewTarget({...newTarget, tuppersCount: e.target.value})}/>
+            <label className="premium-label">Cantidad de Bandejas</label>
+            <input type="number" className="premium-input" required min="1" value={newTarget.tuppersCount} onChange={e=>setNewTarget({...newTarget, tuppersCount: Number(e.target.value)})}/>
           </div>
-          <button type="submit" className="climate-btn" style={{ margin: 0, width: 'auto', minWidth: '150px' }}>Crear Rutina</button>
+          <button type="submit" className="climate-btn" style={{ margin: 0, width: 'auto', minWidth: '150px' }}>Añadir a Rutina</button>
         </form>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', gap: '1.5rem' }}>
         {harvestTargets?.map(ht => {
-          const product = products?.find(p => p.id === ht.productId);
+          const cType = cropTypes?.find(c => c.id === ht.productId);
           const days = ['Domingo','Lunes','Martes','Miércoles','Jueves','Viernes','Sábado'];
           return (
             <div key={ht.id} style={{ background: 'white', border: '1px solid #e2e8f0', borderRadius: '16px', padding: '1.5rem', position: 'relative', overflow: 'hidden', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.05)' }}>
               <div style={{ position: 'absolute', top: 0, left: 0, width: '4px', height: '100%', background: 'var(--crop-primary)' }}></div>
               <button onClick={() => deleteHarvestTarget(ht.id)} style={{ position: 'absolute', top: '1rem', right: '1rem', background: 'none', border: 'none', color: '#94a3b8', cursor: 'pointer', fontSize: '1rem' }}>✖</button>
-              <h4 style={{ margin: '0 0 1rem 0', fontSize: '1.1rem', fontWeight: 900, color: '#1e293b', paddingRight: '1rem' }}>{product?.name || 'Producto Eliminado'}</h4>
+              <h4 style={{ margin: '0 0 1rem 0', fontSize: '1.1rem', fontWeight: 900, color: '#1e293b', paddingRight: '1rem' }}>{cType?.name || 'Variedad Eliminada'}</h4>
               <div style={{ display: 'flex', alignItems: 'baseline', gap: '0.5rem', marginBottom: '1rem' }}>
                 <span style={{ fontSize: '2.5rem', fontWeight: 900, color: 'var(--crop-primary)', lineHeight: 1 }}>{ht.tuppersCount}</span>
-                <span style={{ fontSize: '0.85rem', fontWeight: 'bold', color: '#64748b' }}>tuppers</span>
+                <span style={{ fontSize: '0.85rem', fontWeight: 'bold', color: '#64748b' }}>bandejas</span>
               </div>
               <div style={{ display: 'inline-block', padding: '4px 12px', background: '#ecfdf5', color: '#059669', borderRadius: '8px', fontSize: '0.8rem', fontWeight: 'bold' }}>
-                Todos los {days[ht.targetDayOfWeek]}
+                Sembramos en: {days[ht.targetDayOfWeek]}
               </div>
             </div>
           )
         })}
+        {(!harvestTargets || harvestTargets.length === 0) && (
+          <p style={{ gridColumn: '1 / -1', textAlign: 'center', color: '#64748b', padding: '2rem' }}>No has configurado ninguna rutina de siembra semanal.</p>
+        )}
       </div>
     </div>
   );
