@@ -74,7 +74,8 @@ export default function Crops() {
       'HARVESTED': 'Cosechado',
       'DISCARDED': 'Descartado'
     };
-    return statusMap[status] || status;
+    const normalized = (status || '').toUpperCase();
+    return statusMap[normalized] || status;
   };
 
   const renderLotes = () => {

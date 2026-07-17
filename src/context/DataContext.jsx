@@ -327,6 +327,23 @@ export const DataProvider = ({ children }) => {
     await supabase.from('crops').delete().eq('id', id);
   };
 
+  const advanceCropStatus = async (crop) => {
+    const sequence = ['SOAKING', 'GERMINATING', 'GROWING', 'HARVESTED'];
+    const currentIdx = sequence.indexOf(crop.status ? crop.status.toUpperCase() : 'SOWED');
+    if (currentIdx === -1) {
+      // If it's SOWED, advance to GERMINATING
+      await updateCrop(crop.id, { status: 'GERMINATING' });
+    } else if (currentIdx < sequence.length - 1) {
+      await updateCrop(crop.id, { status: sequence[currentIdx + 1] });
+    }
+  };
+
+  const discardCrop = async (crop) => {
+    if (window.confirm("¿Seguro que quieres descartar esta bandeja por completo?")) {
+      await updateCrop(crop.id, { status: 'DISCARDED' });
+    }
+  };
+
   // HarvestTarget
   const addHarvestTarget = async (item) => {
     const tempId = Date.now().toString();
@@ -696,8 +713,8 @@ export const DataProvider = ({ children }) => {
         cropTypes, addCropType, updateCropType, deleteCropType,
         seeds, addSeed, updateSeed, deleteSeed,
         seedInventory, addSeedInventory, updateSeedInventory, deleteSeedInventory,
-      crops, addCrop, sowCrop, updateCrop, deleteCrop,
-      harvestTargets, addHarvestTarget, updateHarvestTarget, deleteHarvestTarget,
+        crops, addCrop, sowCrop, updateCrop, deleteCrop, advanceCropStatus, discardCrop,
+        harvestTargets, addHarvestTarget, updateHarvestTarget, deleteHarvestTarget,
       harvests, addHarvest, updateHarvest, deleteHarvest,
       dailyLogs, addDailyLog, updateDailyLog, deleteDailyLog,
 
