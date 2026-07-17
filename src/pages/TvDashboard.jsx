@@ -5,7 +5,7 @@ import '../crops.css';
 
 export default function TvDashboard() {
   const [tvTab, setTvTab] = useState('tasks');
-  const { crops, seeds, advanceCropStatus, refreshData } = useData();
+  const { crops, seeds, advanceCropStatus, refreshData, orders, clients } = useData();
 
   useEffect(() => {
     // Auto-refresh data every 30 seconds for TV Mode
@@ -16,10 +16,22 @@ export default function TvDashboard() {
   }, [refreshData]);
 
 
+
+  useEffect(() => {
+    const tabs = ['tasks', 'greenhouse', 'orders'];
+    const rotateInterval = setInterval(() => {
+      setTvTab(prev => {
+        const nextIndex = (tabs.indexOf(prev) + 1) % tabs.length;
+        return tabs[nextIndex];
+      });
+    }, 15000); // Rotate every 15 seconds
+    return () => clearInterval(rotateInterval);
+  }, []);
+
   const activeCropsList = crops?.filter(c => c.status !== 'HARVESTED' && c.status !== 'DISCARDED') || [];
 
   return (
-    <div className="tv-mode">
+    <div className="tv-mode" style={{ minHeight: "100vh" }}>
       <div style={{ display: 'flex', gap: '1rem', marginBottom: '3rem', justifyContent: 'center' }}>
         <button 
           onClick={() => setTvTab('tasks')}
@@ -54,6 +66,24 @@ export default function TvDashboard() {
             boxShadow: tvTab === 'greenhouse' ? '0 10px 25px rgba(52, 211, 153, 0.3)' : 'none'
           }}>
           🪴 INVERNADERO ACTIVO
+        </button>
+
+        <button 
+          onClick={() => setTvTab('orders')}
+          style={{
+            background: tvTab === 'orders' ? 'linear-gradient(135deg, #34d399, #0ea5e9)' : '#1e293b',
+            color: tvTab === 'orders' ? 'white' : '#94a3b8',
+            border: '2px solid',
+            borderColor: tvTab === 'orders' ? 'transparent' : '#334155',
+            padding: '1rem 3rem',
+            fontSize: '1.5rem',
+            fontWeight: '900',
+            borderRadius: '16px',
+            cursor: 'pointer',
+            transition: 'all 0.3s ease',
+            boxShadow: tvTab === 'orders' ? '0 10px 25px rgba(52, 211, 153, 0.3)' : 'none'
+          }}>
+          📦 ESTADO PEDIDOS
         </button>
       </div>
 
