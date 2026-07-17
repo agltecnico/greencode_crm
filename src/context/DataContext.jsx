@@ -140,42 +140,91 @@ export const DataProvider = ({ children }) => {
     await supabase.from('providers').delete().eq('id', id);
   };
 
-  // Seed
-  const addSeed = async (item) => {
-    const tempId = Date.now().toString();
-    const newItem = { ...item, id: tempId };
-    setSeeds(prev => [...prev, newItem]);
-    const { data, error } = await supabase.from('seeds').insert([newItem]).select();
-    if (!error && data) setSeeds(prev => prev.map(i => i.id === tempId ? data[0] : i));
-    return tempId;
-  };
-  const updateSeed = async (id, updatedFields) => {
-    setSeeds(prev => prev.map(i => i.id === id ? { ...i, ...updatedFields } : i));
-    await supabase.from('seeds').update(updatedFields).eq('id', id);
-  };
-  const deleteSeed = async (id) => {
-    setSeeds(prev => prev.filter(i => i.id !== id));
-    await supabase.from('seeds').delete().eq('id', id);
-  };
+  // Unified Articles and Stock Entries
+    const addArticle = async (article) => {
+      const tempId = Date.now().toString();
+      const newItem = { ...article, id: tempId };
+      setArticles(prev => [...prev, newItem]);
+      const { data, error } = await supabase.from('articles').insert([newItem]).select();
+      if (!error && data) setArticles(prev => prev.map(i => i.id === tempId ? data[0] : i));
+      return tempId;
+    };
+    const updateArticle = async (id, updatedFields) => {
+      setArticles(prev => prev.map(i => i.id === id ? { ...i, ...updatedFields } : i));
+      await supabase.from('articles').update(updatedFields).eq('id', id);
+    };
+    const deleteArticle = async (id) => {
+      setArticles(prev => prev.filter(i => i.id !== id));
+      await supabase.from('articles').delete().eq('id', id);
+    };
 
-  // SeedInventory
-  const addSeedInventory = async (item) => {
-    const tempId = Date.now().toString();
-    const newItem = { ...item, id: tempId };
-    setSeedInventory(prev => [...prev, newItem]);
-    const { data, error } = await supabase.from('seed_inventory').insert([newItem]).select();
-    if (!error && data) setSeedInventory(prev => prev.map(i => i.id === tempId ? data[0] : i));
-    return tempId;
-  };
-  const updateSeedInventory = async (id, updatedFields) => {
-    setSeedInventory(prev => prev.map(i => i.id === id ? { ...i, ...updatedFields } : i));
-    await supabase.from('seed_inventory').update(updatedFields).eq('id', id);
-  };
-  const deleteSeedInventory = async (id) => {
-    setSeedInventory(prev => prev.filter(i => i.id !== id));
-    await supabase.from('seed_inventory').delete().eq('id', id);
-  };
+    const addStockEntry = async (entry) => {
+      const tempId = Date.now().toString();
+      const newItem = { ...entry, id: tempId };
+      setStockEntries(prev => [...prev, newItem]);
+      const { data, error } = await supabase.from('stock_entries').insert([newItem]).select();
+      if (!error && data) setStockEntries(prev => prev.map(i => i.id === tempId ? data[0] : i));
+      return tempId;
+    };
+    const updateStockEntry = async (id, updatedFields) => {
+      setStockEntries(prev => prev.map(i => i.id === id ? { ...i, ...updatedFields } : i));
+      await supabase.from('stock_entries').update(updatedFields).eq('id', id);
+    };
+    const deleteStockEntry = async (id) => {
+      setStockEntries(prev => prev.filter(i => i.id !== id));
+      await supabase.from('stock_entries').delete().eq('id', id);
+    };
 
+    // Derived Aliases for backwards compatibility in other files
+    const seeds = articles.filter(a => a.type === 'SEMILLA');
+    const substrates = articles.filter(a => a.type === 'SUSTRATO');
+    
+    // Seed inventory expects { seedId, weightGrams, providerBatch, purchaseDate }
+    const seedInventory = stockEntries
+      .filter(e => articles.find(a => a.id === e.articleId)?.type === 'SEMILLA')
+      .map(e => ({
+        ...e,
+        seedId: e.articleId,
+        weightGrams: e.quantity,
+        providerBatch: e.batchNumber
+      }));
+      
+    // Substrate inventory
+    const substrateInventory = stockEntries
+      .filter(e => articles.find(a => a.id === e.articleId)?.type === 'SUSTRATO')
+      .map(e => ({
+        ...e,
+        substrateId: e.articleId
+      }));
+
+    const addSeed = (seed) => addArticle({ ...seed, type: 'SEMILLA' });
+    const updateSeed = updateArticle;
+    const deleteSeed = deleteArticle;
+    
+    const addSubstrate = (sub) => addArticle({ ...sub, type: 'SUSTRATO' });
+    const deleteSubstrate = deleteArticle;
+
+    const addSeedInventory = (inv) => addStockEntry({
+      articleId: inv.seedId,
+      quantity: inv.weightGrams || inv.quantity,
+      batchNumber: inv.providerBatch || inv.batchNumber,
+      purchaseDate: inv.purchaseDate,
+      deliveryNote: inv.deliveryNote,
+      price: inv.price || 0
+    });
+    const updateSeedInventory = updateStockEntry;
+    const deleteSeedInventory = deleteStockEntry;
+
+    const addSubstrateInventory = (inv) => addStockEntry({
+      articleId: inv.substrateId,
+      quantity: inv.quantity,
+      batchNumber: inv.batchNumber,
+      purchaseDate: inv.purchaseDate,
+      deliveryNote: inv.deliveryNote,
+      price: inv.price || 0
+    });
+    const deleteSubstrateInventory = deleteStockEntry;
+  
   // Crop
   const addCrop = async (item) => {
     const tempId = Date.now().toString();
@@ -559,9 +608,9 @@ export const DataProvider = ({ children }) => {
       companyProfile, updateCompanyProfile, companyLogo, updateCompanyLogo,
 
       providers, addProvider, updateProvider, deleteProvider,
-      seeds, addSeed, updateSeed, deleteSeed,
-      seedInventory, addSeedInventory, updateSeedInventory, deleteSeedInventory,
-        articles, stockEntries, addArticle, deleteArticle, addStockEntry, deleteStockEntry,
+        articles, stockEntries, addArticle, updateArticle, deleteArticle, addStockEntry, updateStockEntry, deleteStockEntry,
+        seeds, addSeed, updateSeed, deleteSeed,
+        seedInventory, addSeedInventory, updateSeedInventory, deleteSeedInventory,
       crops, addCrop, updateCrop, deleteCrop,
       harvestTargets, addHarvestTarget, updateHarvestTarget, deleteHarvestTarget,
       harvests, addHarvest, updateHarvest, deleteHarvest,
