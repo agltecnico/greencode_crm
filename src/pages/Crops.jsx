@@ -36,8 +36,13 @@ export default function Crops() {
       if (selectedCropType) {
         const requiredGrams = (selectedCropType.seedGrams || 0) * newCrop.traysCount;
         const remainingSeed = totalAvailableSeed - requiredGrams;
-        const seedArticle = articles?.find(a => a.id === selectedCropType.seedId);
         
+        if (remainingSeed < 0) {
+          alert(`⛔ Stock insuficiente: Necesitas ${requiredGrams}g pero solo tienes ${totalAvailableSeed}g en el inventario. Registra una entrada de almacén primero.`);
+          return;
+        }
+
+        const seedArticle = articles?.find(a => a.id === selectedCropType.seedId);
         if (seedArticle && seedArticle.minStock > 0 && remainingSeed <= seedArticle.minStock) {
           alert(`¡Atención! Con esta siembra el stock de la semilla "${seedArticle.name}" bajará o ya está por debajo del límite de seguridad (${seedArticle.minStock}g). Recuerda pedir más a tu proveedor.`);
         }
