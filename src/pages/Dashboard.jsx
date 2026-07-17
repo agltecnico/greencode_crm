@@ -4,7 +4,8 @@ import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContaine
 
 export default function Dashboard() {
   const { companyProfile, updateCompanyProfile, companyLogo, updateCompanyLogo, clients, orders, deliveryNotes, invoices,
-      expenses, products, importData } = useData();
+      expenses, products, importData, articles, stockEntries } = useData();
+  const lowStockAlerts = (articles || []).filter(a => ['SEMILLA', 'SUSTRATO', 'ENVASE', 'OTRO'].includes(a.type)).map(a => { const currentStock = (stockEntries || []).filter(e => e.articleId === a.id).reduce((acc, curr) => acc + Number(curr.quantity || 0), 0); return { ...a, currentStock }; }).filter(a => a.minStock > 0 && a.currentStock <= a.minStock);
   const [drillLevel, setDrillLevel] = useState('YEARS');
   const [drillYear, setDrillYear] = useState(null);
   const [drillMonth, setDrillMonth] = useState(null);
@@ -285,6 +286,20 @@ export default function Dashboard() {
 
   return (
     <div>
+      {lowStockAlerts.length > 0 && (
+        <div className="mb-6 p-4 rounded-lg bg-red-50 border-l-4 border-red-500 shadow-sm">
+          <h3 className="text-red-800 font-bold flex items-center gap-2 mb-2">
+            <span className="text-xl">⚠️</span> Alertas de Stock Bajo
+          </h3>
+          <ul className="list-disc pl-8">
+            {lowStockAlerts.map(a => (
+              <li key={a.id} className="text-red-700">
+                <strong>{a.name}</strong>: Quedan <strong>{a.currentStock}</strong> (Mínimo: {a.minStock}). <span className="text-sm opacity-80">Por favor, repón stock lo antes posible.</span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
       <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'space-between', alignItems: 'center', gap: '16px', marginBottom: '1.5rem' }}>
         <h2 className="text-2xl font-bold">Panel Principal</h2>
         <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '12px', backgroundColor: 'white', padding: '12px 16px', borderRadius: '12px', boxShadow: '0 4px 15px rgba(0,0,0,0.03)', border: '1px solid #f3f4f6' }}>

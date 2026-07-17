@@ -19,7 +19,7 @@ export default function Supplies() {
   const [expProvider, setExpProvider] = useState('');
 
   // Forms State
-  const [newArticle, setNewArticle] = useState({ name: '', type: 'SEMILLA' });
+  const [newArticle, setNewArticle] = useState({ name: '', type: 'SEMILLA', minStock: 0 });
   const [editingArticleId, setEditingArticleId] = useState(null);
   const [editedArticle, setEditedArticle] = useState(null);
   const [editingCropTypeId, setEditingCropTypeId] = useState(null);
@@ -39,7 +39,7 @@ export default function Supplies() {
   const handleAddArticle = e => { 
     e.preventDefault(); 
     addArticle(newArticle); 
-    setNewArticle({name:'', type:'SEMILLA'}); 
+    setNewArticle({name:'', type:'SEMILLA', minStock: 0}); 
     setShowArticleModal(false);
   };
   
@@ -254,10 +254,11 @@ export default function Supplies() {
           <div className="table-container">
             <table className="admin-table">
               <thead>
-                <tr>
-                  <th>Tipo</th>
-                  <th>Nombre del Artículo</th>
-                  <th>Acciones</th>
+                <tr style={{ borderBottom: '2px solid var(--color-border)', color: '#64748b', textAlign: 'left' }}>
+                  <th className="font-bold text-slate-700 pb-3 border-b">Tipo</th>
+                  <th className="font-bold text-slate-700 pb-3 border-b">Artículo</th>
+                  <th className="font-bold text-slate-700 pb-3 border-b">Stock Mínimo</th>
+                  <th className="font-bold text-slate-700 pb-3 border-b text-right">Acciones</th>
                 </tr>
               </thead>
               <tbody>
@@ -267,12 +268,12 @@ export default function Supplies() {
                       <td>
                         <select className="form-control" value={editedArticle.type} onChange={e => setEditedArticle({...editedArticle, type: e.target.value})}>
                           <option value="SEMILLA">🌱 Semilla (Stock y Gasto)</option>
-                          <option value="SUSTRATO">🪨 Sustrato (Stock y Gasto)</option>
+                          <option value="SUSTRATO">🟤 Sustrato (Stock y Gasto)</option>
                           <option value="ENVASE">📦 Envase / Bandeja (Stock y Gasto)</option>
-                          <option value="OTRO">🏷️ Consumible (Stock y Gasto)</option>
+                          <option value="OTRO">❓ Consumible (Stock y Gasto)</option>
                           <optgroup label="Gastos (Sin Stock)">
-                            <option value="GASTO_FIJO">💸 Gasto Fijo General</option>
-                            <option value="SUMINISTROS">⚡ Suministros (Luz, Agua, etc)</option>
+                            <option value="GASTO_FIJO">🏢 Gasto Fijo General</option>
+                            <option value="SUMINISTROS">💧 Suministros (Luz, Agua, etc)</option>
                             <option value="MANTENIMIENTO">🔧 Reparaciones / Mantenimiento</option>
                             <option value="MARKETING">📢 Publicidad y Software</option>
                             <option value="NOMINAS">👥 Nóminas y Seguros Sociales</option>
@@ -283,7 +284,14 @@ export default function Supplies() {
                         <input type="text" className="form-control" value={editedArticle.name} onChange={e => setEditedArticle({...editedArticle, name: e.target.value})} />
                       </td>
                       <td>
-                        <div style={{ display: 'flex', gap: '0.5rem' }}>
+                        {['SEMILLA', 'SUSTRATO', 'ENVASE', 'OTRO'].includes(editedArticle.type) ? (
+                          <input type="number" min="0" className="form-control w-24" value={editedArticle.minStock || 0} onChange={e => setEditedArticle({...editedArticle, minStock: parseFloat(e.target.value) || 0})} />
+                        ) : (
+                          <span className="text-gray-400">-</span>
+                        )}
+                      </td>
+                      <td>
+                        <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'flex-end' }}>
                           <button className="btn btn-primary" style={{ padding: '0.3rem 0.6rem', fontSize: '0.8rem' }} onClick={() => { updateArticle(a.id, editedArticle); setEditingArticleId(null); }}>Guardar</button>
                           <button className="btn btn-secondary" style={{ padding: '0.3rem 0.6rem', fontSize: '0.8rem', background: 'transparent' }} onClick={() => setEditingArticleId(null)}>Cancelar</button>
                         </div>
@@ -293,8 +301,9 @@ export default function Supplies() {
                     <tr key={a.id}>
                       <td className="font-medium text-slate-500">{getTypeLabel(a.type)}</td>
                       <td className="font-bold text-slate-800">{a.name}</td>
+                      <td className="font-mono text-slate-600">{['SEMILLA', 'SUSTRATO', 'ENVASE', 'OTRO'].includes(a.type) ? (a.minStock || 0) : '-'}</td>
                       <td>
-                        <div style={{ display: 'flex', gap: '0.5rem' }}>
+                        <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'flex-end' }}>
                           <button className="btn btn-secondary" style={{ padding: '0.3rem 0.6rem', fontSize: '0.8rem', background: 'transparent' }} onClick={() => { setEditingArticleId(a.id); setEditedArticle(a); }}>Editar</button>
                           <button className="btn btn-danger" style={{ padding: '0.3rem 0.6rem', fontSize: '0.8rem', background: 'transparent', color: '#ef4444', border: '1px solid #ef4444' }} onClick={() => deleteArticle(a.id)}>Borrar</button>
                         </div>
@@ -622,6 +631,12 @@ export default function Supplies() {
                 <label className="form-label">Nombre (Ej: Bandeja 1020, Recibo Luz, Semilla X)</label>
                 <input required type="text" className="form-control" value={newArticle.name} onChange={e => setNewArticle({...newArticle, name: e.target.value})} />
               </div>
+              {['SEMILLA', 'SUSTRATO', 'ENVASE', 'OTRO'].includes(newArticle.type) && (
+                <div>
+                  <label className="form-label">Stock de Seguridad (Aviso si baja de esta cantidad)</label>
+                  <input type="number" min="0" className="form-control" value={newArticle.minStock} onChange={e => setNewArticle({...newArticle, minStock: parseFloat(e.target.value) || 0})} />
+                </div>
+              )}
               <div className="flex justify-end gap-3 mt-4">
                 <button type="button" className="btn btn-secondary" onClick={() => setShowArticleModal(false)}>Cancelar</button>
                 <button type="submit" className="btn btn-primary">Añadir al Catálogo</button>
