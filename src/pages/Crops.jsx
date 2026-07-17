@@ -573,6 +573,113 @@ export default function Crops() {
     </div>
   );
 
+  const renderSowingAnalytics = () => {
+    const thirtyDaysAgo = new Date();
+    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+
+    const recentOrders = orders?.filter(o => new Date(o.date || o.createdAt) >= thirtyDaysAgo && o.status !== 'CANCELLED') || [];
+    
+    const productSales = {};
+    recentOrders.forEach(o => {
+      o.items?.forEach(item => {
+        productSales[item.productId] = (productSales[item.productId] || 0) + Number(item.quantity || 0);
+      });
+    });
+
+    const recentHarvests = harvests?.filter(h => new Date(h.harvestDate) >= thirtyDaysAgo) || [];
+    
+    const productYields = {};
+    recentHarvests.forEach(h => {
+      if(!productYields[h.productId]) productYields[h.productId] = { totalTuppers: 0, totalTrays: 0 };
+      productYields[h.productId].totalTuppers += Number(h.tuppersCount || 0);
+      
+      let traysHarvested = 0;
+      h.selectedCropIds?.forEach(cid => {
+        const crop = crops?.find(c => c.id === cid);
+        if (crop) traysHarvested += Number(crop.traysCount || 1);
+      });
+      if (traysHarvested === 0 && h.selectedCropIds?.length > 0) traysHarvested = h.selectedCropIds.length;
+      
+      productYields[h.productId].totalTrays += traysHarvested;
+    });
+
+    const analytics = cropTypes?.map(cType => {
+      const linkedProducts = products?.filter(p => p.recipeSeeds?.some(rs => rs.seedId === cType.seedId) || (p.recipeSeeds?.length === 0 && p.id === cType.id)) || [];
+      
+      let totalDemand30d = 0;
+      let yieldTuppers = 0;
+      let yieldTrays = 0;
+
+      linkedProducts.forEach(p => {
+        totalDemand30d += (productSales[p.id] || 0);
+        if (productYields[p.id]) {
+          yieldTuppers += productYields[p.id].totalTuppers;
+          yieldTrays += productYields[p.id].totalTrays;
+        }
+      });
+
+      const avgWeeklyDemand = totalDemand30d / (30 / 7);
+      const actualYieldRate = yieldTrays > 0 ? (yieldTuppers / yieldTrays) : 5;
+      
+      const recommendedTrays = Math.ceil(avgWeeklyDemand / actualYieldRate);
+      const currentlyPlannedTrays = harvestTargets?.filter(ht => ht.productId === cType.id).reduce((sum, ht) => sum + Number(ht.tuppersCount || 0), 0) || 0;
+
+      return {
+        cType,
+        avgWeeklyDemand: avgWeeklyDemand.toFixed(1),
+        yieldRate: actualYieldRate.toFixed(1),
+        recommendedTrays,
+        currentlyPlannedTrays,
+        diff: currentlyPlannedTrays - recommendedTrays
+      };
+    });
+
+    return (
+      <div style={{ background: 'white', borderRadius: '20px', padding: '2rem', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.05)', marginBottom: '2rem', border: '1px solid #e2e8f0' }}>
+        <h3 style={{ margin: '0 0 1.5rem 0', display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '1.4rem', color: '#1e293b' }}>
+          <span>💡</span> Sugerencias de Siembra (Últimos 30 días)
+        </h3>
+        <div style={{ overflowX: 'auto' }}>
+          <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
+            <thead>
+              <tr style={{ background: '#f8fafc', borderBottom: '2px solid #e2e8f0' }}>
+                <th style={{ padding: '1rem', color: '#64748b', fontWeight: 'bold' }}>Variedad</th>
+                <th style={{ padding: '1rem', color: '#64748b', fontWeight: 'bold' }}>Ventas Medias</th>
+                <th style={{ padding: '1rem', color: '#64748b', fontWeight: 'bold' }}>Rendimiento Real</th>
+                <th style={{ padding: '1rem', color: '#64748b', fontWeight: 'bold' }}>Recomendación</th>
+                <th style={{ padding: '1rem', color: '#64748b', fontWeight: 'bold' }}>Estado Actual</th>
+              </tr>
+            </thead>
+            <tbody>
+              {analytics?.map(a => (
+                <tr key={a.cType.id} style={{ borderBottom: '1px solid #e2e8f0' }}>
+                  <td style={{ padding: '1rem', fontWeight: 'bold', color: '#334155' }}>{a.cType.name}</td>
+                  <td style={{ padding: '1rem', color: '#64748b' }}>{a.avgWeeklyDemand} tup/sem</td>
+                  <td style={{ padding: '1rem', color: '#64748b' }}>{a.yieldRate} tup/bandeja</td>
+                  <td style={{ padding: '1rem', fontWeight: 'bold', color: 'var(--crop-primary)' }}>🌱 {a.recommendedTrays} bandejas/sem</td>
+                  <td style={{ padding: '1rem' }}>
+                    {a.diff === 0 ? (
+                      <span style={{ background: '#ecfdf5', color: '#059669', padding: '4px 8px', borderRadius: '6px', fontSize: '0.85rem', fontWeight: 'bold' }}>✔️ Óptimo</span>
+                    ) : a.diff > 0 ? (
+                      <span style={{ background: '#fffbeb', color: '#d97706', padding: '4px 8px', borderRadius: '6px', fontSize: '0.85rem', fontWeight: 'bold' }}>⚠️ Sobran {a.diff}</span>
+                    ) : (
+                      <span style={{ background: '#fef2f2', color: '#ef4444', padding: '4px 8px', borderRadius: '6px', fontSize: '0.85rem', fontWeight: 'bold' }}>⚠️ Faltan {Math.abs(a.diff)}</span>
+                    )}
+                  </td>
+                </tr>
+              ))}
+              {(!analytics || analytics.length === 0) && (
+                <tr>
+                  <td colSpan="5" style={{ padding: '2rem', textAlign: 'center', color: '#94a3b8' }}>No hay suficientes datos todavía.</td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    );
+  };
+
   const renderPlanificador = () => (
     <div>
       <div style={{ background: 'linear-gradient(135deg, #f0fdf4, #ccfbf1)', border: '1px solid #99f6e4', padding: '2rem', borderRadius: '20px', marginBottom: '2rem' }}>
@@ -581,6 +688,8 @@ export default function Crops() {
           Define qué variedades vas a sembrar cada día de la semana para mantener tu ritmo de producción. El sistema generará automáticamente las tareas de Siembra y te avisará un día antes si la semilla requiere remojo.
         </p>
       </div>
+
+      {renderSowingAnalytics()}
 
       <div className="premium-card" style={{ marginBottom: '2rem' }}>
         <form onSubmit={handleAddHarvestTarget} style={{ display: 'flex', gap: '1rem', alignItems: 'flex-end', flexWrap: 'wrap' }}>
