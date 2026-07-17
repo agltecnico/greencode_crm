@@ -169,7 +169,10 @@ export default function Crops() {
                 {selectedCropType && (
                   <div style={{ background: '#fffbeb', padding: '1rem', borderRadius: '8px', border: '1px solid #fde68a' }}>
                     <label className="text-sm font-semibold mb-1 block text-amber-900">Stock de Semilla Disponible</label>
-                    <p className="text-lg font-bold text-amber-800 m-0">{totalAvailableSeed.toFixed(2)} g disponibles</p>
+                    <p className="text-lg font-bold text-amber-800 m-0">
+                      {totalAvailableSeed.toFixed(2)} g disponibles 
+                      {selectedCropType.seedGrams > 0 && ` (Máx. ${Math.floor(totalAvailableSeed / selectedCropType.seedGrams)} bandejas)`}
+                    </p>
                     <p className="text-xs text-amber-700 mt-1">El sistema descontará {selectedCropType.seedGrams}g por cada bandeja automáticamente usando el método FIFO (primeras entradas, primeras salidas).</p>
                   </div>
                 )}
