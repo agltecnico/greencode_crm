@@ -52,7 +52,8 @@ export const DataProvider = ({ children }) => {
           { data: cropTypesData },
           { data: cropsData },
           { data: harvestTargetsData },
-          { data: harvestsData },\n            { data: dailyLogsData }
+          { data: harvestsData },
+            { data: dailyLogsData }
         ] = await Promise.all([
           supabase.from('clients').select('*').order('createdAt', { ascending: true }),
           supabase.from('products').select('*').order('createdAt', { ascending: true }),
