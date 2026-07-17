@@ -25,11 +25,8 @@ export const DataProvider = ({ children }) => {
   const [companyLogo, setCompanyLogo] = useState(null);
 
   const [providers, setProviders] = useState([]);
-  const [seeds, setSeeds] = useState([]);
-  const [seedInventory, setSeedInventory] = useState([]);
-
-  const [substrates, setSubstrates] = useState([]);
-  const [substrateInventory, setSubstrateInventory] = useState([]);
+  const [articles, setArticles] = useState([]);
+  const [stockEntries, setStockEntries] = useState([]);
 
   const [crops, setCrops] = useState([]);
   const [harvestTargets, setHarvestTargets] = useState([]);
@@ -64,8 +61,8 @@ export const DataProvider = ({ children }) => {
           supabase.from('expenses').select('*').order('createdAt', { ascending: true }),
           supabase.from('company_profile').select('*').limit(1),
           supabase.from('providers').select('*').order('createdAt', { ascending: true }),
-          supabase.from('seeds').select('*').order('createdAt', { ascending: true }),
-          supabase.from('seed_inventory').select('*').order('createdAt', { ascending: true }),
+          supabase.from('articles').select('*').order('createdAt', { ascending: true }),
+          supabase.from('stock_entries').select('*').order('createdAt', { ascending: true }),
           supabase.from('crops').select('*').order('createdAt', { ascending: true }),
           supabase.from('harvest_targets').select('*').order('createdAt', { ascending: true }),
           supabase.from('harvests').select('*').order('createdAt', { ascending: true }),

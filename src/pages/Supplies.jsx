@@ -5,72 +5,78 @@ import { usePagination } from '../hooks/usePagination';
 export default function Supplies() {
   const { 
     providers, addProvider, deleteProvider,
-    seeds, addSeed, deleteSeed,
-    seedInventory, addSeedInventory, deleteSeedInventory,
-    substrates, addSubstrate, deleteSubstrate,
-    substrateInventory, addSubstrateInventory, deleteSubstrateInventory
+    articles, addArticle, deleteArticle,
+    stockEntries, addStockEntry, deleteStockEntry
   } = useData();
 
-  const [activeTab, setActiveTab] = useState('PROVIDERS');
+  const [activeTab, setActiveTab] = useState('CATALOG');
   const [searchTerm, setSearchTerm] = useState('');
 
   // Forms State
   const [newProvider, setNewProvider] = useState({ name: '', contactInfo: '' });
   
-  // Semillas State
-  const [newSeed, setNewSeed] = useState({ name: '', expectedYieldGrams: 0 });
-  const [newSeedEntry, setNewSeedEntry] = useState({ purchaseDate: new Date().toISOString().split('T')[0], deliveryNote: '', batchNumber: '', seedId: '', quantity: 1000, price: 0 });
+  // Catalog State
+  const [newArticle, setNewArticle] = useState({ name: '', type: 'SEMILLA' });
   
-  // Sustratos State
-  const [newSubstrate, setNewSubstrate] = useState({ name: '' });
-  const [newSubstrateEntry, setNewSubstrateEntry] = useState({ purchaseDate: new Date().toISOString().split('T')[0], deliveryNote: '', batchNumber: '', substrateId: '', quantity: 50, price: 0 });
+  // Stock State
+  const [newStockEntry, setNewStockEntry] = useState({ purchaseDate: new Date().toISOString().split('T')[0], deliveryNote: '', batchNumber: '', articleId: '', quantity: 1, price: 0 });
 
   // Handlers
   const handleAddProvider = e => { e.preventDefault(); addProvider(newProvider); setNewProvider({name:'', contactInfo:''}); };
-  const handleAddSeed = e => { e.preventDefault(); addSeed(newSeed); setNewSeed({name:'', expectedYieldGrams: 0}); };
-  const handleAddSubstrate = e => { e.preventDefault(); addSubstrate(newSubstrate); setNewSubstrate({name:''}); };
+  const handleAddArticle = e => { e.preventDefault(); addArticle(newArticle); setNewArticle({...newArticle, name:''}); };
   
-  const handleAddSeedEntry = e => { 
+  const handleAddStockEntry = e => { 
     e.preventDefault(); 
-    addSeedInventory(newSeedEntry); 
-    setNewSeedEntry({...newSeedEntry, deliveryNote: '', batchNumber: '', quantity: 1000, price: 0}); 
-  };
-  
-  const handleAddSubstrateEntry = e => { 
-    e.preventDefault(); 
-    addSubstrateInventory(newSubstrateEntry); 
-    setNewSubstrateEntry({...newSubstrateEntry, deliveryNote: '', batchNumber: '', quantity: 50, price: 0}); 
+    addStockEntry(newStockEntry); 
+    setNewStockEntry({...newStockEntry, deliveryNote: '', batchNumber: '', quantity: 1, price: 0}); 
   };
 
   // Filtration logic
   const filteredProviders = providers?.filter(p => p.name.toLowerCase().includes(searchTerm.toLowerCase())) || [];
   const { currentData: paginatedProviders, currentPage: pPage, totalPages: pTotal, goToPage: pGo, nextPage: pNext, prevPage: pPrev } = usePagination(filteredProviders, 10);
 
-  const filteredSeedEntries = seedInventory?.filter(entry => {
-    const seed = seeds?.find(s => s.id === entry.seedId);
-    return seed?.name.toLowerCase().includes(searchTerm.toLowerCase()) || entry.deliveryNote?.toLowerCase().includes(searchTerm.toLowerCase());
-  }).sort((a,b) => new Date(b.purchaseDate) - new Date(a.purchaseDate)) || [];
-  const { currentData: paginatedSeedEntries, currentPage: sPage, totalPages: sTotal, goToPage: sGo, nextPage: sNext, prevPage: sPrev } = usePagination(filteredSeedEntries, 10);
+  const filteredArticles = articles?.filter(a => a.name.toLowerCase().includes(searchTerm.toLowerCase()) || a.type.toLowerCase().includes(searchTerm.toLowerCase())) || [];
+  const { currentData: paginatedArticles, currentPage: aPage, totalPages: aTotal, goToPage: aGo, nextPage: aNext, prevPage: aPrev } = usePagination(filteredArticles, 10);
 
-  const filteredSubstrateEntries = substrateInventory?.filter(entry => {
-    const sub = substrates?.find(s => s.id === entry.substrateId);
-    return sub?.name.toLowerCase().includes(searchTerm.toLowerCase()) || entry.deliveryNote?.toLowerCase().includes(searchTerm.toLowerCase());
+  const filteredStock = stockEntries?.filter(entry => {
+    const art = articles?.find(a => a.id === entry.articleId);
+    return art?.name.toLowerCase().includes(searchTerm.toLowerCase()) || entry.deliveryNote?.toLowerCase().includes(searchTerm.toLowerCase()) || entry.batchNumber?.toLowerCase().includes(searchTerm.toLowerCase());
   }).sort((a,b) => new Date(b.purchaseDate) - new Date(a.purchaseDate)) || [];
-  const { currentData: paginatedSubstrateEntries, currentPage: subPage, totalPages: subTotal, goToPage: subGo, nextPage: subNext, prevPage: subPrev } = usePagination(filteredSubstrateEntries, 10);
+  const { currentData: paginatedStock, currentPage: sPage, totalPages: sTotal, goToPage: sGo, nextPage: sNext, prevPage: sPrev } = usePagination(filteredStock, 10);
+
+  const getTypeLabel = (type) => {
+    switch(type) {
+      case 'SEMILLA': return '🌱 Semilla';
+      case 'SUSTRATO': return '🪨 Sustrato';
+      case 'ENVASE': return '📦 Envase';
+      case 'OTRO': return '🏷️ Consumible/Otro';
+      default: return type;
+    }
+  };
+
+  const getUnitLabel = (type) => {
+    switch(type) {
+      case 'SEMILLA': return 'Gramos';
+      case 'SUSTRATO': return 'Litros';
+      default: return 'Unidades';
+    }
+  };
+
+  const selectedArticleType = newStockEntry.articleId ? articles?.find(a => a.id === newStockEntry.articleId)?.type : null;
 
   return (
     <div className="admin-container">
       <div className="admin-header">
         <div>
-          <h2 className="text-2xl font-bold">Gestión de Insumos y Stock</h2>
-          <p className="text-muted" style={{ marginTop: '0.25rem' }}>Control de proveedores, semillas y sustratos mediante albaranes.</p>
+          <h2 className="text-2xl font-bold">Gestión de Insumos y Almacén</h2>
+          <p className="text-muted" style={{ marginTop: '0.25rem' }}>Control unificado de artículos, stock y proveedores.</p>
         </div>
       </div>
 
       <div className="admin-tabs">
         <button className={`admin-tab ${activeTab === 'PROVIDERS' ? 'active' : ''}`} onClick={() => setActiveTab('PROVIDERS')}>Proveedores</button>
-        <button className={`admin-tab ${activeTab === 'SEEDS' ? 'active' : ''}`} onClick={() => setActiveTab('SEEDS')}>Compra de Semillas</button>
-        <button className={`admin-tab ${activeTab === 'SUBSTRATES' ? 'active' : ''}`} onClick={() => setActiveTab('SUBSTRATES')}>Compra de Sustratos</button>
+        <button className={`admin-tab ${activeTab === 'CATALOG' ? 'active' : ''}`} onClick={() => setActiveTab('CATALOG')}>Catálogo de Artículos</button>
+        <button className={`admin-tab ${activeTab === 'STOCK' ? 'active' : ''}`} onClick={() => setActiveTab('STOCK')}>Entrada de Albaranes (Stock)</button>
       </div>
 
       <div className="admin-toolbar">
@@ -80,7 +86,7 @@ export default function Supplies() {
           </svg>
           <input 
             type="text" 
-            placeholder="Buscar por nombre o número de albarán..." 
+            placeholder="Buscar..." 
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
           />
@@ -141,52 +147,99 @@ export default function Supplies() {
         </div>
       )}
 
-      {activeTab === 'SEEDS' && (
+      {activeTab === 'CATALOG' && (
         <div style={{ animation: 'fadeIn 0.3s ease' }}>
           <div className="card" style={{ marginBottom: '2rem' }}>
-            <h3 className="font-bold mb-4">Entrada de Stock de Semillas (con Albarán)</h3>
-            
-            {/* Pequeño formulario para dar de alta nombre de semilla si no existe */}
-            <div style={{ background: '#f8fafc', padding: '1rem', borderRadius: '8px', marginBottom: '1.5rem', border: '1px solid #e2e8f0' }}>
-              <h4 className="font-semibold mb-2 text-sm text-slate-500">¿No existe la variedad en el catálogo? Añádela primero:</h4>
-              <form onSubmit={handleAddSeed} style={{ display: 'flex', gap: '1rem', alignItems: 'flex-end', flexWrap: 'wrap' }}>
-                <div style={{ flex: '1 1 200px' }}>
-                  <label className="form-label" style={{ fontSize: '0.8rem' }}>Variedad de Semilla</label>
-                  <input required type="text" className="form-control" value={newSeed.name} onChange={e => setNewSeed({...newSeed, name: e.target.value})} />
-                </div>
-                <button type="submit" className="btn btn-secondary" style={{ height: '38px', padding: '0 1rem' }}>+ Crear Catálogo</button>
-              </form>
-            </div>
+            <h3 className="font-bold mb-4">Crear Artículo para el Almacén</h3>
+            <form onSubmit={handleAddArticle} style={{ display: 'flex', gap: '1rem', alignItems: 'flex-end', flexWrap: 'wrap' }}>
+              <div style={{ width: '200px' }}>
+                <label className="form-label">Tipo de Artículo</label>
+                <select className="form-control" value={newArticle.type} onChange={e => setNewArticle({...newArticle, type: e.target.value})}>
+                  <option value="SEMILLA">🌱 Semilla</option>
+                  <option value="SUSTRATO">🪨 Sustrato</option>
+                  <option value="ENVASE">📦 Envase / Bandeja</option>
+                  <option value="OTRO">🏷️ Consumible / Otro</option>
+                </select>
+              </div>
+              <div style={{ flex: '1 1 250px' }}>
+                <label className="form-label">Nombre del Artículo (Ej: Bandeja 1020, Coco Mix)</label>
+                <input required type="text" className="form-control" value={newArticle.name} onChange={e => setNewArticle({...newArticle, name: e.target.value})} />
+              </div>
+              <button type="submit" className="btn btn-secondary" style={{ height: '42px', padding: '0 1.5rem' }}>Añadir al Catálogo</button>
+            </form>
+          </div>
 
-            <form onSubmit={handleAddSeedEntry} style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: '1rem', alignItems: 'flex-end' }}>
+          <div className="table-container">
+            <table className="admin-table">
+              <thead>
+                <tr>
+                  <th>Tipo</th>
+                  <th>Nombre del Artículo</th>
+                  <th>Acciones</th>
+                </tr>
+              </thead>
+              <tbody>
+                {paginatedArticles.map(a => (
+                  <tr key={a.id}>
+                    <td className="font-medium text-slate-500">{getTypeLabel(a.type)}</td>
+                    <td className="font-bold text-slate-800">{a.name}</td>
+                    <td>
+                      <button className="btn btn-danger" style={{ padding: '0.3rem 0.6rem', fontSize: '0.8rem', background: 'transparent', color: '#ef4444', border: '1px solid #ef4444' }} onClick={() => deleteArticle(a.id)}>Borrar</button>
+                    </td>
+                  </tr>
+                ))}
+                {paginatedArticles.length === 0 && (
+                  <tr><td colSpan="3" style={{ textAlign: 'center', padding: '3rem', color: '#94a3b8' }}>El catálogo está vacío. Añade tu primer artículo.</td></tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+          {aTotal > 1 && (
+            <div className="pagination">
+              <button className="page-btn" onClick={aPrev} disabled={aPage === 1}>&lt; Ant</button>
+              {Array.from({ length: aTotal }, (_, i) => i + 1).map(page => (
+                <button key={page} className={`page-btn ${aPage === page ? 'active' : ''}`} onClick={() => aGo(page)}>{page}</button>
+              ))}
+              <button className="page-btn" onClick={aNext} disabled={aPage === aTotal}>Sig &gt;</button>
+            </div>
+          )}
+        </div>
+      )}
+
+      {activeTab === 'STOCK' && (
+        <div style={{ animation: 'fadeIn 0.3s ease' }}>
+          <div className="card" style={{ marginBottom: '2rem' }}>
+            <h3 className="font-bold mb-4">Registro de Albaranes (Entrada de Stock)</h3>
+            
+            <form onSubmit={handleAddStockEntry} style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: '1rem', alignItems: 'flex-end' }}>
               <div>
                 <label className="form-label">Fecha</label>
-                <input required type="date" className="form-control" value={newSeedEntry.purchaseDate} onChange={e => setNewSeedEntry({...newSeedEntry, purchaseDate: e.target.value})} />
+                <input required type="date" className="form-control" value={newStockEntry.purchaseDate} onChange={e => setNewStockEntry({...newStockEntry, purchaseDate: e.target.value})} />
               </div>
               <div>
-                <label className="form-label">Nº Albarán</label>
-                <input required type="text" className="form-control" placeholder="Ej: ALB-123" value={newSeedEntry.deliveryNote} onChange={e => setNewSeedEntry({...newSeedEntry, deliveryNote: e.target.value})} />
-              </div>
-              <div>
-                <label className="form-label">Lote</label>
-                <input required type="text" className="form-control" placeholder="Ej: L-2026-X" value={newSeedEntry.batchNumber} onChange={e => setNewSeedEntry({...newSeedEntry, batchNumber: e.target.value})} />
-              </div>
-              <div>
-                <label className="form-label">Artículo (Semilla)</label>
-                <select required className="form-control" value={newSeedEntry.seedId} onChange={e => setNewSeedEntry({...newSeedEntry, seedId: e.target.value})}>
+                <label className="form-label">Artículo</label>
+                <select required className="form-control" value={newStockEntry.articleId} onChange={e => setNewStockEntry({...newStockEntry, articleId: e.target.value})}>
                   <option value="">Selecciona...</option>
-                  {seeds?.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+                  {articles?.map(a => <option key={a.id} value={a.id}>{getTypeLabel(a.type)} - {a.name}</option>)}
                 </select>
               </div>
               <div>
-                <label className="form-label">Cantidad (Gramos)</label>
-                <input required type="number" min="1" className="form-control" value={newSeedEntry.quantity} onChange={e => setNewSeedEntry({...newSeedEntry, quantity: Number(e.target.value)})} />
+                <label className="form-label">Nº Albarán</label>
+                <input type="text" className="form-control" placeholder="Ej: ALB-123" value={newStockEntry.deliveryNote} onChange={e => setNewStockEntry({...newStockEntry, deliveryNote: e.target.value})} />
+              </div>
+              <div>
+                <label className="form-label">Lote</label>
+                <input type="text" className="form-control" placeholder="Ej: L-2026-X" value={newStockEntry.batchNumber} onChange={e => setNewStockEntry({...newStockEntry, batchNumber: e.target.value})} />
+              </div>
+              <div>
+                <label className="form-label">Cant. ({selectedArticleType ? getUnitLabel(selectedArticleType) : 'Uds'})</label>
+                <input required type="number" min="0.01" step="0.01" className="form-control" value={newStockEntry.quantity} onChange={e => setNewStockEntry({...newStockEntry, quantity: Number(e.target.value)})} />
               </div>
               <div>
                 <label className="form-label">Precio Total (€)</label>
-                <input required type="number" step="0.01" min="0" className="form-control" value={newSeedEntry.price} onChange={e => setNewSeedEntry({...newSeedEntry, price: Number(e.target.value)})} />
+                <input required type="number" step="0.01" min="0" className="form-control" value={newStockEntry.price} onChange={e => setNewStockEntry({...newStockEntry, price: Number(e.target.value)})} />
               </div>
-              <button type="submit" className="btn btn-primary" style={{ height: '42px' }}>Registrar Compra</button>
+              <button type="submit" className="btn btn-primary" style={{ height: '42px' }}>Registrar Entrada</button>
             </form>
           </div>
 
@@ -195,34 +248,33 @@ export default function Supplies() {
               <thead>
                 <tr>
                   <th>Fecha</th>
+                  <th>Artículo</th>
                   <th>Albarán</th>
                   <th>Lote</th>
-                  <th>Artículo / Variedad</th>
-                  <th>Cantidad Registrada</th>
+                  <th>Cantidad</th>
                   <th>Coste Total</th>
                   <th>Acciones</th>
                 </tr>
               </thead>
               <tbody>
-                {paginatedSeedEntries.map(entry => {
-                  const seed = seeds?.find(s => s.id === entry.seedId);
+                {paginatedStock.map(entry => {
+                  const art = articles?.find(a => a.id === entry.articleId);
                   return (
                     <tr key={entry.id}>
                       <td>{new Date(entry.purchaseDate).toLocaleDateString()}</td>
+                      <td className="font-bold text-primary">{art ? getTypeLabel(art.type) + ' ' + art.name : 'Desconocido'}</td>
                       <td className="text-muted font-mono">{entry.deliveryNote || '-'}</td>
                       <td className="font-mono text-indigo-600">{entry.batchNumber || '-'}</td>
-                      <td className="font-mono text-indigo-600">{entry.batchNumber || '-'}</td>
-                      <td className="font-bold text-primary">{seed?.name || 'Desconocida'}</td>
-                      <td>{entry.quantity} g <span className="text-muted" style={{fontSize:'0.8rem'}}>({(entry.quantity/1000).toFixed(2)} Kg)</span></td>
+                      <td>{entry.quantity} {art ? getUnitLabel(art.type) : ''}</td>
                       <td className="font-semibold">{entry.price ? `${entry.price.toFixed(2)} €` : '-'}</td>
                       <td>
-                        <button className="btn btn-danger" style={{ padding: '0.3rem 0.6rem', fontSize: '0.8rem', background: 'transparent', color: '#ef4444', border: '1px solid #ef4444' }} onClick={() => deleteSeedInventory(entry.id)}>Borrar</button>
+                        <button className="btn btn-danger" style={{ padding: '0.3rem 0.6rem', fontSize: '0.8rem', background: 'transparent', color: '#ef4444', border: '1px solid #ef4444' }} onClick={() => deleteStockEntry(entry.id)}>Borrar</button>
                       </td>
                     </tr>
                   )
                 })}
-                {paginatedSeedEntries.length === 0 && (
-                  <tr><td colSpan="6" style={{ textAlign: 'center', padding: '3rem', color: '#94a3b8' }}>No hay compras de semillas registradas.</td></tr>
+                {paginatedStock.length === 0 && (
+                  <tr><td colSpan="7" style={{ textAlign: 'center', padding: '3rem', color: '#94a3b8' }}>No hay entradas de stock registradas.</td></tr>
                 )}
               </tbody>
             </table>
@@ -234,102 +286,6 @@ export default function Supplies() {
                 <button key={page} className={`page-btn ${sPage === page ? 'active' : ''}`} onClick={() => sGo(page)}>{page}</button>
               ))}
               <button className="page-btn" onClick={sNext} disabled={sPage === sTotal}>Sig &gt;</button>
-            </div>
-          )}
-        </div>
-      )}
-
-      {activeTab === 'SUBSTRATES' && (
-        <div style={{ animation: 'fadeIn 0.3s ease' }}>
-          <div className="card" style={{ marginBottom: '2rem' }}>
-            <h3 className="font-bold mb-4">Entrada de Stock de Sustratos (con Albarán)</h3>
-            
-            {/* Pequeño formulario para dar de alta nombre de sustrato si no existe */}
-            <div style={{ background: '#f8fafc', padding: '1rem', borderRadius: '8px', marginBottom: '1.5rem', border: '1px solid #e2e8f0' }}>
-              <h4 className="font-semibold mb-2 text-sm text-slate-500">¿No existe el sustrato en el catálogo? Añádelo primero:</h4>
-              <form onSubmit={handleAddSubstrate} style={{ display: 'flex', gap: '1rem', alignItems: 'flex-end', flexWrap: 'wrap' }}>
-                <div style={{ flex: '1 1 200px' }}>
-                  <label className="form-label" style={{ fontSize: '0.8rem' }}>Nombre / Tipo de Sustrato (Ej: Coco Mix)</label>
-                  <input required type="text" className="form-control" value={newSubstrate.name} onChange={e => setNewSubstrate({...newSubstrate, name: e.target.value})} />
-                </div>
-                <button type="submit" className="btn btn-secondary" style={{ height: '38px', padding: '0 1rem' }}>+ Crear Catálogo</button>
-              </form>
-            </div>
-
-            <form onSubmit={handleAddSubstrateEntry} style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: '1rem', alignItems: 'flex-end' }}>
-              <div>
-                <label className="form-label">Fecha</label>
-                <input required type="date" className="form-control" value={newSubstrateEntry.purchaseDate} onChange={e => setNewSubstrateEntry({...newSubstrateEntry, purchaseDate: e.target.value})} />
-              </div>
-              <div>
-                <label className="form-label">Nº Albarán</label>
-                <input required type="text" className="form-control" placeholder="Ej: ALB-123" value={newSubstrateEntry.deliveryNote} onChange={e => setNewSubstrateEntry({...newSubstrateEntry, deliveryNote: e.target.value})} />
-              </div>
-              <div>
-                <label className="form-label">Lote</label>
-                <input required type="text" className="form-control" placeholder="Ej: S-2026-Y" value={newSubstrateEntry.batchNumber} onChange={e => setNewSubstrateEntry({...newSubstrateEntry, batchNumber: e.target.value})} />
-              </div>
-              <div>
-                <label className="form-label">Artículo (Sustrato)</label>
-                <select required className="form-control" value={newSubstrateEntry.substrateId} onChange={e => setNewSubstrateEntry({...newSubstrateEntry, substrateId: e.target.value})}>
-                  <option value="">Selecciona...</option>
-                  {substrates?.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
-                </select>
-              </div>
-              <div>
-                <label className="form-label">Cantidad (Litros)</label>
-                <input required type="number" min="1" className="form-control" value={newSubstrateEntry.quantity} onChange={e => setNewSubstrateEntry({...newSubstrateEntry, quantity: Number(e.target.value)})} />
-              </div>
-              <div>
-                <label className="form-label">Precio Total (€)</label>
-                <input required type="number" step="0.01" min="0" className="form-control" value={newSubstrateEntry.price} onChange={e => setNewSubstrateEntry({...newSubstrateEntry, price: Number(e.target.value)})} />
-              </div>
-              <button type="submit" className="btn btn-primary" style={{ height: '42px' }}>Registrar Compra</button>
-            </form>
-          </div>
-
-          <div className="table-container">
-            <table className="admin-table">
-              <thead>
-                <tr>
-                  <th>Fecha</th>
-                  <th>Albarán</th>
-                  <th>Lote</th>
-                  <th>Artículo / Tipo de Sustrato</th>
-                  <th>Cantidad Registrada</th>
-                  <th>Coste Total</th>
-                  <th>Acciones</th>
-                </tr>
-              </thead>
-              <tbody>
-                {paginatedSubstrateEntries.map(entry => {
-                  const sub = substrates?.find(s => s.id === entry.substrateId);
-                  return (
-                    <tr key={entry.id}>
-                      <td>{new Date(entry.purchaseDate).toLocaleDateString()}</td>
-                      <td className="text-muted font-mono">{entry.deliveryNote || '-'}</td>
-                      <td className="font-bold text-emerald-600">{sub?.name || 'Desconocido'}</td>
-                      <td>{entry.quantity} Litros</td>
-                      <td className="font-semibold">{entry.price ? `${entry.price.toFixed(2)} €` : '-'}</td>
-                      <td>
-                        <button className="btn btn-danger" style={{ padding: '0.3rem 0.6rem', fontSize: '0.8rem', background: 'transparent', color: '#ef4444', border: '1px solid #ef4444' }} onClick={() => deleteSubstrateInventory(entry.id)}>Borrar</button>
-                      </td>
-                    </tr>
-                  )
-                })}
-                {paginatedSubstrateEntries.length === 0 && (
-                  <tr><td colSpan="6" style={{ textAlign: 'center', padding: '3rem', color: '#94a3b8' }}>No hay compras de sustratos registradas.</td></tr>
-                )}
-              </tbody>
-            </table>
-          </div>
-          {subTotal > 1 && (
-            <div className="pagination">
-              <button className="page-btn" onClick={subPrev} disabled={subPage === 1}>&lt; Ant</button>
-              {Array.from({ length: subTotal }, (_, i) => i + 1).map(page => (
-                <button key={page} className={`page-btn ${subPage === page ? 'active' : ''}`} onClick={() => subGo(page)}>{page}</button>
-              ))}
-              <button className="page-btn" onClick={subNext} disabled={subPage === subTotal}>Sig &gt;</button>
             </div>
           )}
         </div>
