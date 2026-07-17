@@ -36,13 +36,6 @@ export default function Layout() {
           <NavLink onClick={() => setSidebarOpen(false)} to="/admin/invoices" className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}>
             <Receipt /> Facturación
           </NavLink>
-          
-          <NavLink onClick={() => setSidebarOpen(false)} to="/crops" className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}>
-            <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" className="w-5 h-5">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z" />
-            </svg>
-            Cultivos
-          </NavLink>
           <NavLink onClick={() => setSidebarOpen(false)} to="/admin/supplies" className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}>
             <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" className="w-5 h-5">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z" />
