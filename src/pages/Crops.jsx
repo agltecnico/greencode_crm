@@ -140,8 +140,8 @@ export default function Crops() {
 
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4 mt-6">
           {activeCropsList.map(crop => {
-            const cType = cropTypes?.find(c => c.id === crop.cropTypeId);
-            const daysAlive = Math.floor((new Date() - new Date(crop.plantedAt || crop.datePlanted)) / (1000 * 60 * 60 * 24));
+            const cType = cropTypes?.find(c => c.id === crop.seedId || c.id === crop.cropTypeId);
+            const daysAlive = Math.floor((new Date() - new Date(crop.datePlanted || crop.plantedAt)) / (1000 * 60 * 60 * 24));
             
             return (
               <div key={crop.id} className={`status-card \${crop.status}`}>

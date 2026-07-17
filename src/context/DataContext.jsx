@@ -268,14 +268,17 @@ export const DataProvider = ({ children }) => {
     const deleteSubstrateInventory = deleteStockEntry;
   
   // Crop
-  const addCrop = async (item) => {
-    const tempId = Date.now().toString();
-    const newItem = { ...item, id: tempId };
-    setCrops(prev => [...prev, newItem]);
-    const { data, error } = await supabase.from('crops').insert([newItem]).select();
-    if (!error && data) setCrops(prev => prev.map(i => i.id === tempId ? data[0] : i));
-    return tempId;
-  };
+    const addCrop = async (item) => {
+      const tempId = Date.now().toString();
+      const newItem = { ...item, id: tempId };
+      setCrops(prev => [...prev, newItem]);
+      const { data, error } = await supabase.from('crops').insert([newItem]).select();
+      if (error) {
+        console.error("Error inserting crop:", error);
+      }
+      if (!error && data) setCrops(prev => prev.map(i => i.id === tempId ? data[0] : i));
+      return tempId;
+    };
 
   const sowCrop = async (newCrop) => {
     // 1. Get the CropType definition
@@ -283,14 +286,16 @@ export const DataProvider = ({ children }) => {
     if (!cType) throw new Error("Ficha de cultivo no encontrada.");
 
     const trays = Number(newCrop.traysCount || 1);
+    const batchNum = `S-${Date.now().toString().slice(-6)}`;
     
-    // 2. Create the Crop Record
+    // 2. Create the Crop Record using existing DB columns: seedId, inventoryId, datePlanted, batchNumber
     const cropRecord = {
-      cropTypeId: cType.id,
+      seedId: cType.id, // we store cropTypeId in seedId to match schema
       traysCount: trays,
       status: cType.soakingHours > 0 ? 'SOAKING' : 'SOWED',
-      seedBatchId: newCrop.selectedSeedBatchId || null,
-      plantedAt: new Date().toISOString()
+      inventoryId: newCrop.selectedSeedBatchId || null,
+      datePlanted: new Date().toISOString(),
+      batchNumber: batchNum
     };
     
     await addCrop(cropRecord);
