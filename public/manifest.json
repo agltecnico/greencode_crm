@@ -1,0 +1,18 @@
+{
+  "short_name": "greencode",
+  "name": "greencode",
+  "icons": [
+    {
+      "src": "/logo.png",
+      "type": "image/png",
+      "sizes": "512x512",
+      "purpose": "any maskable"
+    }
+  ],
+  "start_url": "/repartidor",
+  "background_color": "#f4f7f6",
+  "theme_color": "#3db846",
+  "display": "standalone",
+  "orientation": "portrait",
+  "scope": "/"
+}

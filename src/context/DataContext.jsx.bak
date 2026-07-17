@@ -1,0 +1,238 @@
+import { createContext, useContext, useState, useEffect } from 'react';
+
+const DataContext = createContext();
+
+export const useData = () => useContext(DataContext);
+
+export const DataProvider = ({ children }) => {
+  // Try to load from localStorage first
+  const loadData = (key, defaultVal) => {
+    const saved = localStorage.getItem(key);
+    return saved ? JSON.parse(saved) : defaultVal;
+  };
+
+  const [clients, setClients] = useState(() => loadData('crm_clients', []));
+  const [products, setProducts] = useState(() => loadData('crm_products', []));
+  const [orders, setOrders] = useState(() => loadData('crm_orders', []));
+  const [deliveryNotes, setDeliveryNotes] = useState(() => loadData('crm_delivery_notes', []));
+  const [invoices, setInvoices] = useState(() => loadData('crm_invoices', []));
+  const [expenses, setExpenses] = useState(() => loadData('crm_expenses', []));
+  const [companyProfile, setCompanyProfile] = useState(() => loadData('crm_company_profile', {
+    fiscalName: 'GREENCODE',
+    ownerName: 'ANTONIO JOSÉ GÓMEZ LÓPEZ',
+    nif: '48351348N',
+    address: 'CALLE SANTA FAZ 41',
+    city: 'ASPE',
+    province: 'ALICANTE',
+    postalCode: '',
+    bankAccount: ''
+  }));
+
+  // Backfill old clients with paymentMethod
+  useEffect(() => {
+    let changed = false;
+    const migratedClients = clients.map(c => {
+      if (!c.paymentMethod) {
+        changed = true;
+        return { ...c, paymentMethod: 'Transferencia' };
+      }
+      return c;
+    });
+    if (changed) {
+      setClients(migratedClients);
+    }
+  }, [clients]);
+
+  // Save to localStorage whenever data changes
+  useEffect(() => { localStorage.setItem('crm_clients', JSON.stringify(clients)); }, [clients]);
+  useEffect(() => { localStorage.setItem('crm_products', JSON.stringify(products)); }, [products]);
+  useEffect(() => { localStorage.setItem('crm_orders', JSON.stringify(orders)); }, [orders]);
+  useEffect(() => { localStorage.setItem('crm_delivery_notes', JSON.stringify(deliveryNotes)); }, [deliveryNotes]);
+  useEffect(() => { localStorage.setItem('crm_invoices', JSON.stringify(invoices)); }, [invoices]);
+  useEffect(() => { localStorage.setItem('crm_expenses', JSON.stringify(expenses)); }, [expenses]);
+  useEffect(() => { localStorage.setItem('crm_company_profile', JSON.stringify(companyProfile)); }, [companyProfile]);
+
+  const [companyLogo, setCompanyLogo] = useState(() => loadData('crm_company_logo', null));
+
+  // Company Profile
+  const updateCompanyProfile = (newProfile) => {
+    setCompanyProfile({ ...companyProfile, ...newProfile });
+  };
+  const updateCompanyLogo = (base64) => {
+    setCompanyLogo(base64);
+    if (base64) {
+      localStorage.setItem('crm_company_logo', JSON.stringify(base64));
+    } else {
+      localStorage.removeItem('crm_company_logo');
+    }
+  };
+
+  // Clients
+  const addClient = (client) => {
+    // Determine next client number, ensure it's 2 digits
+    const nextNum = clients.length > 0 ? Math.max(...clients.map(c => parseInt(c.clientNumber))) + 1 : 1;
+    const clientNumber = nextNum.toString().padStart(2, '0');
+    setClients([...clients, { ...client, id: Date.now().toString(), clientNumber }]);
+  };
+
+  const updateClient = (id, updatedClient) => {
+    setClients(clients.map(c => c.id.toString() === id.toString() ? { ...c, ...updatedClient } : c));
+  };
+  
+  const deleteClient = (id) => {
+     setClients(clients.filter(c => c.id.toString() !== id.toString()));
+  };
+
+  // Products
+  const addProduct = (product) => {
+    setProducts([...products, { ...product, id: Date.now().toString() }]);
+  };
+
+  const updateProduct = (id, updatedProduct) => {
+    setProducts(products.map(p => p.id.toString() === id.toString() ? { ...p, ...updatedProduct } : p));
+  };
+  
+  const deleteProduct = (id) => {
+    setProducts(products.filter(p => p.id.toString() !== id.toString()));
+  };
+
+  // Orders
+  const addOrder = (order) => {
+    setOrders([...orders, { ...order, id: Date.now().toString(), status: 'PENDING', date: order.date || new Date().toISOString() }]);
+  };
+
+  const updateOrderList = (id, updatedFields) => {
+    setOrders(orders.map(o => o.id.toString() === id.toString() ? { ...o, ...updatedFields } : o));
+    
+    // Automatically keep the corresponding Delivery Note (Albarán) in sync if it exists
+    if (updatedFields.items || updatedFields.total !== undefined || updatedFields.clientId || updatedFields.deliveredTo !== undefined) {
+      setDeliveryNotes(prev => prev.map(dn => {
+        if (dn.orderId.toString() === id.toString()) {
+          return {
+            ...dn,
+            items: updatedFields.items || dn.items,
+            total: updatedFields.total !== undefined ? updatedFields.total : dn.total,
+            clientId: updatedFields.clientId || dn.clientId,
+            deliveredTo: updatedFields.deliveredTo !== undefined ? updatedFields.deliveredTo : dn.deliveredTo,
+            date: updatedFields.date || dn.date
+          };
+        }
+        return dn;
+      }));
+    }
+  };
+
+  const deleteOrder = (id) => {
+    setOrders(orders.filter(o => o.id.toString() !== id.toString()));
+    setDeliveryNotes(notes => notes.filter(dn => dn.orderId.toString() !== id.toString()));
+  };
+
+  const markOrderAsDelivered = (orderId, deliveredTo) => {
+    const order = orders.find(o => o.id.toString() === orderId.toString());
+    if (!order || order.status === 'DELIVERED') return;
+
+    // 1. Update order status
+    updateOrderList(orderId, { status: 'DELIVERED', deliveredTo });
+
+    // Calculate sequential Albaran Number
+    const date = new Date();
+    const year = date.getFullYear();
+    // Use the functional state update or just read from deliveryNotes because it's synchronous here
+    const albaranesThisYear = deliveryNotes.filter(dn => new Date(dn.date).getFullYear() === year);
+    const seq = String(albaranesThisYear.length + 1).padStart(4, '0');
+    const albaranNumber = `${year}-${seq}`;
+
+    // 2. Create Delivery Note (Albaran)
+    const newAlbaran = {
+      id: Date.now().toString(),
+      albaranNumber: albaranNumber,
+      orderId: order.id,
+      clientId: order.clientId,
+      items: order.items,
+      total: order.total,
+      date: order.date || new Date().toISOString(),
+      status: 'UNBILLED',
+      deliveredTo: deliveredTo || ''
+    };
+    setDeliveryNotes(prev => [...prev, newAlbaran]);
+  };
+
+  // Delivery Notes
+  const updateDeliveryNote = (id, updatedFields) => {
+    setDeliveryNotes(notes => notes.map(n => n.id.toString() === id.toString() ? { ...n, ...updatedFields } : n));
+  };
+
+  const deleteDeliveryNote = (id) => {
+    setDeliveryNotes(notes => notes.filter(n => n.id.toString() !== id.toString()));
+  };
+
+  const markDeliveryNoteAsBilled = (ids) => {
+    setDeliveryNotes(notes => notes.map(n => ids.includes(n.id.toString()) || ids.includes(n.id) ? { ...n, status: 'BILLED' } : n));
+  };
+
+  const markInvoiceAsPaid = (id, isPaid) => {
+    setInvoices(invs => invs.map(i => i.id.toString() === id.toString() ? { ...i, isPaid } : i));
+  };
+
+  // Invoices
+  const addInvoice = (invoiceObj, deliveryNoteIds) => {
+    setInvoices([...invoices, { ...invoiceObj, id: Date.now().toString() }]);
+    markDeliveryNoteAsBilled(deliveryNoteIds);
+  };
+  
+  const deleteInvoice = (id) => {
+    const invoiceToDelete = invoices.find(i => i.id.toString() === id.toString());
+    if (invoiceToDelete) {
+      setDeliveryNotes(notes => notes.map(n => 
+        invoiceToDelete.deliveryNoteIds.includes(n.id) || invoiceToDelete.deliveryNoteIds.includes(n.id.toString()) 
+        ? { ...n, status: 'UNBILLED' } 
+        : n
+      ));
+      setInvoices(invoices.filter(i => i.id.toString() !== id.toString()));
+    }
+  };
+
+
+  // Expenses
+  const addExpense = (expenseObj) => {
+    setExpenses([...expenses, { ...expenseObj, id: Date.now().toString() }]);
+  };
+
+  const updateExpense = (id, updatedFields) => {
+    setExpenses(exps => exps.map(e => e.id.toString() === id.toString() ? { ...e, ...updatedFields } : e));
+  };
+
+  const deleteExpense = (id) => {
+    setExpenses(exps => exps.filter(e => e.id.toString() !== id.toString()));
+  };
+
+  const markExpenseAsPaid = (id, isPaid) => {
+    setExpenses(exps => exps.map(e => e.id.toString() === id.toString() ? { ...e, isPaid } : e));
+  };
+
+  const importData = (dataObject) => {
+    if (dataObject.clients) setClients(dataObject.clients);
+    if (dataObject.products) setProducts(dataObject.products);
+    if (dataObject.orders) setOrders(dataObject.orders);
+    if (dataObject.deliveryNotes) setDeliveryNotes(dataObject.deliveryNotes);
+    if (dataObject.invoices) setInvoices(dataObject.invoices);
+    if (dataObject.expenses) setExpenses(dataObject.expenses);
+    if (dataObject.companyProfile) setCompanyProfile(dataObject.companyProfile);
+    if (dataObject.companyLogo) setCompanyLogo(dataObject.companyLogo);
+    alert("¡Datos importados con éxito! La aplicación se ha actualizado.");
+  };
+
+  return (
+    <DataContext.Provider value={{
+      companyProfile, updateCompanyProfile, companyLogo, updateCompanyLogo,
+      clients, addClient, updateClient, deleteClient,
+      products, addProduct, updateProduct, deleteProduct,
+      orders, addOrder, updateOrderList, deleteOrder, markOrderAsDelivered,
+      deliveryNotes, updateDeliveryNote, deleteDeliveryNote,
+      invoices, addInvoice, deleteInvoice, importData, markInvoiceAsPaid,
+      expenses, addExpense, updateExpense, deleteExpense, markExpenseAsPaid
+    }}>
+      {children}
+    </DataContext.Provider>
+  );
+};

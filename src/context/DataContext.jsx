@@ -1,0 +1,409 @@
+import { createContext, useContext, useState, useEffect } from 'react';
+import { supabase } from '../config/supabase';
+
+export const DataContext = createContext();
+
+export const useData = () => useContext(DataContext);
+
+export const DataProvider = ({ children }) => {
+  const [clients, setClients] = useState([]);
+  const [products, setProducts] = useState([]);
+  const [orders, setOrders] = useState([]);
+  const [deliveryNotes, setDeliveryNotes] = useState([]);
+  const [invoices, setInvoices] = useState([]);
+  const [expenses, setExpenses] = useState([]);
+  const [companyProfile, setCompanyProfile] = useState({
+    fiscalName: 'GREENCODE',
+    ownerName: 'ANTONIO JOSÉ GÓMEZ LÓPEZ',
+    nif: '48351348N',
+    address: 'CALLE SANTA FAZ 41',
+    city: 'ASPE',
+    province: 'ALICANTE',
+    postalCode: '',
+    bankAccount: ''
+  });
+  const [companyLogo, setCompanyLogo] = useState(null);
+
+  // Load Initial Data from Supabase
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        const [
+          { data: clientsData },
+          { data: productsData },
+          { data: ordersData },
+          { data: notesData },
+          { data: invoicesData },
+          { data: expensesData },
+          { data: profileData }
+        ] = await Promise.all([
+          supabase.from('clients').select('*').order('createdAt', { ascending: true }),
+          supabase.from('products').select('*').order('createdAt', { ascending: true }),
+          supabase.from('orders').select('*').order('createdAt', { ascending: true }),
+          supabase.from('delivery_notes').select('*').order('createdAt', { ascending: true }),
+          supabase.from('invoices').select('*').order('createdAt', { ascending: true }),
+          supabase.from('expenses').select('*').order('createdAt', { ascending: true }),
+          supabase.from('company_profile').select('*').limit(1)
+        ]);
+
+        if (clientsData) setClients(clientsData);
+        if (productsData) setProducts(productsData);
+        if (ordersData) setOrders(ordersData);
+        if (notesData) setDeliveryNotes(notesData);
+        if (invoicesData) setInvoices(invoicesData);
+        if (expensesData) {
+            const mappedExpenses = expensesData.map(exp => {
+              let concept = exp.concept || '';
+              let paymentMethod = 'Transferencia';
+              let ivaPercentage = 21;
+              if (concept.includes('|||')) {
+                const parts = concept.split('|||');
+                concept = parts[0].trim();
+                paymentMethod = parts[1] ? parts[1].trim() : 'Transferencia';
+                ivaPercentage = parts[2] ? parseFloat(parts[2].trim()) : 21;
+              }
+              const total = exp.amount || 0;
+              const baseAmount = total / (1 + ivaPercentage / 100);
+              
+              return {
+                ...exp,
+                concept,
+                paymentMethod,
+                ivaPercentage,
+                total,
+                baseAmount
+              };
+            });
+            setExpenses(mappedExpenses);
+          }
+        if (profileData && profileData.length > 0) {
+          setCompanyProfile(profileData[0]);
+          localStorage.setItem('crm_company_profile', JSON.stringify(profileData[0]));
+        }
+      } catch (err) {
+        console.error("Error loading data from Supabase:", err);
+      }
+    };
+    fetchData();
+  }, []);
+
+  // Company Profile
+  const updateCompanyProfile = async (newProfile) => {
+    const profile = { ...companyProfile, ...newProfile };
+    setCompanyProfile(profile);
+    localStorage.setItem('crm_company_profile', JSON.stringify(profile));
+    
+    if (companyProfile.id) {
+      await supabase.from('company_profile').update(newProfile).eq('id', companyProfile.id);
+    } else {
+      const { data } = await supabase.from('company_profile').insert([newProfile]).select();
+      if (data && data.length > 0) setCompanyProfile(data[0]);
+    }
+  };
+
+  const updateCompanyLogo = (base64) => {
+    setCompanyLogo(base64);
+    if (base64) localStorage.setItem('crm_company_logo', JSON.stringify(base64));
+    else localStorage.removeItem('crm_company_logo');
+  };
+  
+  useEffect(() => {
+    const saved = localStorage.getItem('crm_company_logo');
+    if (saved) setCompanyLogo(JSON.parse(saved));
+  }, []);
+
+  // Clients
+  const addClient = async (client) => {
+    const nextNum = clients.length > 0 ? Math.max(...clients.map(c => parseInt(c.clientNumber || 0))) + 1 : 1;
+    const clientNumber = nextNum.toString().padStart(2, '0');
+    
+    const tempId = Date.now().toString();
+    const newClient = { ...client, clientNumber, id: tempId };
+    setClients(prev => [...prev, newClient]);
+
+    const { data, error } = await supabase.from('clients').insert([newClient]).select();
+    if (!error && data) {
+      setClients(prev => prev.map(c => c.id === tempId ? data[0] : c));
+    }
+  };
+
+  const updateClient = async (id, updatedClient) => {
+    setClients(prev => prev.map(c => c.id === id ? { ...c, ...updatedClient } : c));
+    await supabase.from('clients').update(updatedClient).eq('id', id);
+  };
+  
+  const deleteClient = async (id) => {
+     setClients(prev => prev.filter(c => c.id !== id));
+     await supabase.from('clients').delete().eq('id', id);
+  };
+
+  // Products
+  const addProduct = async (product) => {
+    const tempId = Date.now().toString();
+    setProducts(prev => [...prev, { ...product, id: tempId }]);
+    
+    const { data, error } = await supabase.from('products').insert([{ ...product, id: tempId }]).select();
+    if (!error && data) {
+      setProducts(prev => prev.map(p => p.id === tempId ? data[0] : p));
+    }
+  };
+
+  const updateProduct = async (id, updatedProduct) => {
+    setProducts(prev => prev.map(p => p.id === id ? { ...p, ...updatedProduct } : p));
+    await supabase.from('products').update(updatedProduct).eq('id', id);
+  };
+  
+  const deleteProduct = async (id) => {
+    setProducts(prev => prev.filter(p => p.id !== id));
+    await supabase.from('products').delete().eq('id', id);
+  };
+
+  // Orders
+  const addOrder = async (order) => {
+    const tempId = Date.now().toString();
+    const newOrder = { ...order, id: tempId, status: 'PENDING', date: order.date || new Date().toISOString() };
+    setOrders(prev => [...prev, newOrder]);
+
+    const { data, error } = await supabase.from('orders').insert([newOrder]).select();
+    if (!error && data) {
+      setOrders(prev => prev.map(o => o.id === tempId ? data[0] : o));
+    }
+  };
+
+  const updateOrderList = async (id, updatedFields) => {
+    setOrders(prev => prev.map(o => o.id === id ? { ...o, ...updatedFields } : o));
+    await supabase.from('orders').update(updatedFields).eq('id', id);
+    
+    // Automatically keep the corresponding Delivery Note in sync
+    if (updatedFields.items || updatedFields.total !== undefined || updatedFields.clientId || updatedFields.deliveredTo !== undefined) {
+      setDeliveryNotes(prev => prev.map(dn => {
+        if (dn.orderId === id) {
+          const dnUpdates = {
+            items: updatedFields.items || dn.items,
+            total: updatedFields.total !== undefined ? updatedFields.total : dn.total,
+            clientId: updatedFields.clientId || dn.clientId,
+            deliveredTo: updatedFields.deliveredTo !== undefined ? updatedFields.deliveredTo : dn.deliveredTo,
+            date: updatedFields.date || dn.date
+          };
+          // Fire and forget update
+          supabase.from('delivery_notes').update(dnUpdates).eq('id', dn.id).then();
+          return { ...dn, ...dnUpdates };
+        }
+        return dn;
+      }));
+    }
+  };
+
+  const deleteOrder = async (id) => {
+    setOrders(prev => prev.filter(o => o.id !== id));
+    setDeliveryNotes(prev => prev.filter(dn => dn.orderId !== id));
+    
+    await supabase.from('delivery_notes').delete().eq('orderId', id);
+    await supabase.from('orders').delete().eq('id', id);
+  };
+
+  const markOrderAsDelivered = async (orderId, deliveredTo, editedItems = null) => {
+    const order = orders.find(o => o.id === orderId);
+    if (!order || order.status === 'DELIVERED') return null;
+
+    const finalItems = editedItems || order.items;
+    
+    // Calculate new total if items were edited
+    let finalTotal = order.total;
+    if (editedItems) {
+      finalTotal = editedItems.reduce((acc, item) => {
+        const lineTotal = (Number(item.price) * Number(item.quantity)) * (1 - (Number(item.discount || 0)) / 100);
+        return acc + lineTotal;
+      }, 0);
+    }
+
+    // Update order items and total locally and in Supabase if edited during delivery
+    // (do NOT mark as DELIVERED yet)
+    const orderUpdate = { deliveredTo };
+    if (editedItems) {
+      orderUpdate.items = editedItems;
+      orderUpdate.total = finalTotal;
+    }
+    await updateOrderList(orderId, orderUpdate);
+
+    // Calculate sequential Albaran Number
+    const date = new Date();
+    const year = date.getFullYear();
+    const albaranesThisYear = deliveryNotes.filter(dn => new Date(dn.date).getFullYear() === year);
+    const seq = String(albaranesThisYear.length + 1).padStart(4, '0');
+    const albaranNumber = `${year}-${seq}`;
+
+    const tempId = Date.now().toString();
+    const client = clients.find(c => c.id === order.clientId);
+    const newAlbaran = {
+      id: tempId,
+      albaranNumber: albaranNumber,
+      orderId: order.id,
+      clientId: order.clientId,
+      clientName: client ? client.name : '',
+      clientCommercialName: client ? client.commercialName : '',
+      items: finalItems,
+      total: finalTotal,
+      date: order.date || new Date().toISOString(),
+      status: 'UNBILLED',
+      deliveredTo: deliveredTo || '',
+      signature: null,
+      sent: false
+    };
+
+    return newAlbaran;
+  };
+
+  const saveSignedDeliveryNote = async (albaran, signatureBase64) => {
+    const signedAlbaran = { ...albaran, signature: signatureBase64 };
+    
+    // Insert into Supabase delivery_notes table
+    const { data, error } = await supabase.from('delivery_notes').insert([signedAlbaran]).select();
+    if (!error && data) {
+       // Update local state with the saved albarán
+       setDeliveryNotes(prev => [...prev, data[0]]);
+       
+       // Update order status to DELIVERED in Supabase and local state
+       await updateOrderList(albaran.orderId, { 
+         status: 'DELIVERED', 
+         deliveredTo: albaran.deliveredTo 
+       });
+       
+       return data[0];
+    } else {
+       console.error('Error saving signed delivery note:', error);
+       throw new Error(error?.message || 'Error al guardar el albarán en la base de datos');
+    }
+  };
+
+  // Delivery Notes
+  const updateDeliveryNote = async (id, updatedFields) => {
+    setDeliveryNotes(prev => prev.map(n => n.id === id ? { ...n, ...updatedFields } : n));
+    await supabase.from('delivery_notes').update(updatedFields).eq('id', id);
+  };
+
+  const deleteDeliveryNote = async (id) => {
+    setDeliveryNotes(prev => prev.filter(n => n.id !== id));
+    await supabase.from('delivery_notes').delete().eq('id', id);
+  };
+
+  const markDeliveryNoteAsBilled = async (ids) => {
+    setDeliveryNotes(prev => prev.map(n => ids.includes(n.id) ? { ...n, status: 'BILLED' } : n));
+    await supabase.from('delivery_notes').update({ status: 'BILLED' }).in('id', ids);
+  };
+
+  const markInvoiceAsPaid = async (id, isPaid) => {
+    setInvoices(prev => prev.map(i => i.id === id ? { ...i, isPaid } : i));
+    await supabase.from('invoices').update({ isPaid }).eq('id', id);
+  };
+
+  // Invoices
+  const addInvoice = async (invoiceObj, deliveryNoteIds) => {
+    const tempId = Date.now().toString();
+    const newInvoice = { ...invoiceObj, id: tempId };
+    setInvoices(prev => [...prev, newInvoice]);
+    
+    markDeliveryNoteAsBilled(deliveryNoteIds);
+
+    const { data, error } = await supabase.from('invoices').insert([newInvoice]).select();
+    if (!error && data) {
+       setInvoices(prev => prev.map(i => i.id === tempId ? data[0] : i));
+    }
+  };
+  
+  const deleteInvoice = async (id) => {
+    const invoiceToDelete = invoices.find(i => i.id === id);
+    if (invoiceToDelete) {
+      setDeliveryNotes(prev => prev.map(n => 
+        invoiceToDelete.deliveryNoteIds.includes(n.id) 
+        ? { ...n, status: 'UNBILLED' } 
+        : n
+      ));
+      setInvoices(prev => prev.filter(i => i.id !== id));
+      
+      await supabase.from('delivery_notes').update({ status: 'UNBILLED' }).in('id', invoiceToDelete.deliveryNoteIds);
+      await supabase.from('invoices').delete().eq('id', id);
+    }
+  };
+
+  // Expenses
+  const addExpense = async (expenseObj) => {
+      const tempId = Date.now().toString();
+      const newExpense = { ...expenseObj, id: tempId };
+      setExpenses(prev => [...prev, newExpense]);
+  
+      const dbExpense = {
+        id: tempId,
+        date: expenseObj.date,
+        category: expenseObj.category,
+        amount: expenseObj.total,
+        isPaid: expenseObj.isPaid,
+        concept: `${expenseObj.concept} ||| ${expenseObj.paymentMethod || 'Transferencia'} ||| ${expenseObj.ivaPercentage || 21}`
+      };
+
+      const { data, error } = await supabase.from('expenses').insert([dbExpense]).select();
+      if (!error && data) {
+        // Retain local mapped properties, just update the DB id and createdAt if needed
+        setExpenses(prev => prev.map(e => e.id === tempId ? { ...newExpense, createdAt: data[0].createdAt } : e));
+      } else {
+        console.error("Error inserting expense:", error);
+      }
+    };
+
+  const updateExpense = async (id, updatedFields) => {
+      setExpenses(prev => prev.map(e => e.id === id ? { ...e, ...updatedFields } : e));
+      
+      const exp = expenses.find(e => e.id === id);
+      const merged = { ...exp, ...updatedFields };
+      
+      const dbExpense = {
+        date: merged.date,
+        category: merged.category,
+        amount: merged.total,
+        isPaid: merged.isPaid,
+        concept: `${merged.concept} ||| ${merged.paymentMethod || 'Transferencia'} ||| ${merged.ivaPercentage || 21}`
+      };
+
+      await supabase.from('expenses').update(dbExpense).eq('id', id);
+    };
+
+  const deleteExpense = async (id) => {
+    setExpenses(prev => prev.filter(e => e.id !== id));
+    await supabase.from('expenses').delete().eq('id', id);
+  };
+
+  const markExpenseAsPaid = async (id, isPaid) => {
+    setExpenses(prev => prev.map(e => e.id === id ? { ...e, isPaid } : e));
+    await supabase.from('expenses').update({ isPaid }).eq('id', id);
+  };
+
+    const importData = async (dataObject) => {
+    try {
+      if (dataObject.clients && dataObject.clients.length > 0) await supabase.from('clients').insert(dataObject.clients);
+      if (dataObject.products && dataObject.products.length > 0) await supabase.from('products').insert(dataObject.products);
+      if (dataObject.orders && dataObject.orders.length > 0) await supabase.from('orders').insert(dataObject.orders);
+      if (dataObject.deliveryNotes && dataObject.deliveryNotes.length > 0) await supabase.from('delivery_notes').insert(dataObject.deliveryNotes);
+      if (dataObject.invoices && dataObject.invoices.length > 0) await supabase.from('invoices').insert(dataObject.invoices);
+      if (dataObject.expenses && dataObject.expenses.length > 0) await supabase.from('expenses').insert(dataObject.expenses);
+      
+      alert("¡Datos subidos a Supabase con éxito! Recarga la página para verlos.");
+    } catch (e) {
+      console.error(e);
+      alert("Error importando datos. Abre F12 para ver los detalles.");
+    }
+  };
+
+  return (
+    <DataContext.Provider value={{
+      companyProfile, updateCompanyProfile, companyLogo, updateCompanyLogo,
+      clients, addClient, updateClient, deleteClient,
+      products, addProduct, updateProduct, deleteProduct,
+      orders, addOrder, updateOrderList, deleteOrder, markOrderAsDelivered, saveSignedDeliveryNote,
+      deliveryNotes, updateDeliveryNote, deleteDeliveryNote,
+      invoices, addInvoice, deleteInvoice, importData, markInvoiceAsPaid,
+      expenses, addExpense, updateExpense, deleteExpense, markExpenseAsPaid
+    }}>
+      {children}
+    </DataContext.Provider>
+  );
+};
