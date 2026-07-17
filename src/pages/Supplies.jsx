@@ -19,11 +19,11 @@ export default function Supplies() {
   
   // Semillas State
   const [newSeed, setNewSeed] = useState({ name: '', expectedYieldGrams: 0 });
-  const [newSeedEntry, setNewSeedEntry] = useState({ purchaseDate: new Date().toISOString().split('T')[0], deliveryNote: '', seedId: '', quantity: 1000, price: 0 });
+  const [newSeedEntry, setNewSeedEntry] = useState({ purchaseDate: new Date().toISOString().split('T')[0], deliveryNote: '', batchNumber: '', seedId: '', quantity: 1000, price: 0 });
   
   // Sustratos State
   const [newSubstrate, setNewSubstrate] = useState({ name: '' });
-  const [newSubstrateEntry, setNewSubstrateEntry] = useState({ purchaseDate: new Date().toISOString().split('T')[0], deliveryNote: '', substrateId: '', quantity: 50, price: 0 });
+  const [newSubstrateEntry, setNewSubstrateEntry] = useState({ purchaseDate: new Date().toISOString().split('T')[0], deliveryNote: '', batchNumber: '', substrateId: '', quantity: 50, price: 0 });
 
   // Handlers
   const handleAddProvider = e => { e.preventDefault(); addProvider(newProvider); setNewProvider({name:'', contactInfo:''}); };
@@ -33,13 +33,13 @@ export default function Supplies() {
   const handleAddSeedEntry = e => { 
     e.preventDefault(); 
     addSeedInventory(newSeedEntry); 
-    setNewSeedEntry({...newSeedEntry, deliveryNote: '', quantity: 1000, price: 0}); 
+    setNewSeedEntry({...newSeedEntry, deliveryNote: '', batchNumber: '', quantity: 1000, price: 0}); 
   };
   
   const handleAddSubstrateEntry = e => { 
     e.preventDefault(); 
     addSubstrateInventory(newSubstrateEntry); 
-    setNewSubstrateEntry({...newSubstrateEntry, deliveryNote: '', quantity: 50, price: 0}); 
+    setNewSubstrateEntry({...newSubstrateEntry, deliveryNote: '', batchNumber: '', quantity: 50, price: 0}); 
   };
 
   // Filtration logic
@@ -168,6 +168,10 @@ export default function Supplies() {
                 <input required type="text" className="form-control" placeholder="Ej: ALB-123" value={newSeedEntry.deliveryNote} onChange={e => setNewSeedEntry({...newSeedEntry, deliveryNote: e.target.value})} />
               </div>
               <div>
+                <label className="form-label">Lote</label>
+                <input required type="text" className="form-control" placeholder="Ej: L-2026-X" value={newSeedEntry.batchNumber} onChange={e => setNewSeedEntry({...newSeedEntry, batchNumber: e.target.value})} />
+              </div>
+              <div>
                 <label className="form-label">Artículo (Semilla)</label>
                 <select required className="form-control" value={newSeedEntry.seedId} onChange={e => setNewSeedEntry({...newSeedEntry, seedId: e.target.value})}>
                   <option value="">Selecciona...</option>
@@ -192,6 +196,7 @@ export default function Supplies() {
                 <tr>
                   <th>Fecha</th>
                   <th>Albarán</th>
+                  <th>Lote</th>
                   <th>Artículo / Variedad</th>
                   <th>Cantidad Registrada</th>
                   <th>Coste Total</th>
@@ -205,6 +210,8 @@ export default function Supplies() {
                     <tr key={entry.id}>
                       <td>{new Date(entry.purchaseDate).toLocaleDateString()}</td>
                       <td className="text-muted font-mono">{entry.deliveryNote || '-'}</td>
+                      <td className="font-mono text-indigo-600">{entry.batchNumber || '-'}</td>
+                      <td className="font-mono text-indigo-600">{entry.batchNumber || '-'}</td>
                       <td className="font-bold text-primary">{seed?.name || 'Desconocida'}</td>
                       <td>{entry.quantity} g <span className="text-muted" style={{fontSize:'0.8rem'}}>({(entry.quantity/1000).toFixed(2)} Kg)</span></td>
                       <td className="font-semibold">{entry.price ? `${entry.price.toFixed(2)} €` : '-'}</td>
@@ -259,6 +266,10 @@ export default function Supplies() {
                 <input required type="text" className="form-control" placeholder="Ej: ALB-123" value={newSubstrateEntry.deliveryNote} onChange={e => setNewSubstrateEntry({...newSubstrateEntry, deliveryNote: e.target.value})} />
               </div>
               <div>
+                <label className="form-label">Lote</label>
+                <input required type="text" className="form-control" placeholder="Ej: S-2026-Y" value={newSubstrateEntry.batchNumber} onChange={e => setNewSubstrateEntry({...newSubstrateEntry, batchNumber: e.target.value})} />
+              </div>
+              <div>
                 <label className="form-label">Artículo (Sustrato)</label>
                 <select required className="form-control" value={newSubstrateEntry.substrateId} onChange={e => setNewSubstrateEntry({...newSubstrateEntry, substrateId: e.target.value})}>
                   <option value="">Selecciona...</option>
@@ -283,6 +294,7 @@ export default function Supplies() {
                 <tr>
                   <th>Fecha</th>
                   <th>Albarán</th>
+                  <th>Lote</th>
                   <th>Artículo / Tipo de Sustrato</th>
                   <th>Cantidad Registrada</th>
                   <th>Coste Total</th>
