@@ -29,6 +29,7 @@ export default function EmployeeTasks() {
     activeCrops.forEach(crop => {
       const seed = seeds?.find(s => s.id === crop.seedId);
       if(!seed) return;
+      const cType = cropTypes?.find(ct => ct.id === crop.cropTypeId);
 
       const planted = new Date(crop.datePlanted);
       planted.setHours(0,0,0,0);
