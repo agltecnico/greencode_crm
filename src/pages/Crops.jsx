@@ -28,7 +28,7 @@ export default function Crops() {
   const handleAddInventory = e => { e.preventDefault(); addSeedInventory(newInventory); setNewInventory({...newInventory, providerBatch:''}); };
   const handleAddCrop = e => { 
     e.preventDefault(); 
-    const batchNum = `S-\${Date.now().toString().slice(-6)}`;
+    const batchNum = `S-${Date.now().toString().slice(-6)}`;
     addCrop({...newCrop, datePlanted: new Date().toISOString(), batchNumber: batchNum, status: 'SOAKING'}); 
     setNewCrop({...newCrop, traysCount: 1, seedGramsPerTray: 0}); 
   };
@@ -36,12 +36,12 @@ export default function Crops() {
   
   const handleRegisterHarvest = e => {
     e.preventDefault();
-    const batchNum = `L-\${Date.now().toString().slice(-6)}`;
+    const batchNum = `L-${Date.now().toString().slice(-6)}`;
     addHarvest({...newHarvest, harvestDate: new Date().toISOString(), batchNumber: batchNum});
     const product = products?.find(p => p.id === newHarvest.productId);
     generateLabelPDF(product?.name || 'Desconocido', batchNum, product?.shelfLifeDays || 10, newHarvest.tuppersCount);
     setNewHarvest({...newHarvest, tuppersCount: 1});
-    alert(`Cosecha registrada con el lote Sanidad: \${batchNum}. Generando PDF...`);
+    alert(`Cosecha registrada con el lote Sanidad: ${batchNum}. Generando PDF...`);
   };
 
   const generateLabelPDF = (productName, batch, shelfLife, copies) => {
