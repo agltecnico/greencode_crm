@@ -136,7 +136,7 @@ export default function Crops() {
     return statusMap[normalized] || status;
   };
 
-  const renderHistorial = () => {
+    const renderHistorial = () => {
     const historicalCrops = crops?.filter(c => c.status === 'HARVESTED' || c.status === 'DISCARDED') || [];
     
     const filteredHistory = historicalCrops.filter(crop => {
@@ -152,16 +152,16 @@ export default function Crops() {
 
     return (
       <div style={{ animation: 'fadeIn 0.3s ease' }}>
-        <div className="flex justify-between items-center mb-6 flex-wrap gap-4">
-          <div className="relative flex-1 min-w-[250px] max-w-md">
-            <span className="absolute inset-y-0 left-0 pl-3 flex items-center text-slate-400">
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem', flexWrap: 'wrap', gap: '1rem' }}>
+          <div style={{ position: 'relative', flex: '1', minWidth: '250px', maxWidth: '400px' }}>
+            <span style={{ position: 'absolute', top: '50%', left: '1rem', transform: 'translateY(-50%)', color: '#94a3b8' }}>
               🔍
             </span>
             <input 
               type="text" 
               placeholder="Buscar por lote o cultivo..." 
-              className="premium-input w-full pl-10" 
-              style={{ padding: '0.75rem 1rem 0.75rem 2.5rem', borderRadius: '12px', border: '1px solid #cbd5e1' }}
+              className="premium-input" 
+              style={{ width: '100%', padding: '0.75rem 1rem 0.75rem 2.5rem', borderRadius: '12px', border: '1px solid #cbd5e1', boxSizing: 'border-box' }}
               value={historySearch}
               onChange={(e) => { setHistorySearch(e.target.value); setHistoryPage(1); }}
             />
@@ -186,14 +186,14 @@ export default function Crops() {
                   const plantedDate = new Date(crop.datePlanted || crop.plantedAt).toLocaleDateString('es-ES', { year: 'numeric', month: 'short', day: 'numeric' });
                   
                   return (
-                    <tr key={crop.id} style={{ borderBottom: '1px solid #f1f5f9', transition: 'background 0.2s' }} className="hover:bg-slate-50">
+                    <tr key={crop.id} style={{ borderBottom: '1px solid #f1f5f9', transition: 'background 0.2s', cursor: 'default' }} onMouseOver={e => e.currentTarget.style.backgroundColor = '#f8fafc'} onMouseOut={e => e.currentTarget.style.backgroundColor = 'transparent'}>
                       <td style={{ padding: '1.25rem 1.5rem', fontWeight: '600', color: '#0f172a' }}>{crop.batchNumber || 'N/A'}</td>
                       <td style={{ padding: '1.25rem 1.5rem' }}>
-                        <div className="flex items-center gap-3">
-                          <div className="w-8 h-8 rounded-full bg-emerald-100 flex items-center justify-center text-emerald-600 font-bold text-xs">
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                          <div style={{ width: '2rem', height: '2rem', borderRadius: '50%', backgroundColor: '#dcfce7', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#059669', fontWeight: 'bold', fontSize: '0.75rem' }}>
                             {(cType?.name || '?').charAt(0).toUpperCase()}
                           </div>
-                          <span className="font-semibold text-slate-700">{cType?.name || 'Desconocido'}</span>
+                          <span style={{ fontWeight: '600', color: '#334155' }}>{cType?.name || 'Desconocido'}</span>
                         </div>
                       </td>
                       <td style={{ padding: '1.25rem 1.5rem', color: '#64748b' }}>{plantedDate}</td>
@@ -215,27 +215,27 @@ export default function Crops() {
             {paginatedHistory.length === 0 && (
               <div style={{ textAlign: 'center', padding: '4rem 2rem', color: '#64748b' }}>
                 <div style={{ fontSize: '3rem', marginBottom: '1rem', opacity: 0.5 }}>📭</div>
-                <h3 className="text-xl font-bold mb-2">No hay resultados</h3>
-                <p>No se encontraron cultivos en el historial que coincidan con tu búsqueda.</p>
+                <h3 style={{ fontSize: '1.25rem', fontWeight: 'bold', margin: '0 0 0.5rem 0' }}>No hay resultados</h3>
+                <p style={{ margin: 0 }}>No se encontraron cultivos en el historial que coincidan con tu búsqueda.</p>
               </div>
             )}
           </div>
           
           {totalPages > 1 && (
-            <div className="flex items-center justify-between px-6 py-4 border-t border-slate-200 bg-slate-50">
-              <span className="text-sm text-slate-500">Mostrando {(historyPage - 1) * ITEMS_PER_PAGE + 1} a {Math.min(historyPage * ITEMS_PER_PAGE, filteredHistory.length)} de {filteredHistory.length} resultados</span>
-              <div className="flex gap-2">
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '1rem 1.5rem', borderTop: '1px solid #e2e8f0', backgroundColor: '#f8fafc' }}>
+              <span style={{ fontSize: '0.875rem', color: '#64748b' }}>Mostrando {(historyPage - 1) * ITEMS_PER_PAGE + 1} a {Math.min(historyPage * ITEMS_PER_PAGE, filteredHistory.length)} de {filteredHistory.length} resultados</span>
+              <div style={{ display: 'flex', gap: '0.5rem' }}>
                 <button 
                   onClick={() => setHistoryPage(p => Math.max(1, p - 1))} 
                   disabled={historyPage === 1}
-                  className="px-3 py-1 rounded border border-slate-300 bg-white text-slate-600 disabled:opacity-50 hover:bg-slate-100 font-medium"
+                  style={{ padding: '0.25rem 0.75rem', borderRadius: '0.25rem', border: '1px solid #cbd5e1', backgroundColor: 'white', color: '#475569', fontWeight: '500', cursor: historyPage === 1 ? 'not-allowed' : 'pointer', opacity: historyPage === 1 ? 0.5 : 1 }}
                 >Anterior</button>
-                <div className="flex gap-1">
+                <div style={{ display: 'flex', gap: '0.25rem' }}>
                   {Array.from({ length: totalPages }, (_, i) => i + 1).map(page => (
                     <button 
                       key={page} 
                       onClick={() => setHistoryPage(page)}
-                      className={`w-8 h-8 rounded flex items-center justify-center font-medium ${historyPage === page ? 'bg-emerald-600 text-white' : 'border border-slate-300 bg-white text-slate-600 hover:bg-slate-100'}`}
+                      style={{ width: '2rem', height: '2rem', borderRadius: '0.25rem', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: '500', cursor: 'pointer', border: page === historyPage ? 'none' : '1px solid #cbd5e1', backgroundColor: page === historyPage ? '#059669' : 'white', color: page === historyPage ? 'white' : '#475569' }}
                     >
                       {page}
                     </button>
@@ -244,7 +244,7 @@ export default function Crops() {
                 <button 
                   onClick={() => setHistoryPage(p => Math.min(totalPages, p + 1))} 
                   disabled={historyPage === totalPages}
-                  className="px-3 py-1 rounded border border-slate-300 bg-white text-slate-600 disabled:opacity-50 hover:bg-slate-100 font-medium"
+                  style={{ padding: '0.25rem 0.75rem', borderRadius: '0.25rem', border: '1px solid #cbd5e1', backgroundColor: 'white', color: '#475569', fontWeight: '500', cursor: historyPage === totalPages ? 'not-allowed' : 'pointer', opacity: historyPage === totalPages ? 0.5 : 1 }}
                 >Siguiente</button>
               </div>
             </div>
@@ -259,27 +259,27 @@ export default function Crops() {
 
     return (
       <div style={{ animation: 'fadeIn 0.3s ease' }}>
-        <div className="flex justify-between items-center mb-6">
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem', flexWrap: 'wrap', gap: '1rem' }}>
           <div>
-            <h2 className="text-3xl font-black text-slate-800 tracking-tight">Gestión de Siembra</h2>
-            <p className="text-slate-500 text-lg mt-1">Supervisa y planta nuevas bandejas</p>
+            <h2 style={{ fontSize: '1.875rem', fontWeight: '900', color: '#1e293b', margin: '0 0 0.25rem 0', letterSpacing: '-0.025em' }}>Gestión de Siembra</h2>
+            <p style={{ color: '#64748b', fontSize: '1.125rem', margin: 0 }}>Supervisa y planta nuevas bandejas</p>
           </div>
-          <button onClick={() => setIsSowModalOpen(true)} className="btn hover:-translate-y-1 transition-transform shadow-lg shadow-emerald-600/30" style={{ background: 'linear-gradient(135deg, #10b981, #059669)', color: 'white', border: 'none', padding: '0.875rem 1.5rem', borderRadius: '12px', fontWeight: 'bold', cursor: 'pointer', fontSize: '1rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+          <button onClick={() => setIsSowModalOpen(true)} className="btn" style={{ background: 'linear-gradient(135deg, #10b981, #059669)', color: 'white', border: 'none', padding: '0.875rem 1.5rem', borderRadius: '12px', fontWeight: 'bold', cursor: 'pointer', fontSize: '1rem', display: 'flex', alignItems: 'center', gap: '0.5rem', boxShadow: '0 10px 15px -3px rgba(16, 185, 129, 0.3)', transition: 'transform 0.2s ease' }} onMouseOver={e=>e.currentTarget.style.transform='translateY(-2px)'} onMouseOut={e=>e.currentTarget.style.transform='none'}>
             <span style={{ fontSize: '1.2rem' }}>⊕</span> Registrar Siembra
           </button>
         </div>
 
         {/* Tab Navigation */}
-        <div className="flex gap-2 mb-8 bg-slate-100 p-1 rounded-xl w-fit">
+        <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '2rem', backgroundColor: '#f1f5f9', padding: '0.25rem', borderRadius: '0.75rem', width: 'fit-content' }}>
           <button 
             onClick={() => setSowTab('activos')}
-            className={`px-6 py-2.5 rounded-lg font-bold text-sm transition-all ${sowTab === 'activos' ? 'bg-white text-emerald-700 shadow-sm' : 'text-slate-500 hover:text-slate-700 hover:bg-slate-200/50'}`}
+            style={{ padding: '0.625rem 1.5rem', borderRadius: '0.5rem', fontWeight: 'bold', fontSize: '0.875rem', transition: 'all 0.2s', cursor: 'pointer', border: 'none', backgroundColor: sowTab === 'activos' ? 'white' : 'transparent', color: sowTab === 'activos' ? '#047857' : '#64748b', boxShadow: sowTab === 'activos' ? '0 1px 3px rgba(0,0,0,0.1)' : 'none' }}
           >
             🪴 Bandejas Activas ({activeCropsList.length})
           </button>
           <button 
             onClick={() => setSowTab('historico')}
-            className={`px-6 py-2.5 rounded-lg font-bold text-sm transition-all ${sowTab === 'historico' ? 'bg-white text-slate-800 shadow-sm' : 'text-slate-500 hover:text-slate-700 hover:bg-slate-200/50'}`}
+            style={{ padding: '0.625rem 1.5rem', borderRadius: '0.5rem', fontWeight: 'bold', fontSize: '0.875rem', transition: 'all 0.2s', cursor: 'pointer', border: 'none', backgroundColor: sowTab === 'historico' ? 'white' : 'transparent', color: sowTab === 'historico' ? '#1e293b' : '#64748b', boxShadow: sowTab === 'historico' ? '0 1px 3px rgba(0,0,0,0.1)' : 'none' }}
           >
             📖 Histórico de Siembras
           </button>
@@ -288,21 +288,21 @@ export default function Crops() {
         {isSowModalOpen && (
           <div style={modalOverlayStyle}>
             <div style={{ ...modalCardStyle, maxWidth: '500px', padding: 0, overflow: 'hidden' }}>
-              <div style={{ background: 'linear-gradient(135deg, #10b981, #059669)', padding: '1.5rem', color: 'white' }} className="flex justify-between items-center">
-                <div className="flex items-center gap-3">
-                  <div className="bg-white/20 p-2 rounded-lg text-2xl">🌱</div>
+              <div style={{ background: 'linear-gradient(135deg, #10b981, #059669)', padding: '1.5rem', color: 'white', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                  <div style={{ backgroundColor: 'rgba(255,255,255,0.2)', padding: '0.5rem', borderRadius: '0.5rem', fontSize: '1.5rem' }}>🌱</div>
                   <div>
-                    <h3 className="font-bold text-xl m-0">Registrar Siembra</h3>
-                    <p className="text-emerald-100 text-sm m-0">Añade nuevas bandejas al invernadero</p>
+                    <h3 style={{ fontWeight: 'bold', fontSize: '1.25rem', margin: 0 }}>Registrar Siembra</h3>
+                    <p style={{ color: '#d1fae5', fontSize: '0.875rem', margin: 0 }}>Añade nuevas bandejas al invernadero</p>
                   </div>
                 </div>
-                <button onClick={() => setIsSowModalOpen(false)} style={{ background: 'none', border: 'none', color: 'white', fontSize: '1.5rem', cursor: 'pointer', opacity: 0.8 }} className="hover:opacity-100 transition-opacity">&times;</button>
+                <button onClick={() => setIsSowModalOpen(false)} style={{ background: 'none', border: 'none', color: 'white', fontSize: '1.5rem', cursor: 'pointer', opacity: 0.8 }} onMouseOver={e=>e.currentTarget.style.opacity=1} onMouseOut={e=>e.currentTarget.style.opacity=0.8}>&times;</button>
               </div>
               <div style={{ padding: '2rem' }}>
-                <form onSubmit={handleAddCrop} className="flex flex-col gap-5">
+                <form onSubmit={handleAddCrop} style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
                   <div>
-                    <label className="text-sm font-bold mb-2 block text-slate-700">1. ¿Qué vas a plantar?</label>
-                    <select className="premium-input w-full" style={{ padding: '1rem', borderRadius: '12px', border: '2px solid #e2e8f0', background: '#f8fafc', fontSize: '1rem', fontWeight: '500' }} required value={newCrop.cropTypeId} onChange={e=>setNewCrop({...newCrop, cropTypeId: e.target.value, selectedSeedBatchId: ''})}>
+                    <label style={{ fontSize: '0.875rem', fontWeight: 'bold', marginBottom: '0.5rem', display: 'block', color: '#334155' }}>1. ¿Qué vas a plantar?</label>
+                    <select className="premium-input" style={{ width: '100%', padding: '1rem', borderRadius: '0.75rem', border: '2px solid #e2e8f0', background: '#f8fafc', fontSize: '1rem', fontWeight: '500', boxSizing: 'border-box' }} required value={newCrop.cropTypeId} onChange={e=>setNewCrop({...newCrop, cropTypeId: e.target.value, selectedSeedBatchId: ''})}>
                       <option value="">Selecciona una variedad...</option>
                       {cropTypes?.map(c => (
                         <option key={c.id} value={c.id}>{c.name}</option>
@@ -311,27 +311,27 @@ export default function Crops() {
                   </div>
                   
                   {selectedCropType && (
-                    <div style={{ background: '#f0fdf4', padding: '1.25rem', borderRadius: '12px', border: '1px solid #bbf7d0', display: 'flex', gap: '1rem', alignItems: 'flex-start' }}>
-                      <div className="text-2xl mt-1">📦</div>
+                    <div style={{ background: '#f0fdf4', padding: '1.25rem', borderRadius: '0.75rem', border: '1px solid #bbf7d0', display: 'flex', gap: '1rem', alignItems: 'flex-start' }}>
+                      <div style={{ fontSize: '1.5rem', marginTop: '0.25rem' }}>📦</div>
                       <div>
-                        <label className="text-xs font-bold uppercase tracking-wider text-green-800 block mb-1">Inventario Disponible</label>
-                        <p className="text-xl font-black text-green-900 m-0">
+                        <label style={{ fontSize: '0.75rem', fontWeight: 'bold', textTransform: 'uppercase', letterSpacing: '0.05em', color: '#166534', display: 'block', marginBottom: '0.25rem' }}>Inventario Disponible</label>
+                        <p style={{ fontSize: '1.25rem', fontWeight: '900', color: '#14532d', margin: 0 }}>
                           {totalAvailableSeed.toFixed(2)} g 
-                          {selectedCropType.seedGrams > 0 && <span className="text-sm font-semibold text-green-700 ml-2">(Max. {Math.floor(totalAvailableSeed / selectedCropType.seedGrams)} bandejas)</span>}
+                          {selectedCropType.seedGrams > 0 && <span style={{ fontSize: '0.875rem', fontWeight: '600', color: '#15803d', marginLeft: '0.5rem' }}>(Max. {Math.floor(totalAvailableSeed / selectedCropType.seedGrams)} bandejas)</span>}
                         </p>
-                        <p className="text-xs text-green-700 mt-1 leading-relaxed">El sistema descontará automáticamente {selectedCropType.seedGrams}g por cada bandeja empleando el método FIFO.</p>
+                        <p style={{ fontSize: '0.75rem', color: '#15803d', marginTop: '0.25rem', lineHeight: 1.5 }}>El sistema descontará automáticamente {selectedCropType.seedGrams}g por cada bandeja empleando el método FIFO.</p>
                       </div>
                     </div>
                   )}
 
                   <div>
-                    <label className="text-sm font-bold mb-2 block text-slate-700">2. ¿Cuántas bandejas son?</label>
-                    <input type="number" required min="1" className="premium-input w-full text-center" style={{ padding: '1rem', borderRadius: '12px', border: '2px solid #e2e8f0', fontSize: '1.5rem', fontWeight: '900', color: '#0f172a' }} value={newCrop.traysCount} onChange={e=>setNewCrop({...newCrop, traysCount: Number(e.target.value)})}/>
+                    <label style={{ fontSize: '0.875rem', fontWeight: 'bold', marginBottom: '0.5rem', display: 'block', color: '#334155' }}>2. ¿Cuántas bandejas son?</label>
+                    <input type="number" required min="1" className="premium-input" style={{ width: '100%', padding: '1rem', borderRadius: '0.75rem', border: '2px solid #e2e8f0', fontSize: '1.5rem', fontWeight: '900', color: '#0f172a', textAlign: 'center', boxSizing: 'border-box' }} value={newCrop.traysCount} onChange={e=>setNewCrop({...newCrop, traysCount: Number(e.target.value)})}/>
                   </div>
 
-                  <div className="flex gap-3 mt-4">
-                    <button type="button" onClick={() => setIsSowModalOpen(false)} className="flex-1 py-3 px-4 rounded-xl border-2 border-slate-200 text-slate-600 font-bold hover:bg-slate-50 transition-colors">Cancelar</button>
-                    <button type="submit" className="flex-1 py-3 px-4 rounded-xl text-white font-bold transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-lg" style={{ background: 'linear-gradient(135deg, #10b981, #059669)', border: 'none' }} disabled={selectedCropType && totalAvailableSeed <= 0}>
+                  <div style={{ display: 'flex', gap: '0.75rem', marginTop: '1rem' }}>
+                    <button type="button" onClick={() => setIsSowModalOpen(false)} style={{ flex: '1', padding: '0.75rem 1rem', borderRadius: '0.75rem', border: '2px solid #e2e8f0', color: '#475569', fontWeight: 'bold', backgroundColor: 'white', cursor: 'pointer', transition: 'background-color 0.2s' }} onMouseOver={e=>e.currentTarget.style.backgroundColor='#f8fafc'} onMouseOut={e=>e.currentTarget.style.backgroundColor='white'}>Cancelar</button>
+                    <button type="submit" disabled={selectedCropType && totalAvailableSeed <= 0} style={{ flex: '1', padding: '0.75rem 1rem', borderRadius: '0.75rem', border: 'none', color: 'white', fontWeight: 'bold', background: 'linear-gradient(135deg, #10b981, #059669)', cursor: (selectedCropType && totalAvailableSeed <= 0) ? 'not-allowed' : 'pointer', opacity: (selectedCropType && totalAvailableSeed <= 0) ? 0.5 : 1, boxShadow: '0 4px 6px -1px rgba(16, 185, 129, 0.2)' }}>
                       {selectedCropType && totalAvailableSeed <= 0 ? 'Sin Semilla' : 'Confirmar Siembra'}
                     </button>
                   </div>
@@ -342,7 +342,7 @@ export default function Crops() {
         )}
 
         {sowTab === 'activos' && (
-          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: '1.5rem' }}>
             {activeCropsList.map(crop => {
               const cType = cropTypes?.find(c => c.id === crop.seedId || c.id === crop.cropTypeId);
               const daysAlive = Math.floor((new Date() - new Date(crop.datePlanted || crop.plantedAt)) / (1000 * 60 * 60 * 24));
@@ -350,47 +350,47 @@ export default function Crops() {
               const progressPercentage = Math.min(100, Math.max(0, (daysAlive / expectedDays) * 100));
               
               return (
-                <div key={crop.id} className={`bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-sm hover:shadow-md transition-shadow flex flex-col`}>
-                  <div className="p-5 border-b border-slate-100 flex justify-between items-start">
-                    <div className="flex gap-4 items-center">
-                      <div className="w-12 h-12 rounded-xl bg-emerald-50 text-emerald-500 flex items-center justify-center font-black text-xl border border-emerald-100">
+                <div key={crop.id} style={{ backgroundColor: 'white', borderRadius: '1rem', border: '1px solid #e2e8f0', overflow: 'hidden', boxShadow: '0 1px 2px 0 rgba(0, 0, 0, 0.05)', display: 'flex', flexDirection: 'column' }}>
+                  <div style={{ padding: '1.25rem', borderBottom: '1px solid #f1f5f9', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                    <div style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
+                      <div style={{ width: '3rem', height: '3rem', borderRadius: '0.75rem', backgroundColor: '#ecfdf5', color: '#10b981', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: '900', fontSize: '1.25rem', border: '1px solid #d1fae5' }}>
                         {cType?.name ? cType.name.charAt(0).toUpperCase() : '🌱'}
                       </div>
                       <div>
-                        <h4 className="font-bold text-slate-800 text-lg m-0">{cType?.name || 'Desconocido'}</h4>
-                        <span className="text-xs font-bold bg-slate-100 text-slate-600 px-2 py-0.5 rounded-full mt-1 inline-block border border-slate-200">{crop.batchNumber || 'N/A'}</span>
+                        <h4 style={{ fontWeight: 'bold', color: '#1e293b', fontSize: '1.125rem', margin: 0 }}>{cType?.name || 'Desconocido'}</h4>
+                        <span style={{ fontSize: '0.75rem', fontWeight: 'bold', backgroundColor: '#f1f5f9', color: '#475569', padding: '0.125rem 0.5rem', borderRadius: '9999px', marginTop: '0.25rem', display: 'inline-block', border: '1px solid #e2e8f0' }}>{crop.batchNumber || 'N/A'}</span>
                       </div>
                     </div>
-                    <div className="text-right">
-                      <span className="text-2xl font-black text-emerald-600 block leading-none">{crop.traysCount}</span>
-                      <span className="text-xs font-bold text-slate-400 uppercase tracking-wide">Bandejas</span>
+                    <div style={{ textAlign: 'right' }}>
+                      <span style={{ fontSize: '1.5rem', fontWeight: '900', color: '#059669', display: 'block', lineHeight: 1 }}>{crop.traysCount}</span>
+                      <span style={{ fontSize: '0.75rem', fontWeight: 'bold', color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Bandejas</span>
                     </div>
                   </div>
                   
-                  <div className="p-5 flex-1 flex flex-col justify-between gap-4">
+                  <div style={{ padding: '1.25rem', flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'space-between', gap: '1rem' }}>
                     <div>
-                      <div className="flex justify-between items-end mb-2">
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', marginBottom: '0.5rem' }}>
                         <div>
-                          <p className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">Estado</p>
-                          <p className="font-bold text-slate-700 m-0">{translateStatus(crop.status)}</p>
+                          <p style={{ fontSize: '0.75rem', fontWeight: 'bold', color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.05em', margin: '0 0 0.25rem 0' }}>Estado</p>
+                          <p style={{ fontWeight: 'bold', color: '#334155', margin: 0 }}>{translateStatus(crop.status)}</p>
                         </div>
-                        <div className="text-right">
-                          <p className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">Progreso</p>
-                          <p className="font-black text-emerald-600 m-0 text-xl">{daysAlive >= 0 ? daysAlive : 0} <span className="text-sm text-slate-400 font-bold">/ {expectedDays} d</span></p>
+                        <div style={{ textAlign: 'right' }}>
+                          <p style={{ fontSize: '0.75rem', fontWeight: 'bold', color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.05em', margin: '0 0 0.25rem 0' }}>Progreso</p>
+                          <p style={{ fontWeight: '900', color: '#059669', margin: 0, fontSize: '1.25rem' }}>{daysAlive >= 0 ? daysAlive : 0} <span style={{ fontSize: '0.875rem', color: '#94a3b8', fontWeight: 'bold' }}>/ {expectedDays} d</span></p>
                         </div>
                       </div>
                       
                       {/* Progress bar */}
-                      <div className="w-full bg-slate-100 rounded-full h-2.5 overflow-hidden">
-                        <div className="bg-emerald-500 h-2.5 rounded-full" style={{ width: `${progressPercentage}%` }}></div>
+                      <div style={{ width: '100%', backgroundColor: '#f1f5f9', borderRadius: '9999px', height: '0.625rem', overflow: 'hidden' }}>
+                        <div style={{ backgroundColor: '#10b981', height: '100%', borderRadius: '9999px', width: `${progressPercentage}%` }}></div>
                       </div>
                     </div>
 
-                    <div className="flex gap-2 mt-2">
-                      <button onClick={() => discardCrop(crop)} className="flex-1 py-2 rounded-lg font-bold text-xs border border-red-200 text-red-600 hover:bg-red-50 transition-colors">
+                    <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.5rem' }}>
+                      <button onClick={() => discardCrop(crop)} style={{ flex: '1', padding: '0.5rem', borderRadius: '0.5rem', fontWeight: 'bold', fontSize: '0.75rem', border: '1px solid #fecaca', color: '#dc2626', backgroundColor: 'transparent', cursor: 'pointer', transition: 'background-color 0.2s' }} onMouseOver={e=>e.currentTarget.style.backgroundColor='#fef2f2'} onMouseOut={e=>e.currentTarget.style.backgroundColor='transparent'}>
                         Descartar
                       </button>
-                      <button onClick={() => advanceCropStatus(crop)} className="flex-[2] py-2 rounded-lg font-bold text-sm bg-slate-800 text-white hover:bg-slate-700 transition-colors shadow-md">
+                      <button onClick={() => advanceCropStatus(crop)} style={{ flex: '2', padding: '0.5rem', borderRadius: '0.5rem', fontWeight: 'bold', fontSize: '0.875rem', backgroundColor: '#1e293b', color: 'white', border: 'none', cursor: 'pointer', transition: 'background-color 0.2s', boxShadow: '0 1px 3px rgba(0,0,0,0.1)' }} onMouseOver={e=>e.currentTarget.style.backgroundColor='#334155'} onMouseOut={e=>e.currentTarget.style.backgroundColor='#1e293b'}>
                         Avanzar Fase ⏭
                       </button>
                     </div>
@@ -399,11 +399,11 @@ export default function Crops() {
               );
             })}
             {activeCropsList.length === 0 && (
-              <div className="col-span-full flex flex-col items-center justify-center py-16 bg-white rounded-2xl border-2 border-dashed border-slate-200">
-                <div className="text-5xl mb-4 opacity-50">🪴</div>
-                <h3 className="text-xl font-bold text-slate-700 mb-2">Invernadero Vacío</h3>
-                <p className="text-slate-500 mb-6 text-center max-w-md">No tienes ninguna bandeja creciendo actualmente. Registra tu primera siembra para empezar.</p>
-                <button onClick={() => setIsSowModalOpen(true)} className="btn btn-primary shadow-lg shadow-emerald-600/20" style={{ background: '#10b981', color: 'white', border: 'none', padding: '0.75rem 1.5rem', borderRadius: '12px', fontWeight: 'bold' }}>
+              <div style={{ gridColumn: '1 / -1', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '4rem 2rem', backgroundColor: 'white', borderRadius: '1rem', border: '2px dashed #e2e8f0' }}>
+                <div style={{ fontSize: '3rem', marginBottom: '1rem', opacity: 0.5 }}>🪴</div>
+                <h3 style={{ fontSize: '1.25rem', fontWeight: 'bold', color: '#334155', margin: '0 0 0.5rem 0' }}>Invernadero Vacío</h3>
+                <p style={{ color: '#64748b', marginBottom: '1.5rem', textAlign: 'center', maxWidth: '400px' }}>No tienes ninguna bandeja creciendo actualmente. Registra tu primera siembra para empezar.</p>
+                <button onClick={() => setIsSowModalOpen(true)} className="btn btn-primary" style={{ background: '#10b981', color: 'white', border: 'none', padding: '0.75rem 1.5rem', borderRadius: '0.75rem', fontWeight: 'bold', boxShadow: '0 4px 6px -1px rgba(16, 185, 129, 0.2)', cursor: 'pointer' }}>
                   Hacer una Siembra
                 </button>
               </div>
@@ -416,7 +416,6 @@ export default function Crops() {
       </div>
     );
   };
-
   const renderCosechas = () => (
     <div style={{ animation: 'fadeIn 0.3s ease' }}>
       <div className="flex justify-between items-center mb-6">
@@ -637,7 +636,7 @@ export default function Crops() {
     </div>
   );
 
-  const renderCropsHub = () => (
+    const renderCropsHub = () => (
     <div className="hub-container" style={{ padding: '2rem', animation: 'fadeIn 0.4s ease', maxWidth: '1000px', margin: '0 auto' }}>
       <div className="hub-header" style={{ marginBottom: '4rem', textAlign: 'center', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
         <h1 style={{ fontSize: '3rem', margin: '0 0 0.5rem 0', color: '#0f172a', fontWeight: '900', letterSpacing: '-0.05em' }}>Control de Cultivo</h1>
@@ -645,7 +644,7 @@ export default function Crops() {
       </div>
       
       <div className="hub-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1.5rem' }}>
-        <button onClick={() => setActiveTab('tareas')} className="hub-card crops-card" style={{ border: 'none', width: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '2.5rem 1rem', background: 'white', borderRadius: '24px', boxShadow: '0 10px 25px -5px rgba(0,0,0,0.05), 0 8px 10px -6px rgba(0,0,0,0.01)', transition: 'all 0.3s ease' }}>
+        <button onClick={() => setActiveTab('tareas')} className="hub-card crops-card" style={{ border: 'none', width: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '2.5rem 1rem', background: 'white', borderRadius: '24px', boxShadow: '0 10px 25px -5px rgba(0,0,0,0.05), 0 8px 10px -6px rgba(0,0,0,0.01)', transition: 'all 0.3s ease', cursor: 'pointer' }}>
           <div className="hub-card-text" style={{ textAlign: 'center', marginBottom: '1.5rem' }}>
             <h2 style={{ fontSize: '1.75rem', fontWeight: '800', color: '#1e293b', margin: '0 0 0.5rem 0' }}>Tareas</h2>
             <p style={{ fontSize: '1rem', color: '#64748b', margin: 0 }}>Día / Semana / Mes</p>
@@ -653,7 +652,7 @@ export default function Crops() {
           <div className="hub-card-icon" style={{ fontSize: '4rem', background: '#fef2f2', width: '80px', height: '80px', display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: '50%' }}>🎯</div>
         </button>
 
-        <button onClick={() => setActiveTab('lotes')} className="hub-card tv-card" style={{ border: 'none', width: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '2.5rem 1rem', background: 'white', borderRadius: '24px', boxShadow: '0 10px 25px -5px rgba(0,0,0,0.05), 0 8px 10px -6px rgba(0,0,0,0.01)', transition: 'all 0.3s ease' }}>
+        <button onClick={() => setActiveTab('lotes')} className="hub-card tv-card" style={{ border: 'none', width: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '2.5rem 1rem', background: 'white', borderRadius: '24px', boxShadow: '0 10px 25px -5px rgba(0,0,0,0.05), 0 8px 10px -6px rgba(0,0,0,0.01)', transition: 'all 0.3s ease', cursor: 'pointer' }}>
           <div className="hub-card-text" style={{ textAlign: 'center', marginBottom: '1.5rem' }}>
             <h2 style={{ fontSize: '1.75rem', fontWeight: '800', color: '#1e293b', margin: '0 0 0.5rem 0' }}>Siembra</h2>
             <p style={{ fontSize: '1rem', color: '#64748b', margin: 0 }}>Bandejas en curso</p>
@@ -661,7 +660,7 @@ export default function Crops() {
           <div className="hub-card-icon" style={{ fontSize: '4rem', background: '#f0fdf4', width: '80px', height: '80px', display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: '50%' }}>🪴</div>
         </button>
 
-        <button onClick={() => setActiveTab('cosechas')} className="hub-card admin-card" style={{ border: 'none', width: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '2.5rem 1rem', background: 'white', borderRadius: '24px', boxShadow: '0 10px 25px -5px rgba(0,0,0,0.05), 0 8px 10px -6px rgba(0,0,0,0.01)', transition: 'all 0.3s ease' }}>
+        <button onClick={() => setActiveTab('cosechas')} className="hub-card admin-card" style={{ border: 'none', width: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '2.5rem 1rem', background: 'white', borderRadius: '24px', boxShadow: '0 10px 25px -5px rgba(0,0,0,0.05), 0 8px 10px -6px rgba(0,0,0,0.01)', transition: 'all 0.3s ease', cursor: 'pointer' }}>
           <div className="hub-card-text" style={{ textAlign: 'center', marginBottom: '1.5rem' }}>
             <h2 style={{ fontSize: '1.75rem', fontWeight: '800', color: '#1e293b', margin: '0 0 0.5rem 0' }}>Cosecha</h2>
             <p style={{ fontSize: '1rem', color: '#64748b', margin: 0 }}>Envasado y etiquetas</p>
@@ -669,7 +668,7 @@ export default function Crops() {
           <div className="hub-card-icon" style={{ fontSize: '4rem', background: '#f8fafc', width: '80px', height: '80px', display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: '50%' }}>🔪</div>
         </button>
 
-        <button onClick={() => setActiveTab('planificador')} className="hub-card driver-card" style={{ border: 'none', width: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '2.5rem 1rem', background: 'white', borderRadius: '24px', boxShadow: '0 10px 25px -5px rgba(0,0,0,0.05), 0 8px 10px -6px rgba(0,0,0,0.01)', transition: 'all 0.3s ease' }}>
+        <button onClick={() => setActiveTab('planificador')} className="hub-card driver-card" style={{ border: 'none', width: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '2.5rem 1rem', background: 'white', borderRadius: '24px', boxShadow: '0 10px 25px -5px rgba(0,0,0,0.05), 0 8px 10px -6px rgba(0,0,0,0.01)', transition: 'all 0.3s ease', cursor: 'pointer' }}>
           <div className="hub-card-text" style={{ textAlign: 'center', marginBottom: '1.5rem' }}>
             <h2 style={{ fontSize: '1.75rem', fontWeight: '800', color: '#1e293b', margin: '0 0 0.5rem 0' }}>Planificador</h2>
             <p style={{ fontSize: '1rem', color: '#64748b', margin: 0 }}>Rutinas automáticas</p>
