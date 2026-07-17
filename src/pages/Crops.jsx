@@ -271,6 +271,43 @@ export default function Crops() {
       )}
 
       <div className="premium-card mt-6">
+        <h3 className="premium-card-title mb-4">🌱 Cultivos Listos para Cosechar</h3>
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          {(crops?.filter(c => c.status === 'GROWING') || []).map(crop => {
+            const cType = cropTypes?.find(c => c.id === crop.seedId || c.id === crop.cropTypeId);
+            const daysAlive = Math.floor((new Date() - new Date(crop.datePlanted || crop.plantedAt)) / (1000 * 60 * 60 * 24));
+            
+            return (
+              <div key={crop.id} className="p-4 rounded-xl border border-green-200 bg-green-50 shadow-sm relative">
+                <div className="flex justify-between items-start mb-2">
+                  <h4 className="font-bold text-green-800 text-lg">{cType?.name || 'Desconocido'}</h4>
+                  <span className="bg-green-600 text-white text-xs px-2 py-1 rounded-md font-mono">{crop.batchNumber || 'N/A'}</span>
+                </div>
+                <div className="flex flex-col gap-1 text-sm text-green-700">
+                  <p><strong>Bandejas:</strong> {crop.traysCount}</p>
+                  <p><strong>Días de vida:</strong> {daysAlive} días</p>
+                </div>
+                <button 
+                  onClick={() => {
+                    setIsHarvestModalOpen(true);
+                    // Pre-fill modal with related product if possible, but for now just open modal
+                  }}
+                  className="mt-3 w-full bg-green-600 hover:bg-green-700 text-white font-bold py-2 rounded-lg transition-colors"
+                >
+                  Ir a Envasar
+                </button>
+              </div>
+            );
+          })}
+          {(crops?.filter(c => c.status === 'GROWING') || []).length === 0 && (
+            <div className="col-span-full text-center py-6 bg-gray-50 rounded-xl border border-dashed border-gray-300">
+              <p className="text-gray-500">No hay cultivos en fase de crecimiento actualmente.</p>
+            </div>
+          )}
+        </div>
+      </div>
+
+      <div className="premium-card mt-6">
         <h3 className="premium-card-title">🏷️ Historial de Lotes de Sanidad</h3>
         <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
           {harvests?.slice().reverse().map(h => {
