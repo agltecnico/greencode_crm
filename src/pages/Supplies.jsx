@@ -7,21 +7,18 @@ export default function Supplies() {
     providers, 
     articles, addArticle, updateArticle, deleteArticle,
     stockEntries, addStockEntry, deleteStockEntry,
-    cropTypes, addCropType, deleteCropType
+    cropTypes, addCropType, updateCropType, deleteCropType
   } = useData();
 
   const [activeTab, setActiveTab] = useState('CATALOG');
   const [searchTerm, setSearchTerm] = useState('');
 
-  // Expenses Filters
-  const [expMonth, setExpMonth] = useState('');
-  const [expType, setExpType] = useState('');
-  const [expProvider, setExpProvider] = useState('');
-
   // Forms State
   const [newArticle, setNewArticle] = useState({ name: '', type: 'SEMILLA' });
   const [editingArticleId, setEditingArticleId] = useState(null);
   const [editedArticle, setEditedArticle] = useState(null);
+  const [editingCropTypeId, setEditingCropTypeId] = useState(null);
+  const [editedCropType, setEditedCropType] = useState(null);
   const [newStockEntry, setNewStockEntry] = useState({ purchaseDate: new Date().toISOString().split('T')[0], deliveryNote: '', batchNumber: '', articleId: '', providerId: '', quantity: 1, price: 0 });
   
   const [newType, setNewType] = useState({
@@ -486,7 +483,62 @@ export default function Supplies() {
                   const expectedKg = Number(c.expectedYieldGrams || 0) / 1000;
                   const costPerKg = expectedKg > 0 ? totalCost / expectedKg : 0;
 
-                  return (
+                  return editingCropTypeId === c.id ? (
+                    <tr key={c.id}>
+                      <td colSpan="7" style={{ padding: '1.5rem', background: '#f8fafc', border: '1px solid #e2e8f0' }}>
+                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+                          <div>
+                            <label className="form-label text-sm">Nombre de la Ficha</label>
+                            <input type="text" className="form-control" value={editedCropType.name} onChange={e => setEditedCropType({...editedCropType, name: e.target.value})} />
+                          </div>
+                          <div>
+                            <label className="form-label text-sm">Proveedor Predilecto</label>
+                            <select className="form-control" value={editedCropType.providerId || ''} onChange={e => setEditedCropType({...editedCropType, providerId: e.target.value})}>
+                              <option value="">Cualquiera</option>
+                              {providers?.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+                            </select>
+                          </div>
+                          <div>
+                            <label className="form-label text-sm">Semilla</label>
+                            <select className="form-control" value={editedCropType.seedId || ''} onChange={e => setEditedCropType({...editedCropType, seedId: e.target.value})}>
+                              <option value="">Selecciona...</option>
+                              {seeds.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+                            </select>
+                          </div>
+                          <div>
+                            <label className="form-label text-sm">Gramos de Semilla</label>
+                            <input type="number" step="0.1" min="0" className="form-control" value={editedCropType.seedGrams} onChange={e => setEditedCropType({...editedCropType, seedGrams: Number(e.target.value)})} />
+                          </div>
+                          <div>
+                            <label className="form-label text-sm">Sustrato</label>
+                            <select className="form-control" value={editedCropType.substrateId || ''} onChange={e => setEditedCropType({...editedCropType, substrateId: e.target.value})}>
+                              <option value="">Ninguno</option>
+                              {substrates.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+                            </select>
+                          </div>
+                          <div>
+                            <label className="form-label text-sm">Litros de Sustrato</label>
+                            <input type="number" step="0.1" min="0" className="form-control" value={editedCropType.substrateLiters} onChange={e => setEditedCropType({...editedCropType, substrateLiters: Number(e.target.value)})} />
+                          </div>
+                          <div>
+                            <label className="form-label text-sm">Envase / Bandeja</label>
+                            <select className="form-control" value={editedCropType.containerId || ''} onChange={e => setEditedCropType({...editedCropType, containerId: e.target.value})}>
+                              <option value="">Selecciona...</option>
+                              {containers.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+                            </select>
+                          </div>
+                          <div>
+                            <label className="form-label text-sm">Rendimiento Esperado (g)</label>
+                            <input type="number" step="1" min="0" className="form-control" value={editedCropType.expectedYieldGrams} onChange={e => setEditedCropType({...editedCropType, expectedYieldGrams: Number(e.target.value)})} />
+                          </div>
+                        </div>
+                        <div style={{ marginTop: '1rem', display: 'flex', gap: '0.5rem', justifyContent: 'flex-end' }}>
+                          <button className="btn btn-primary" onClick={() => { updateCropType(c.id, editedCropType); setEditingCropTypeId(null); }}>Guardar Ficha</button>
+                          <button className="btn btn-secondary" onClick={() => setEditingCropTypeId(null)}>Cancelar</button>
+                        </div>
+                      </td>
+                    </tr>
+                  ) : (
                     <tr key={c.id}>
                       <td className="font-bold text-slate-800">{c.name}</td>
                       <td className="text-muted">{providers?.find(p => p.id === c.providerId)?.name || 'Cualquiera'}</td>
@@ -513,7 +565,10 @@ export default function Supplies() {
                         )}
                       </td>
                       <td>
-                        <button className="btn btn-danger" style={{ padding: '0.3rem 0.6rem', fontSize: '0.8rem', background: 'transparent', color: '#ef4444', border: '1px solid #ef4444' }} onClick={() => deleteCropType(c.id)}>Borrar</button>
+                        <div style={{ display: 'flex', gap: '0.5rem' }}>
+                          <button className="btn btn-secondary" style={{ padding: '0.3rem 0.6rem', fontSize: '0.8rem', background: 'transparent' }} onClick={() => { setEditingCropTypeId(c.id); setEditedCropType(c); }}>Editar</button>
+                          <button className="btn btn-danger" style={{ padding: '0.3rem 0.6rem', fontSize: '0.8rem', background: 'transparent', color: '#ef4444', border: '1px solid #ef4444' }} onClick={() => deleteCropType(c.id)}>Borrar</button>
+                        </div>
                       </td>
                     </tr>
                   )
