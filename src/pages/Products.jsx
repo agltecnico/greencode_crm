@@ -119,14 +119,14 @@ export default function Products() {
                       {seeds.map(seed => {
                         const isSelected = formData.recipeSeeds.some(s => s.seedId === seed.id);
                         return (
-                          <label key={seed.id} className={\`flex items-center gap-2 p-2 rounded cursor-pointer transition-colors \${isSelected ? 'bg-primary/20 border border-primary/50' : 'bg-slate-700/50 border border-transparent hover:bg-slate-700'}\`}>
+                          <label key={seed.id} className={`flex items-center gap-2 p-2 rounded cursor-pointer transition-colors ${isSelected ? 'bg-primary/20 border border-primary/50' : 'bg-slate-700/50 border border-transparent hover:bg-slate-700'}`}>
                             <input 
                               type="checkbox"
                               checked={isSelected}
                               onChange={() => toggleSeedInRecipe(seed.id)}
                               className="hidden"
                             />
-                            <div className={\`w-4 h-4 rounded-full border flex items-center justify-center \${isSelected ? 'bg-primary border-primary' : 'border-gray-500'}\`}>
+                            <div className={`w-4 h-4 rounded-full border flex items-center justify-center ${isSelected ? 'bg-primary border-primary' : 'border-gray-500'}`}>
                               {isSelected && <div className="w-2 h-2 bg-slate-900 rounded-full"></div>}
                             </div>
                             <span className={isSelected ? 'text-white' : 'text-gray-300'}>{seed.name}</span>

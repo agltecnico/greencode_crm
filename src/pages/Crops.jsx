@@ -67,7 +67,7 @@ export default function Crops() {
       const g = Number(newCrop.gramsPerTray) || 0;
       const t = Number(newCrop.traysCount) || 1;
       
-      const batchNum = \`S-\${Date.now().toString().slice(-6)}\`;
+      const batchNum = `S-${Date.now().toString().slice(-6)}`;
       addCrop({
         ...newCrop,
         batchNumber: batchNum,
@@ -108,7 +108,7 @@ export default function Crops() {
       const p = products.find(prod => prod.id === newHarvest.productId);
       if(!p) return;
 
-      const lotSanidad = \`LOT-\${new Date().toISOString().slice(2,10).replace(/-/g,'')}-\${p.name.substring(0,3).toUpperCase()}\`;
+      const lotSanidad = `LOT-${new Date().toISOString().slice(2,10).replace(/-/g,'')}-${p.name.substring(0,3).toUpperCase()}`;
       const costPerTupper = 0.50; // Calculo simplificado para la demo
 
       addHarvest({
@@ -239,7 +239,7 @@ export default function Crops() {
                 <td>
                   <div className="flex items-center gap-2">
                     <div className="w-full bg-slate-700 h-2 rounded-full overflow-hidden">
-                      <div className="bg-green-500 h-full" style={{ width: \`\${Math.max(0, (inv.gramsRemaining/inv.gramsPurchased)*100)}%\` }}></div>
+                      <div className="bg-green-500 h-full" style={{ width: `${Math.max(0, (inv.gramsRemaining/inv.gramsPurchased)*100)}%` }}></div>
                     </div>
                     <span className="text-xs">{inv.gramsRemaining}g</span>
                   </div>
@@ -302,7 +302,7 @@ export default function Crops() {
                     </p>
                   </div>
                   <div className="flex items-center gap-4">
-                    <div className={\`px-3 py-1 rounded text-sm font-bold border \${statusColors[crop.status] || 'bg-gray-500'}\`}>
+                    <div className={`px-3 py-1 rounded text-sm font-bold border ${statusColors[crop.status] || 'bg-gray-500'}`}>
                       {crop.status}
                     </div>
                     <button onClick={() => advanceCropStatus(crop)} className="btn btn-secondary text-xs px-2 py-1">
@@ -440,7 +440,7 @@ export default function Crops() {
           <button 
             key={tab.id}
             onClick={() => setActiveTab(tab.id)}
-            className={\`flex-1 py-2 px-4 rounded-md font-bold transition-all whitespace-nowrap \${activeTab === tab.id ? 'bg-primary text-slate-900 shadow-md' : 'text-gray-400 hover:text-white hover:bg-slate-700'}\`}
+            className={`flex-1 py-2 px-4 rounded-md font-bold transition-all whitespace-nowrap ${activeTab === tab.id ? 'bg-primary text-slate-900 shadow-md' : 'text-gray-400 hover:text-white hover:bg-slate-700'}`}
           >
             {tab.icon} {tab.label}
           </button>

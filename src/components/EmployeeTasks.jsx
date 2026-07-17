@@ -28,14 +28,14 @@ export default function EmployeeTasks() {
     if(crop.status !== expectedPhase && expectedPhase !== 'HARVEST_READY') {
       tasks.push({
         type: 'move',
-        text: \`Mover \${crop.traysCount} bandejas de \${seed.name} (\${crop.batchNumber}) a \${expectedPhase}\`,
+        text: `Mover ${crop.traysCount} bandejas de ${seed.name} (${crop.batchNumber}) a ${expectedPhase}`,
         icon: '🔄',
         color: 'bg-blue-500'
       });
     } else if (expectedPhase === 'HARVEST_READY' && crop.status !== 'HARVESTED') {
       tasks.push({
         type: 'harvest',
-        text: \`¡COSECHAR! \${crop.traysCount} bandejas de \${seed.name} (\${crop.batchNumber})\`,
+        text: `¡COSECHAR! ${crop.traysCount} bandejas de ${seed.name} (${crop.batchNumber})`,
         icon: '✂️',
         color: 'bg-green-500'
       });
@@ -64,7 +64,7 @@ export default function EmployeeTasks() {
       if(plantingDay === todayDayOfWeek) {
         tasks.push({
           type: 'plant',
-          text: \`Plantar semilla de \${seed.name} para el objetivo de \${product.name} (cosecha el día \${target.targetDayOfWeek})\`,
+          text: `Plantar semilla de ${seed.name} para el objetivo de ${product.name} (cosecha el día ${target.targetDayOfWeek})`,
           icon: '🌱',
           color: 'bg-yellow-500'
         });
@@ -75,7 +75,7 @@ export default function EmployeeTasks() {
           if(soakingDay === todayDayOfWeek) {
             tasks.push({
               type: 'soak',
-              text: \`Poner a remojo semilla de \${seed.name} (\${seed.soakingHours}h) para plantar mañana\`,
+              text: `Poner a remojo semilla de ${seed.name} (${seed.soakingHours}h) para plantar mañana`,
               icon: '💧',
               color: 'bg-blue-400'
             });
@@ -100,8 +100,8 @@ export default function EmployeeTasks() {
               </div>
             ) : (
               tasks.map((task, i) => (
-                <div key={i} className={\`p-4 rounded-xl flex items-center gap-4 border border-slate-700 shadow-lg \${task.color} bg-opacity-20\`}>
-                  <div className={\`w-12 h-12 flex items-center justify-center rounded-full text-2xl \${task.color} text-white shadow-lg\`}>
+                <div key={i} className={`p-4 rounded-xl flex items-center gap-4 border border-slate-700 shadow-lg ${task.color} bg-opacity-20`}>
+                  <div className={`w-12 h-12 flex items-center justify-center rounded-full text-2xl ${task.color} text-white shadow-lg`}>
                     {task.icon}
                   </div>
                   <p className="text-xl font-bold text-white flex-1">{task.text}</p>

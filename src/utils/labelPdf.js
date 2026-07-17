@@ -3,8 +3,8 @@ export const generateLabelPDF = (productName, batchNumber, shelfLifeDays, count)
   const height = 1131; // A4 size aprox at 96dpi
 
   const svgParts = [];
-  svgParts.push(\`<svg width="\${width}" height="\${height}" xmlns="http://www.w3.org/2000/svg">\`);
-  svgParts.push(\`<rect width="100%" height="100%" fill="white"/>\`);
+  svgParts.push(`<svg width="${width}" height="${height}" xmlns="http://www.w3.org/2000/svg">`);
+  svgParts.push(`<rect width="100%" height="100%" fill="white"/>`);
   
   const cols = 2;
   const rows = 5;
@@ -24,14 +24,14 @@ export const generateLabelPDF = (productName, batchNumber, shelfLifeDays, count)
       const x = col * labelWidth;
       const y = row * labelHeight;
       
-      svgParts.push(\`
-        <g transform="translate(\${x + 20}, \${y + 20})">
-          <rect width="\${labelWidth - 40}" height="\${labelHeight - 40}" fill="none" stroke="#ccc" stroke-width="2" rx="10"/>
+      svgParts.push(`
+        <g transform="translate(${x + 20}, ${y + 20})">
+          <rect width="${labelWidth - 40}" height="${labelHeight - 40}" fill="none" stroke="#ccc" stroke-width="2" rx="10"/>
           <text x="20" y="40" font-family="Arial" font-size="24" font-weight="bold" fill="black">GREENCODE</text>
-          <text x="20" y="80" font-family="Arial" font-size="28" font-weight="bold" fill="#16a34a">\${productName}</text>
+          <text x="20" y="80" font-family="Arial" font-size="28" font-weight="bold" fill="#16a34a">${productName}</text>
           
-          <text x="20" y="120" font-family="Arial" font-size="16" fill="#333">Envasado: \${formattedToday}</text>
-          <text x="20" y="145" font-family="Arial" font-size="16" fill="#333" font-weight="bold">Consumo Preferente: \${formattedExp}</text>
+          <text x="20" y="120" font-family="Arial" font-size="16" fill="#333">Envasado: ${formattedToday}</text>
+          <text x="20" y="145" font-family="Arial" font-size="16" fill="#333" font-weight="bold">Consumo Preferente: ${formattedExp}</text>
           
           <!-- Faux QR Code / Barcode -->
           <rect x="20" y="165" width="60" height="60" fill="black"/>
@@ -41,9 +41,9 @@ export const generateLabelPDF = (productName, batchNumber, shelfLifeDays, count)
           <rect x="40" y="185" width="20" height="20" fill="white"/>
           
           <text x="95" y="195" font-family="monospace" font-size="14" fill="#666">LOTE SANIDAD:</text>
-          <text x="95" y="215" font-family="monospace" font-size="20" font-weight="bold" fill="black">\${batchNumber}</text>
+          <text x="95" y="215" font-family="monospace" font-size="20" font-weight="bold" fill="black">${batchNumber}</text>
         </g>
-      \`);
+      `);
       drawn++;
     }
   }
@@ -59,12 +59,12 @@ export const generateLabelPDF = (productName, batchNumber, shelfLifeDays, count)
   iframe.style.border = 'none';
 
   iframe.contentDocument.open();
-  iframe.contentDocument.write(\`
+  iframe.contentDocument.write(`
     <!DOCTYPE html>
     <html>
-      <head><title>Imprimir Etiquetas \${batchNumber}</title></head>
+      <head><title>Imprimir Etiquetas ${batchNumber}</title></head>
       <body style="margin:0; padding:0; text-align:center;">
-        \${svgString}
+        ${svgString}
         <script>
           window.onload = function() {
             window.print();
@@ -73,6 +73,6 @@ export const generateLabelPDF = (productName, batchNumber, shelfLifeDays, count)
         </script>
       </body>
     </html>
-  \`);
+  `);
   iframe.contentDocument.close();
 };
