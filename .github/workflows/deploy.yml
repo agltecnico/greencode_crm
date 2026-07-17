@@ -1,0 +1,36 @@
+name: Deploy to Hostinger via FTP
+
+on:
+  push:
+    branches:
+      - main # Se ejecutará automáticamente cada vez que haya cambios en la rama principal
+
+jobs:
+  build-and-deploy:
+    name: Build and Deploy
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: 🚚 Obtener el código de GitHub
+      uses: actions/checkout@v3
+
+    - name: ⚙️ Configurar Node.js
+      uses: actions/setup-node@v3
+      with:
+        node-version: '20'
+
+    - name: 📦 Instalar dependencias
+      run: npm install
+
+    - name: 🏗️ Compilar el proyecto (Vite)
+      run: npm run build
+
+    - name: 🚀 Subir a Hostinger por FTP
+      uses: SamKirkland/FTP-Deploy-Action@v4.3.4
+      with:
+        server: ${{ secrets.FTP_SERVER }}
+        username: ${{ secrets.FTP_USERNAME }}
+        password: ${{ secrets.FTP_PASSWORD }}
+        local-dir: ./dist/
+        server-dir: ./public_html/
+        # Si tu dominio en hostinger apunta a otra carpeta, cambia el public_html/ por tu ruta, ej: ./domains/pedidos.mygreencode.es/public_html/
