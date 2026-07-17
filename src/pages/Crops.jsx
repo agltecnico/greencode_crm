@@ -1,9 +1,11 @@
 import { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useData } from '../context/DataContext';
 import EmployeeTasks from '../components/EmployeeTasks';
 import '../crops.css';
 
 export default function Crops() {
+  const navigate = useNavigate();
   const { 
     providers, addProvider, deleteProvider,
     seeds, addSeed, deleteSeed,
@@ -329,7 +331,10 @@ export default function Crops() {
   );
 
   return (
-    <div className="crops-module" style={{ paddingBottom: '5rem', maxWidth: '1400px', margin: '0 auto' }}>
+    <div className="crops-module" style={{ paddingBottom: '5rem', maxWidth: '1400px', margin: '0 auto', paddingTop: '1rem' }}>
+      <button onClick={() => navigate('/')} style={{ background: 'transparent', border: '1px solid var(--crop-border)', color: 'var(--crop-text-main)', padding: '0.5rem 1rem', borderRadius: '8px', fontWeight: 'bold', cursor: 'pointer', marginBottom: '1rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+        <span>←</span> Volver al Hub
+      </button>
       
       <div className="crops-tabs-container">
         {[

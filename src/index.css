@@ -485,3 +485,104 @@ body {
 .custom-select:disabled { opacity: 0.6; cursor: not-allowed; }
 .stats-container { display: flex; flex-wrap: wrap; gap: 24px; margin-bottom: 2rem; width: 100%; justify-content: flex-start; }
 @media (max-width: 768px) { .mobile-hide { display: none !important; } }
+
+/* Hub Layout */
+.hub-container {
+  min-height: 100vh;
+  width: 100%;
+  background: linear-gradient(135deg, #f8fafc, #f1f5f9);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 2rem;
+  box-sizing: border-box;
+}
+
+.hub-content {
+  max-width: 1000px;
+  width: 100%;
+}
+
+.hub-header {
+  text-align: center;
+  margin-bottom: 4rem;
+}
+
+.hub-logo {
+  height: 60px;
+  margin-bottom: 1.5rem;
+}
+
+.hub-header h1 {
+  font-size: 2.5rem;
+  font-weight: 900;
+  color: #1e293b;
+  margin: 0 0 0.5rem 0;
+}
+
+.hub-header p {
+  font-size: 1.2rem;
+  color: #64748b;
+  margin: 0;
+}
+
+.hub-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  gap: 2rem;
+}
+
+.hub-card {
+  background: white;
+  border: 1px solid #e2e8f0;
+  border-radius: 24px;
+  padding: 2.5rem 2rem;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: 1.5rem;
+  cursor: pointer;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  box-shadow: 0 10px 30px -10px rgba(0,0,0,0.05);
+  text-decoration: none;
+}
+
+.hub-card:hover {
+  transform: translateY(-8px);
+  box-shadow: 0 20px 40px -10px rgba(0,0,0,0.1);
+  border-color: #cbd5e1;
+}
+
+.hub-card-icon {
+  font-size: 4rem;
+  filter: drop-shadow(0 4px 6px rgba(0,0,0,0.1));
+}
+
+.hub-card-text h2 {
+  margin: 0 0 0.5rem 0;
+  font-size: 1.5rem;
+  font-weight: 800;
+  color: #1e293b;
+}
+
+.hub-card-text p {
+  margin: 0;
+  font-size: 1rem;
+  color: #64748b;
+  line-height: 1.5;
+}
+
+.admin-card:hover h2 { color: #0ea5e9; }
+.crops-card:hover h2 { color: #10b981; }
+.tv-card:hover h2 { color: #f59e0b; }
+.driver-card:hover h2 { color: #8b5cf6; }
+
+@media (max-width: 768px) {
+  .hub-container {
+    padding: 1rem;
+  }
+  .hub-header h1 {
+    font-size: 2rem;
+  }
+}

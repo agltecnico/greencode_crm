@@ -15,22 +15,25 @@ export default function Layout() {
           <img src="/logo.png" alt="GreenCode" className="sidebar-logo" />
         </div>
         <nav className="sidebar-nav">
-          <NavLink onClick={() => setSidebarOpen(false)} to="/" className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`} end>
+          <NavLink onClick={() => setSidebarOpen(false)} to="/" className="nav-item" end style={{ background: "#f8fafc", color: "#0ea5e9", fontWeight: "bold", border: "1px solid #e0f2fe", marginBottom: "1rem" }}>
+            <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" className="w-5 h-5"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" /></svg> Volver al Hub
+          </NavLink>
+          <NavLink onClick={() => setSidebarOpen(false)} to="/admin" className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`} end>
             <LayoutDashboard /> Dashboard
           </NavLink>
-          <NavLink onClick={() => setSidebarOpen(false)} to="/clients" className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}>
+          <NavLink onClick={() => setSidebarOpen(false)} to="/admin/clients" className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}>
             <Users /> Clientes
           </NavLink>
-          <NavLink onClick={() => setSidebarOpen(false)} to="/products" className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}>
+          <NavLink onClick={() => setSidebarOpen(false)} to="/admin/products" className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}>
             <FileBox /> Productos
           </NavLink>
-          <NavLink onClick={() => setSidebarOpen(false)} to="/orders" className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}>
+          <NavLink onClick={() => setSidebarOpen(false)} to="/admin/orders" className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}>
             <ShoppingBag /> Pedidos
           </NavLink>
-          <NavLink onClick={() => setSidebarOpen(false)} to="/delivery-notes" className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}>
+          <NavLink onClick={() => setSidebarOpen(false)} to="/admin/delivery-notes" className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}>
             <FileText /> Albaranes
           </NavLink>
-          <NavLink onClick={() => setSidebarOpen(false)} to="/invoices" className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}>
+          <NavLink onClick={() => setSidebarOpen(false)} to="/admin/invoices" className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}>
             <Receipt /> Facturación
           </NavLink>
           
@@ -40,7 +43,7 @@ export default function Layout() {
             </svg>
             Cultivos
           </NavLink>
-          <NavLink onClick={() => setSidebarOpen(false)} to="/expenses" className={({ isActive }) => `nav-item hide-on-mobile ${isActive ? 'active' : ''}`}>
+          <NavLink onClick={() => setSidebarOpen(false)} to="/admin/expenses" className={({ isActive }) => `nav-item hide-on-mobile ${isActive ? 'active' : ''}`}>
             <svg fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z" />
             </svg>

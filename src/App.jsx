@@ -1,5 +1,6 @@
 import { Routes, Route } from 'react-router-dom';
 import Layout from './components/Layout';
+import Hub from './pages/Hub';
 import Dashboard from './pages/Dashboard';
 import Clients from './pages/Clients';
 import Products from './pages/Products';
@@ -16,7 +17,8 @@ import './App.css';
 function App() {
   return (
     <Routes>
-      <Route path="/" element={<Layout />}>
+      <Route path="/" element={<Hub />} />
+      <Route path="/admin" element={<Layout />}>
         <Route index element={<Dashboard />} />
         <Route path="clients" element={<Clients />} />
         <Route path="products" element={<Products />} />
@@ -24,8 +26,8 @@ function App() {
         <Route path="delivery-notes" element={<DeliveryNotes />} />
         <Route path="invoices" element={<Invoices />} />
         <Route path="expenses" element={<Expenses />} />
-        <Route path="crops" element={<Crops />} />
       </Route>
+      <Route path="/crops" element={<Crops />} />
 
       {/* Rutas sin Layout (Pantalla completa) */}
       <Route path="/tv" element={<TvDashboard />} />
