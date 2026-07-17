@@ -288,12 +288,11 @@ export const DataProvider = ({ children }) => {
     const trays = Number(newCrop.traysCount || 1);
     const batchNum = `S-${Date.now().toString().slice(-6)}`;
     
-    // 2. Create the Crop Record using existing DB columns: seedId, inventoryId, datePlanted, batchNumber
+    // 2. Create the Crop Record using existing DB columns: seedId, datePlanted, batchNumber
     const cropRecord = {
       seedId: cType.id, // we store cropTypeId in seedId to match schema
       traysCount: trays,
       status: cType.soakingHours > 0 ? 'SOAKING' : 'SOWED',
-      inventoryId: newCrop.selectedSeedBatchId || null,
       datePlanted: new Date().toISOString(),
       batchNumber: batchNum
     };
