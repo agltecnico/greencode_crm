@@ -9,7 +9,6 @@ import DeliveryNotes from './pages/DeliveryNotes';
 import Invoices from './pages/Invoices';
 import Expenses from './pages/Expenses';
 import Supplies from './pages/Supplies';
-import CropTypes from './pages/CropTypes';
 import Crops from './pages/Crops';
 import TvDashboard from './pages/TvDashboard';
 import DriverView from './pages/DriverView';
@@ -29,8 +28,7 @@ function App() {
         <Route path="invoices" element={<Invoices />} />
         <Route path="expenses" element={<Expenses />} />
         <Route path="supplies" element={<Supplies />} />
-        <Route path="crop-types" element={<CropTypes />} />
-      </Route>
+              </Route>
       <Route path="/crops" element={<Crops />} />
 
       {/* Rutas sin Layout (Pantalla completa) */}

@@ -40,11 +40,9 @@ export default function Layout() {
             <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" className="w-5 h-5">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z" />
             </svg>
-            Insumos / Semillas
+            Gestión de Cultivo
           </NavLink>
-          <NavLink onClick={() => setSidebarOpen(false)} to="/admin/crop-types" className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}>
-            <Sprout /> Tipos de Cultivo
-          </NavLink>
+          
           <NavLink onClick={() => setSidebarOpen(false)} to="/admin/expenses" className={({ isActive }) => `nav-item hide-on-mobile ${isActive ? 'active' : ''}`}>
             <svg fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z" />
