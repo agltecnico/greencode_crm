@@ -148,7 +148,12 @@ export const DataProvider = ({ children }) => {
       const newItem = { ...article, id: tempId };
       setArticles(prev => [...prev, newItem]);
       const { data, error } = await supabase.from('articles').insert([newItem]).select();
-      if (!error && data) setArticles(prev => prev.map(i => i.id === tempId ? data[0] : i));
+      if (error) {
+        alert('Error guardando en Supabase: ' + error.message);
+        setArticles(prev => prev.filter(i => i.id !== tempId));
+        return tempId;
+      }
+      if (data) setArticles(prev => prev.map(i => i.id === tempId ? data[0] : i));
       return tempId;
     };
     const updateArticle = async (id, updatedFields) => {
@@ -165,7 +170,12 @@ export const DataProvider = ({ children }) => {
       const newItem = { ...entry, id: tempId };
       setStockEntries(prev => [...prev, newItem]);
       const { data, error } = await supabase.from('stock_entries').insert([newItem]).select();
-      if (!error && data) setStockEntries(prev => prev.map(i => i.id === tempId ? data[0] : i));
+      if (error) {
+        alert('Error guardando en Supabase: ' + error.message);
+        setStockEntries(prev => prev.filter(i => i.id !== tempId));
+        return tempId;
+      }
+      if (data) setStockEntries(prev => prev.map(i => i.id === tempId ? data[0] : i));
       return tempId;
     };
     const updateStockEntry = async (id, updatedFields) => {
@@ -183,7 +193,12 @@ export const DataProvider = ({ children }) => {
       const newItem = { ...item, id: tempId };
       setCropTypes(prev => [...prev, newItem]);
       const { data, error } = await supabase.from('crop_types').insert([newItem]).select();
-      if (!error && data) setCropTypes(prev => prev.map(i => i.id === tempId ? data[0] : i));
+      if (error) {
+        alert('Error guardando en Supabase: ' + error.message);
+        setCropTypes(prev => prev.filter(i => i.id !== tempId));
+        return tempId;
+      }
+      if (data) setCropTypes(prev => prev.map(i => i.id === tempId ? data[0] : i));
       return tempId;
     };
     const updateCropType = async (id, updatedFields) => {
