@@ -13,7 +13,8 @@ export default function Crops() {
     crops, addCrop, advanceCropStatus, discardCrop,
     harvestTargets, addHarvestTarget, deleteHarvestTarget,
     harvests, addHarvest,
-    products
+    products,
+    orders, clients, updateOrderList
   } = useData();
 
   const [activeTab, setActiveTab] = useState('menu');
