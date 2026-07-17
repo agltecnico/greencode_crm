@@ -10,7 +10,7 @@ export default function Supplies() {
     cropTypes, addCropType, updateCropType, deleteCropType
   } = useData();
 
-  const [activeTab, setActiveTab] = useState('CATALOG');
+  const [activeTab, setActiveTab] = useState('INVENTORY');
   const [searchTerm, setSearchTerm] = useState('');
 
   // Expenses Filters
@@ -173,6 +173,7 @@ export default function Supplies() {
       </div>
 
       <div className="admin-tabs" style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem' }}>
+        <button className={`admin-tab ${activeTab === 'INVENTORY' ? 'active' : ''}`} onClick={() => setActiveTab('INVENTORY')}>Inventario (Stock)</button>
         <button className={`admin-tab ${activeTab === 'CATALOG' ? 'active' : ''}`} onClick={() => setActiveTab('CATALOG')}>Catálogo de Artículos</button>
         <button className={`admin-tab ${activeTab === 'STOCK' ? 'active' : ''}`} onClick={() => setActiveTab('STOCK')}>Albaranes de Entrada / Gasto</button>
         <button className={`admin-tab ${activeTab === 'EXPENSES' ? 'active' : ''}`} onClick={() => setActiveTab('EXPENSES')}>Historial de Gastos</button>
@@ -184,6 +185,48 @@ export default function Supplies() {
           <div className="admin-search">
             <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" width="18" height="18"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>
             <input type="text" placeholder="Buscar..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} />
+          </div>
+        </div>
+      )}
+
+      {activeTab === 'INVENTORY' && (
+        <div style={{ animation: 'fadeIn 0.3s ease' }}>
+          <div className="flex justify-between items-center mb-4">
+             <h3 className="font-bold text-lg">Inventario Actual (Físico)</h3>
+             <p className="text-muted text-sm">Resumen de semillas, sustratos y envases disponibles.</p>
+          </div>
+
+          <div className="table-container">
+            <table className="admin-table">
+              <thead>
+                <tr>
+                  <th>Tipo</th>
+                  <th>Artículo</th>
+                  <th>Coste Medio</th>
+                  <th>Stock Físico Actual</th>
+                  <th>Valor Est. Almacén</th>
+                </tr>
+              </thead>
+              <tbody>
+                {articles?.filter(a => !['GASTO_FIJO', 'SUMINISTROS', 'MANTENIMIENTO', 'MARKETING', 'NOMINAS'].includes(a.type))
+                  .filter(a => a.name.toLowerCase().includes(searchTerm.toLowerCase()))
+                  .map(a => {
+                    const totalIn = stockEntries?.filter(e => e.articleId === a.id).reduce((acc, curr) => acc + Number(curr.quantity || 0), 0) || 0;
+                    const avgCost = getAverageUnitCost(a.id);
+                    const totalValue = totalIn * avgCost;
+
+                    return (
+                      <tr key={a.id}>
+                        <td className="font-medium text-slate-500">{getTypeLabel(a.type)}</td>
+                        <td className="font-bold text-slate-800">{a.name}</td>
+                        <td className="text-slate-600">{avgCost.toFixed(2)} € / {getUnitLabel(a.type)}</td>
+                        <td className="font-bold text-emerald-600 text-lg">{totalIn.toFixed(2)} <span className="text-sm font-normal text-slate-500">{getUnitLabel(a.type)}</span></td>
+                        <td className="font-bold text-indigo-600">{totalValue.toFixed(2)} €</td>
+                      </tr>
+                    )
+                  })}
+              </tbody>
+            </table>
           </div>
         </div>
       )}
@@ -201,7 +244,6 @@ export default function Supplies() {
                 <tr>
                   <th>Tipo</th>
                   <th>Nombre del Artículo</th>
-                  <th>Stock Entrante Acumulado</th>
                   <th>Acciones</th>
                 </tr>
               </thead>
@@ -227,7 +269,6 @@ export default function Supplies() {
                       <td>
                         <input type="text" className="form-control" value={editedArticle.name} onChange={e => setEditedArticle({...editedArticle, name: e.target.value})} />
                       </td>
-                      <td className="text-muted text-sm">{getStockBalance(a)}</td>
                       <td>
                         <div style={{ display: 'flex', gap: '0.5rem' }}>
                           <button className="btn btn-primary" style={{ padding: '0.3rem 0.6rem', fontSize: '0.8rem' }} onClick={() => { updateArticle(a.id, editedArticle); setEditingArticleId(null); }}>Guardar</button>
@@ -239,7 +280,6 @@ export default function Supplies() {
                     <tr key={a.id}>
                       <td className="font-medium text-slate-500">{getTypeLabel(a.type)}</td>
                       <td className="font-bold text-slate-800">{a.name}</td>
-                      <td className="font-bold text-emerald-600">{getStockBalance(a)}</td>
                       <td>
                         <div style={{ display: 'flex', gap: '0.5rem' }}>
                           <button className="btn btn-secondary" style={{ padding: '0.3rem 0.6rem', fontSize: '0.8rem', background: 'transparent' }} onClick={() => { setEditingArticleId(a.id); setEditedArticle(a); }}>Editar</button>
