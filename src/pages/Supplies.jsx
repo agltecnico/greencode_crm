@@ -52,8 +52,13 @@ export default function Supplies() {
 
   const handleAddCropType = e => {
     e.preventDefault();
-    addCropType(newType);
-    setNewType({ name: '', seedId: '', seedGrams: 0, substrateId: '', substrateLiters: 0, containerId: '', expectedYieldGrams: 0, providerId: '' });
+    const payload = { ...newType };
+    if (payload.providerId === '') payload.providerId = null;
+    if (payload.substrateId === '') payload.substrateId = null;
+    if (payload.containerId === '') payload.containerId = null;
+    if (payload.seedId === '') payload.seedId = null;
+    addCropType(payload);
+    setNewType({ name: '', seedId: '', seedGrams: 0, substrateId: '', substrateLiters: 0, containerId: '', expectedYieldGrams: 0, providerId: '', soakingHours: 0, germinationDays: 0, darknessDays: 0, lightDays: 0 });
     setShowCropTypeModal(false);
   };
 
@@ -551,8 +556,18 @@ export default function Supplies() {
                         </div>
 
                         <div style={{ marginTop: '1rem', display: 'flex', gap: '0.5rem', justifyContent: 'flex-end' }}>
-                          <button className="btn btn-primary" onClick={() => { updateCropType(c.id, editedCropType); setEditingCropTypeId(null); }}>Guardar Ficha</button>
-                          <button className="btn btn-secondary" onClick={() => setEditingCropTypeId(null)}>Cancelar</button>
+                          <div className="flex gap-2">
+                              <button className="btn btn-primary" onClick={() => { 
+                                const payload = { ...editedCropType };
+                                if (payload.providerId === '') payload.providerId = null;
+                                if (payload.substrateId === '') payload.substrateId = null;
+                                if (payload.containerId === '') payload.containerId = null;
+                                if (payload.seedId === '') payload.seedId = null;
+                                updateCropType(c.id, payload); 
+                                setEditingCropTypeId(null); 
+                              }}>Guardar Ficha</button>
+                              <button className="btn btn-secondary" onClick={() => setEditingCropTypeId(null)}>Cancelar</button>
+                            </div>
                         </div>
                       </td>
                     </tr>
