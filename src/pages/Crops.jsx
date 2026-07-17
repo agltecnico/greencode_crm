@@ -10,7 +10,8 @@ export default function Crops() {
     providers, addProvider, deleteProvider,
     seeds, addSeed, deleteSeed,
     seedInventory, addSeedInventory, deleteSeedInventory,
-    crops, addCrop, advanceCropStatus, discardCrop,
+    crops, addCrop, sowCrop, advanceCropStatus, discardCrop,
+    cropTypes,
     harvestTargets, addHarvestTarget, deleteHarvestTarget,
     harvests, addHarvest,
     products,
@@ -19,16 +20,22 @@ export default function Crops() {
 
   const [activeTab, setActiveTab] = useState('menu');
 
-        const [newCrop, setNewCrop] = useState({ seedId: '', traysCount: 1, seedGramsPerTray: 0, inventoryId: '' });
+        const [newCrop, setNewCrop] = useState({ cropTypeId: '', traysCount: 1 });
   const [newTarget, setNewTarget] = useState({ targetDayOfWeek: 1, productId: '', tuppersCount: 10 });
   const [newHarvest, setNewHarvest] = useState({ productId: '', tuppersCount: 1 });
 
-        const handleAddCrop = e => { 
+        
+  const handleAddCrop = async (e) => { 
     e.preventDefault(); 
-    const batchNum = `S-${Date.now().toString().slice(-6)}`;
-    addCrop({...newCrop, datePlanted: new Date().toISOString(), batchNumber: batchNum, status: 'SOAKING'}); 
-    setNewCrop({...newCrop, traysCount: 1, seedGramsPerTray: 0}); 
+    try {
+      await sowCrop(newCrop);
+      setNewCrop({ cropTypeId: '', traysCount: 1 }); 
+      alert("Cultivo plantado con éxito. Stock descontado.");
+    } catch (error) {
+      alert(error.message);
+    }
   };
+
   const handleAddHarvestTarget = e => { e.preventDefault(); addHarvestTarget(newTarget); };
   
   const handleRegisterHarvest = e => {
