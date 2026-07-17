@@ -1,13 +1,13 @@
 import { useState } from 'react';
 import { useData } from '../context/DataContext';
+import '../crops.css';
 
 export default function EmployeeTasks() {
   const { harvestTargets, crops, seeds, products, dailyLogs, addDailyLog } = useData();
-  const [timeFilter, setTimeFilter] = useState(1); // 1 = Hoy, 7 = Esta semana, 30 = Este mes
+  const [timeFilter, setTimeFilter] = useState(1);
 
   const activeCrops = crops?.filter(c => c.status !== 'HARVESTED' && c.status !== 'DISCARDED') || [];
   
-  // Generar un rango de fechas a proyectar
   const today = new Date();
   today.setHours(0,0,0,0);
   
@@ -19,15 +19,13 @@ export default function EmployeeTasks() {
 
   const allTasks = [];
 
-  // Analizar cada fecha proyectada
   datesToAnalyze.forEach(targetDate => {
     const targetDayOfWeek = targetDate.getDay();
-    const dateKey = targetDate.toISOString().split('T')[0]; // YYYY-MM-DD
+    const dateKey = targetDate.toISOString().split('T')[0];
     const isToday = dateKey === today.toISOString().split('T')[0];
 
     const tasksForDate = [];
 
-    // --- 1. Tareas de Invernadero (basado en bandejas activas) ---
     activeCrops.forEach(crop => {
       const seed = seeds?.find(s => s.id === crop.seedId);
       if(!seed) return;
@@ -35,10 +33,6 @@ export default function EmployeeTasks() {
       const planted = new Date(crop.datePlanted);
       planted.setHours(0,0,0,0);
       const daysSincePlanted = Math.floor((targetDate - planted) / (1000 * 60 * 60 * 24));
-
-      // Solo evaluamos si el targetDate es el da EXACTO del cambio de fase.
-      // Si miramos a futuro, queremos saber el da exacto que toca.
-      // Si miramos hoy, mostramos si debera haberse hecho (retrasado) o toca hoy.
       
       const soakOffset = seed.soakingHours > 0 ? 1 : 0;
       const germDay = soakOffset;
@@ -49,8 +43,6 @@ export default function EmployeeTasks() {
       let action = null;
       let phaseStr = '';
       
-      // La lgica: Si es hoy, avisar de todas las transiciones pendientes o vencidas
-      // Si es a futuro, slo avisar en el da EXACTO
       if (isToday) {
         if (daysSincePlanted >= germDay && crop.status === 'SOAKING') { action = 'move'; phaseStr = 'GERMINACIÓN'; }
         else if (daysSincePlanted >= darkDay && crop.status === 'GERMINATION') { action = 'move'; phaseStr = 'OSCURIDAD'; }
@@ -69,7 +61,7 @@ export default function EmployeeTasks() {
           title: `Mover a ${phaseStr}`,
           desc: `${crop.traysCount} bandejas de ${seed.name} (Lote: ${crop.batchNumber})`,
           icon: '🌱',
-          color: 'from-blue-500/20 to-cyan-500/10 border-cyan-500/50 text-cyan-400'
+          className: 'move'
         });
       } else if (action === 'harvest') {
         tasksForDate.push({
@@ -77,12 +69,11 @@ export default function EmployeeTasks() {
           title: `¡COSECHAR!`,
           desc: `${crop.traysCount} bandejas de ${seed.name} (Lote: ${crop.batchNumber})`,
           icon: '🔪',
-          color: 'from-emerald-500/30 to-green-500/10 border-emerald-500/50 text-emerald-400'
+          className: 'harvest'
         });
       }
     });
 
-    // --- 2. Tareas Predictivas del Planificador ---
     harvestTargets?.forEach(target => {
       const product = products?.find(p => p.id === target.productId);
       if(!product) return;
@@ -104,7 +95,7 @@ export default function EmployeeTasks() {
             title: `Plantar ${seed.name}`,
             desc: `Para el objetivo de ${product.name} (Cosecha: Día ${target.targetDayOfWeek})`,
             icon: '🪴',
-            color: 'from-amber-500/20 to-orange-500/10 border-orange-500/50 text-orange-400'
+            className: 'plant'
           });
         }
         
@@ -117,7 +108,7 @@ export default function EmployeeTasks() {
               title: `Poner a remojo ${seed.name}`,
               desc: `${seed.soakingHours}h requeridas. Plantar al día siguiente.`,
               icon: '💧',
-              color: 'from-blue-600/20 to-indigo-500/10 border-indigo-500/50 text-indigo-400'
+              className: 'soak'
             });
           }
         }
@@ -130,18 +121,14 @@ export default function EmployeeTasks() {
   });
 
   return (
-    <div className="w-full">
-      {/* HEADER DE FILTROS Y REGISTRO AMBIENTAL */}
-      <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-6 mb-8">
-        <div>
-          <h2 className="text-3xl font-black bg-gradient-to-r from-emerald-400 to-cyan-400 bg-clip-text text-transparent drop-shadow-sm mb-2">
-            Dashboard de Tareas
-          </h2>
-          <p className="text-slate-400 font-medium">Controla el pulso de tu invernadero en tiempo real y a futuro.</p>
+    <div className="crops-module">
+      <div className="tasks-header">
+        <div className="tasks-title-area">
+          <h2>Dashboard de Tareas</h2>
+          <p>Controla el pulso de tu invernadero en tiempo real y a futuro.</p>
         </div>
 
-        {/* TIME FILTERS */}
-        <div className="flex bg-slate-800/80 p-1.5 rounded-xl border border-slate-700/50 shadow-inner backdrop-blur-md">
+        <div className="time-filters">
           {[
             { v: 1, l: 'HOY' },
             { v: 7, l: '7 DÍAS' },
@@ -150,7 +137,7 @@ export default function EmployeeTasks() {
             <button 
               key={f.v}
               onClick={() => setTimeFilter(f.v)}
-              className={`px-6 py-2 rounded-lg font-bold transition-all duration-300 ${timeFilter === f.v ? 'bg-gradient-to-r from-emerald-500 to-teal-500 text-white shadow-lg scale-105' : 'text-slate-400 hover:text-white hover:bg-slate-700/50'}`}
+              className={`time-filter-btn \${timeFilter === f.v ? 'active' : ''}`}
             >
               {f.l}
             </button>
@@ -158,34 +145,29 @@ export default function EmployeeTasks() {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 xl:grid-cols-4 gap-8">
+      <div className="dashboard-layout">
         
-        {/* LISTA DE TAREAS */}
-        <div className="xl:col-span-3 space-y-6">
+        <div className="tasks-list-area">
           {allTasks.map((dayGroup, idx) => (
-            <div key={idx} className={`rounded-2xl border ${dayGroup.isToday ? 'border-emerald-500/30 bg-slate-800/60' : 'border-slate-700/50 bg-slate-900/40'} p-6 backdrop-blur-sm shadow-xl transition-all`}>
-              <div className="flex items-center gap-4 mb-6 border-b border-slate-700/50 pb-4">
-                <div className={`text-xl font-black ${dayGroup.isToday ? 'text-emerald-400' : 'text-slate-300'}`}>
-                  {dayGroup.isToday ? '🎯 TAREAS DE HOY' : dayGroup.date.toLocaleDateString('es-ES', { weekday: 'long', day: 'numeric', month: 'short' }).toUpperCase()}
-                </div>
-                {!dayGroup.isToday && <div className="h-px bg-slate-700/50 flex-1"></div>}
+            <div key={idx} className={`task-day-group \${dayGroup.isToday ? 'is-today' : ''}`}>
+              <div className="task-day-header">
+                <span className="task-day-title">
+                  {dayGroup.isToday ? '🎯 TAREAS DE HOY' : dayGroup.date.toLocaleDateString('es-ES', { weekday: 'long', day: 'numeric', month: 'short' })}
+                </span>
               </div>
 
               {dayGroup.items.length === 0 ? (
-                <div className="flex items-center justify-center p-8 rounded-xl bg-slate-800/30 border border-slate-700/30 border-dashed">
-                  <p className="text-slate-500 font-medium text-lg">✨ Todo despejado para este día.</p>
+                <div style={{ padding: '2rem', textAlign: 'center', color: 'var(--crop-text-muted)' }}>
+                  ✨ Todo despejado para este día.
                 </div>
               ) : (
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="task-grid">
                   {dayGroup.items.map((task, i) => (
-                    <div key={i} className={`group relative p-5 rounded-xl border bg-gradient-to-br ${task.color} hover:-translate-y-1 transition-all duration-300 cursor-default`}>
-                      <div className="absolute inset-0 bg-white/5 opacity-0 group-hover:opacity-100 transition-opacity rounded-xl pointer-events-none"></div>
-                      <div className="flex gap-4">
-                        <div className="text-4xl filter drop-shadow-md">{task.icon}</div>
-                        <div>
-                          <h4 className="font-black text-lg mb-1 leading-tight text-white">{task.title}</h4>
-                          <p className="text-sm opacity-80 font-medium leading-snug">{task.desc}</p>
-                        </div>
+                    <div key={i} className={`task-card \${task.className}`}>
+                      <div className="task-icon">{task.icon}</div>
+                      <div className="task-content">
+                        <h4>{task.title}</h4>
+                        <p>{task.desc}</p>
                       </div>
                     </div>
                   ))}
@@ -195,37 +177,30 @@ export default function EmployeeTasks() {
           ))}
         </div>
 
-        {/* SIDEBAR DERECHO: WIDGET AMBIENTAL */}
-        <div className="xl:col-span-1 space-y-6">
-          <div className="rounded-2xl border border-slate-700/50 bg-slate-800/60 p-6 backdrop-blur-sm shadow-xl sticky top-6">
-            <div className="flex items-center gap-3 mb-6">
-              <span className="text-3xl">🌡️</span>
-              <h3 className="text-xl font-black text-white">Clima Invernadero</h3>
+        <div className="climate-sidebar">
+          <div className="climate-widget">
+            <div className="climate-widget-header">
+              <span style={{ fontSize: '2rem' }}>🌡️</span>
+              <h3>Clima Invernadero</h3>
             </div>
             
-            <p className="text-sm text-slate-400 mb-6 font-medium leading-relaxed">
+            <p className="climate-desc">
               Introduce las métricas actuales. Se requiere un registro diario obligatorio por normativas de Sanidad.
             </p>
             
-            <div className="space-y-5">
-              <div className="relative">
-                <label className="text-xs font-bold text-slate-400 uppercase tracking-wider block mb-2">Temperatura (°C)</label>
-                <div className="absolute inset-y-0 right-0 pt-6 pr-4 flex items-center pointer-events-none">
-                  <span className="text-slate-500 font-medium text-lg">°C</span>
-                </div>
-                <input type="number" id="temp-input" step="0.1" className="w-full bg-slate-900 border-2 border-slate-700 text-white rounded-xl px-4 py-3 text-lg font-bold focus:border-emerald-500 focus:outline-none transition-colors" placeholder="Ej: 24.5" />
+            <div className="climate-form">
+              <div className="climate-input-group">
+                <label className="climate-label">Temperatura (°C)</label>
+                <input type="number" id="temp-input" step="0.1" className="climate-input" placeholder="Ej: 24.5" />
               </div>
               
-              <div className="relative">
-                <label className="text-xs font-bold text-slate-400 uppercase tracking-wider block mb-2">Humedad (%)</label>
-                <div className="absolute inset-y-0 right-0 pt-6 pr-4 flex items-center pointer-events-none">
-                  <span className="text-slate-500 font-medium text-lg">%</span>
-                </div>
-                <input type="number" id="hum-input" className="w-full bg-slate-900 border-2 border-slate-700 text-white rounded-xl px-4 py-3 text-lg font-bold focus:border-cyan-500 focus:outline-none transition-colors" placeholder="Ej: 55" />
+              <div className="climate-input-group">
+                <label className="climate-label">Humedad (%)</label>
+                <input type="number" id="hum-input" className="climate-input" placeholder="Ej: 55" />
               </div>
 
               <button 
-                className="w-full bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-400 hover:to-teal-400 text-white font-black py-4 rounded-xl shadow-lg shadow-emerald-500/20 transform transition-all active:scale-95 mt-4"
+                className="climate-btn"
                 onClick={() => {
                    const t = document.getElementById('temp-input').value;
                    const h = document.getElementById('hum-input').value;
