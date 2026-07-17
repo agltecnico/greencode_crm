@@ -130,7 +130,12 @@ export const DataProvider = ({ children }) => {
     const newItem = { ...item, id: tempId };
     setProviders(prev => [...prev, newItem]);
     const { data, error } = await supabase.from('providers').insert([newItem]).select();
-    if (!error && data) setProviders(prev => prev.map(i => i.id === tempId ? data[0] : i));
+      if (error) {
+        alert('Error critico en Supabase (providers): ' + error.message);
+        setProviders(prev => prev.filter(i => i.id !== tempId));
+        return tempId;
+      }
+      if (data) setProviders(prev => prev.map(i => i.id === tempId ? data[0] : i));
     return tempId;
   };
   const updateProvider = async (id, updatedFields) => {
