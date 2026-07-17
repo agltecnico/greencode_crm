@@ -159,6 +159,13 @@ export default function Supplies() {
     return `${totalIn.toFixed(2)} ${getUnitLabel(article.type)}`;
   };
 
+  const totalWarehouseValue = articles?.filter(a => !['GASTO_FIJO', 'SUMINISTROS', 'MANTENIMIENTO', 'MARKETING', 'NOMINAS'].includes(a.type))
+    .reduce((sum, a) => {
+      const totalIn = stockEntries?.filter(e => e.articleId === a.id).reduce((acc, curr) => acc + Number(curr.quantity || 0), 0) || 0;
+      const avgCost = getAverageUnitCost(a.id);
+      return sum + (totalIn * avgCost);
+    }, 0) || 0;
+
   // Modal Styles
   const modalOverlayStyle = { position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 50 };
   const modalCardStyle = { width: '100%', maxWidth: '700px', margin: '20px', maxHeight: '90vh', overflowY: 'auto', backgroundColor: '#fff', padding: '2rem', borderRadius: '8px', border: '1px solid var(--color-border)' };
@@ -192,8 +199,14 @@ export default function Supplies() {
       {activeTab === 'INVENTORY' && (
         <div style={{ animation: 'fadeIn 0.3s ease' }}>
           <div className="flex justify-between items-center mb-4">
-             <h3 className="font-bold text-lg">Inventario Actual (Físico)</h3>
-             <p className="text-muted text-sm">Resumen de semillas, sustratos y envases disponibles.</p>
+             <div>
+               <h3 className="font-bold text-lg">Inventario Actual (Físico)</h3>
+               <p className="text-muted text-sm">Resumen de semillas, sustratos y envases disponibles.</p>
+             </div>
+             <div className="text-right bg-indigo-50 px-4 py-2 rounded-lg border border-indigo-100">
+               <p className="text-muted text-xs font-semibold mb-0 text-indigo-800">VALOR TOTAL ALMACÉN</p>
+               <h3 className="font-bold text-2xl text-indigo-600 m-0">{totalWarehouseValue.toFixed(2)} €</h3>
+             </div>
           </div>
 
           <div className="table-container">
