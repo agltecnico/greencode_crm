@@ -83,6 +83,14 @@ export default function Crops() {
           <div><label className="premium-label">Días Luz</label><input type="number" required min="0" className="premium-input" value={newSeed.lightDays} onChange={e=>setNewSeed({...newSeed, lightDays: e.target.value})}/></div>
           <div className="col-span-2"><button type="submit" className="climate-btn mt-4">Añadir Semilla al Catálogo</button></div>
         </form>
+
+        <button onClick={() => setActiveTab('pedidos')} className="hub-card driver-card" style={{ border: 'none', width: '100%' }}>
+          <div className="hub-card-icon" style={{ fontSize: '3.5rem' }}>📦</div>
+          <div className="hub-card-text">
+            <h2 style={{ fontSize: '1.5rem' }}>Pedidos y Reparto</h2>
+            <p style={{ fontSize: '1rem' }}>Preparar y Enviar</p>
+          </div>
+        </button>
       </div>
     </div>
   );
@@ -368,6 +376,90 @@ export default function Crops() {
     </div>
   );
 
+
+  const renderPedidos = () => {
+    const handleStatusChange = (orderId, newStatus) => {
+      updateOrderList(orderId, { status: newStatus });
+    };
+
+    return (
+      <div style={{ animation: 'fadeIn 0.3s ease' }}>
+        <div className="tasks-header" style={{ marginBottom: '3rem', textAlign: 'center' }}>
+          <h2>Gestión de Pedidos y Reparto</h2>
+          <p style={{ color: '#64748b', fontSize: '1.25rem' }}>Mueve los pedidos por el circuito logístico.</p>
+        </div>
+        
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '1.5rem' }}>
+          {/* Columna Pendientes */}
+          <div style={{ background: '#f8fafc', borderRadius: '16px', padding: '1.5rem', border: '1px solid #e2e8f0' }}>
+            <h3 style={{ color: '#d97706', fontSize: '1.5rem', textAlign: 'center', marginBottom: '1.5rem' }}>🟡 PENDIENTES</h3>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+              {orders?.filter(o => o.status === 'PENDING').map(o => {
+                const client = clients?.find(c => c.id === o.clientId);
+                return (
+                  <div key={o.id} className="crops-card" style={{ padding: '1rem', borderLeft: '6px solid #fbbf24' }}>
+                    <h4 style={{ fontSize: '1.2rem', margin: '0 0 0.5rem 0' }}>{client?.name || 'Desconocido'}</h4>
+                    <p style={{ margin: '0 0 1rem 0', color: '#64748b' }}>{o.items?.length || 0} tuppers a preparar</p>
+                    <button 
+                      onClick={() => handleStatusChange(o.id, 'PREPARED')}
+                      className="btn btn-primary" style={{ width: '100%', padding: '0.8rem', background: '#38bdf8', border: 'none', borderRadius: '8px', fontWeight: 'bold' }}>
+                      MARCAR PREPARADO ✅
+                    </button>
+                  </div>
+                );
+              })}
+              {(!orders || orders.filter(o => o.status === 'PENDING').length === 0) && <p style={{ textAlign: 'center', color: '#94a3b8' }}>Todo envasado</p>}
+            </div>
+          </div>
+
+          {/* Columna Preparados */}
+          <div style={{ background: '#f8fafc', borderRadius: '16px', padding: '1.5rem', border: '1px solid #e2e8f0' }}>
+            <h3 style={{ color: '#0284c7', fontSize: '1.5rem', textAlign: 'center', marginBottom: '1.5rem' }}>🔵 PREPARADOS</h3>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+              {orders?.filter(o => o.status === 'PREPARED').map(o => {
+                const client = clients?.find(c => c.id === o.clientId);
+                return (
+                  <div key={o.id} className="crops-card" style={{ padding: '1rem', borderLeft: '6px solid #38bdf8' }}>
+                    <h4 style={{ fontSize: '1.2rem', margin: '0 0 0.5rem 0' }}>{client?.name || 'Desconocido'}</h4>
+                    <p style={{ margin: '0 0 1rem 0', color: '#64748b' }}>Caja lista en expedición</p>
+                    <button 
+                      onClick={() => handleStatusChange(o.id, 'IN_TRANSIT')}
+                      className="btn btn-primary" style={{ width: '100%', padding: '0.8rem', background: '#a855f7', border: 'none', borderRadius: '8px', fontWeight: 'bold' }}>
+                      METER A FURGONETA 🚚
+                    </button>
+                  </div>
+                );
+              })}
+              {(!orders || orders.filter(o => o.status === 'PREPARED').length === 0) && <p style={{ textAlign: 'center', color: '#94a3b8' }}>Nada esperando carga</p>}
+            </div>
+          </div>
+
+          {/* Columna En Reparto */}
+          <div style={{ background: '#f8fafc', borderRadius: '16px', padding: '1.5rem', border: '1px solid #e2e8f0' }}>
+            <h3 style={{ color: '#7e22ce', fontSize: '1.5rem', textAlign: 'center', marginBottom: '1.5rem' }}>🟣 EN REPARTO</h3>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+              {orders?.filter(o => o.status === 'IN_TRANSIT').map(o => {
+                const client = clients?.find(c => c.id === o.clientId);
+                return (
+                  <div key={o.id} className="crops-card" style={{ padding: '1rem', borderLeft: '6px solid #a855f7' }}>
+                    <h4 style={{ fontSize: '1.2rem', margin: '0 0 0.5rem 0' }}>{client?.name || 'Desconocido'}</h4>
+                    <p style={{ margin: '0 0 1rem 0', color: '#64748b' }}>El conductor lo lleva</p>
+                    <button 
+                      onClick={() => window.location.href='/repartidor'}
+                      className="btn btn-primary" style={{ width: '100%', padding: '0.8rem', background: '#10b981', border: 'none', borderRadius: '8px', fontWeight: 'bold' }}>
+                      FIRMAR ENTREGA 📱
+                    </button>
+                  </div>
+                );
+              })}
+              {(!orders || orders.filter(o => o.status === 'IN_TRANSIT').length === 0) && <p style={{ textAlign: 'center', color: '#94a3b8' }}>Ningún conductor en ruta</p>}
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
   return (
     <div className="crops-module" style={{ paddingBottom: '5rem', maxWidth: '1400px', margin: '0 auto', paddingTop: '1rem' }}>
       {activeTab === 'menu' && (
@@ -400,6 +492,7 @@ export default function Crops() {
         {activeTab === 'lotes' && renderLotes()}
         {activeTab === 'cosechas' && renderCosechas()}
         {activeTab === 'planificador' && renderPlanificador()}
+        {activeTab === 'pedidos' && renderPedidos()}
       </div>
       
     </div>
