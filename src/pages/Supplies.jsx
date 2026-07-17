@@ -90,7 +90,11 @@ export default function Supplies() {
       case 'SUSTRATO': return '🪨 Sustrato';
       case 'ENVASE': return '📦 Envase';
       case 'OTRO': return '🏷️ Consumible (Stock)';
-      case 'GASTO_FIJO': return '💸 Gasto General (Sin Stock)';
+      case 'GASTO_FIJO': return '💸 Gasto Fijo General';
+      case 'SUMINISTROS': return '⚡ Suministros (Luz, Agua)';
+      case 'MANTENIMIENTO': return '🔧 Mantenimiento';
+      case 'MARKETING': return '📢 Marketing / Software';
+      case 'NOMINAS': return '👥 Nóminas / Personal';
       default: return type;
     }
   };
@@ -99,7 +103,11 @@ export default function Supplies() {
     switch(type) {
       case 'SEMILLA': return 'Gramos';
       case 'SUSTRATO': return 'Litros';
-      case 'GASTO_FIJO': return 'Unidades';
+      case 'GASTO_FIJO':
+      case 'SUMINISTROS':
+      case 'MANTENIMIENTO':
+      case 'MARKETING':
+      case 'NOMINAS': return 'Servicios / Pagos';
       default: return 'Unidades';
     }
   };
@@ -125,6 +133,7 @@ export default function Supplies() {
   const substrates = articles?.filter(a => a.type === 'SUSTRATO') || [];
   const containers = articles?.filter(a => a.type === 'ENVASE') || [];
   const selectedArticleType = newStockEntry.articleId ? articles?.find(a => a.id === newStockEntry.articleId)?.type : null;
+  const isExpenseOnly = ['GASTO_FIJO', 'SUMINISTROS', 'MANTENIMIENTO', 'MARKETING', 'NOMINAS'].includes(selectedArticleType);
 
   const getLiveCosts = (formData) => {
     if (!formData) return { totalTray: 0, perKg: 0 };
@@ -195,7 +204,13 @@ export default function Supplies() {
                           <option value="SUSTRATO">🪨 Sustrato (Stock y Gasto)</option>
                           <option value="ENVASE">📦 Envase / Bandeja (Stock y Gasto)</option>
                           <option value="OTRO">🏷️ Consumible (Stock y Gasto)</option>
-                          <option value="GASTO_FIJO">💸 Gasto General / Servicio (SOLO GASTO)</option>
+                          <optgroup label="Gastos (Sin Stock)">
+                            <option value="GASTO_FIJO">💸 Gasto Fijo General</option>
+                            <option value="SUMINISTROS">⚡ Suministros (Luz, Agua, etc)</option>
+                            <option value="MANTENIMIENTO">🔧 Reparaciones / Mantenimiento</option>
+                            <option value="MARKETING">📢 Publicidad y Software</option>
+                            <option value="NOMINAS">👥 Nóminas y Seguros Sociales</option>
+                          </optgroup>
                         </select>
                       </td>
                       <td>
@@ -304,7 +319,11 @@ export default function Supplies() {
                 <option value="SEMILLA">Solo Semillas</option>
                 <option value="SUSTRATO">Solo Sustratos</option>
                 <option value="ENVASE">Solo Envases</option>
-                <option value="GASTO_FIJO">Gastos Fijos/Servicios (Luz, etc)</option>
+                <option value="GASTO_FIJO">Gastos Fijos</option>
+                <option value="SUMINISTROS">Suministros</option>
+                <option value="MANTENIMIENTO">Mantenimiento</option>
+                <option value="MARKETING">Marketing</option>
+                <option value="NOMINAS">Nóminas</option>
               </select>
             </div>
             <div>
@@ -524,7 +543,13 @@ export default function Supplies() {
                   <option value="SUSTRATO">🪨 Sustrato (Stock y Gasto)</option>
                   <option value="ENVASE">📦 Envase / Bandeja (Stock y Gasto)</option>
                   <option value="OTRO">🏷️ Consumible (Stock y Gasto)</option>
-                  <option value="GASTO_FIJO">💸 Gasto General / Servicio (SOLO GASTO)</option>
+                  <optgroup label="Gastos (Sin Stock)">
+                    <option value="GASTO_FIJO">💸 Gasto Fijo General</option>
+                    <option value="SUMINISTROS">⚡ Suministros (Luz, Agua, etc)</option>
+                    <option value="MANTENIMIENTO">🔧 Reparaciones / Mantenimiento</option>
+                    <option value="MARKETING">📢 Publicidad y Software</option>
+                    <option value="NOMINAS">👥 Nóminas y Seguros Sociales</option>
+                  </optgroup>
                 </select>
               </div>
               <div>
@@ -569,7 +594,7 @@ export default function Supplies() {
               </div>
               <div>
                 <label className="form-label">Lote (Para Trazabilidad)</label>
-                <input type="text" className="form-control" placeholder="Solo si aplica" disabled={selectedArticleType === 'GASTO_FIJO'} value={newStockEntry.batchNumber} onChange={e => setNewStockEntry({...newStockEntry, batchNumber: e.target.value})} />
+                <input type="text" className="form-control" placeholder="Solo si aplica" disabled={isExpenseOnly} value={newStockEntry.batchNumber} onChange={e => setNewStockEntry({...newStockEntry, batchNumber: e.target.value})} />
               </div>
               <div>
                 <label className="form-label">Cant. ({selectedArticleType ? getUnitLabel(selectedArticleType) : 'Uds'})</label>
