@@ -47,12 +47,12 @@ export const DataProvider = ({ children }) => {
           { data: expensesData },
           { data: profileData },
           { data: providersData },
-          { data: seedsData },
-          { data: seedInventoryData },
+          { data: articlesData },
+          { data: stockEntriesData },
+          { data: cropTypesData },
           { data: cropsData },
           { data: harvestTargetsData },
-          { data: harvestsData },
-          { data: dailyLogsData }
+          { data: harvestsData },\n            { data: dailyLogsData }
         ] = await Promise.all([
           supabase.from('clients').select('*').order('createdAt', { ascending: true }),
           supabase.from('products').select('*').order('createdAt', { ascending: true }),
@@ -103,12 +103,9 @@ export const DataProvider = ({ children }) => {
           }
         
         if (providersData) setProviders(providersData);
-        if (seedsData) setSeeds(seedsData);
-        if (seedInventoryData) setSeedInventory(seedInventoryData);
-        if (cropsData) setCrops(cropsData);
-        if (harvestTargetsData) setHarvestTargets(harvestTargetsData);
-        if (harvestsData) setHarvests(harvestsData);
-        if (dailyLogsData) setDailyLogs(dailyLogsData);
+        if (articlesData) setArticles(articlesData);
+        if (stockEntriesData) setStockEntries(stockEntriesData);
+        if (cropTypesData) setCropTypes(cropTypesData);\n          if (cropsData) setCrops(cropsData);\n          if (harvestTargetsData) setHarvestTargets(harvestTargetsData);\n          if (harvestsData) setHarvests(harvestsData);\n          if (dailyLogsData) setDailyLogs(dailyLogsData);
 
         if (profileData && profileData.length > 0) {
           setCompanyProfile(profileData[0]);
