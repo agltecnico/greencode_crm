@@ -149,6 +149,16 @@ export default function Supplies() {
   const newTypeCosts = getLiveCosts(newType);
   const editTypeCosts = getLiveCosts(editedCropType);
 
+  const getStockBalance = (article) => {
+    if (['GASTO_FIJO', 'SUMINISTROS', 'MANTENIMIENTO', 'MARKETING', 'NOMINAS'].includes(article.type)) {
+      return '-';
+    }
+    // Total entradas
+    const totalIn = stockEntries?.filter(e => e.articleId === article.id).reduce((acc, curr) => acc + Number(curr.quantity || 0), 0) || 0;
+    // Nota: Aquí se restaría el consumo (crops) en el futuro
+    return `${totalIn.toFixed(2)} ${getUnitLabel(article.type)}`;
+  };
+
   // Modal Styles
   const modalOverlayStyle = { position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 50 };
   const modalCardStyle = { width: '100%', maxWidth: '700px', margin: '20px', maxHeight: '90vh', overflowY: 'auto', backgroundColor: '#fff', padding: '2rem', borderRadius: '8px', border: '1px solid var(--color-border)' };
@@ -191,6 +201,7 @@ export default function Supplies() {
                 <tr>
                   <th>Tipo</th>
                   <th>Nombre del Artículo</th>
+                  <th>Stock Entrante Acumulado</th>
                   <th>Acciones</th>
                 </tr>
               </thead>
@@ -216,6 +227,7 @@ export default function Supplies() {
                       <td>
                         <input type="text" className="form-control" value={editedArticle.name} onChange={e => setEditedArticle({...editedArticle, name: e.target.value})} />
                       </td>
+                      <td className="text-muted text-sm">{getStockBalance(a)}</td>
                       <td>
                         <div style={{ display: 'flex', gap: '0.5rem' }}>
                           <button className="btn btn-primary" style={{ padding: '0.3rem 0.6rem', fontSize: '0.8rem' }} onClick={() => { updateArticle(a.id, editedArticle); setEditingArticleId(null); }}>Guardar</button>
@@ -227,6 +239,7 @@ export default function Supplies() {
                     <tr key={a.id}>
                       <td className="font-medium text-slate-500">{getTypeLabel(a.type)}</td>
                       <td className="font-bold text-slate-800">{a.name}</td>
+                      <td className="font-bold text-emerald-600">{getStockBalance(a)}</td>
                       <td>
                         <div style={{ display: 'flex', gap: '0.5rem' }}>
                           <button className="btn btn-secondary" style={{ padding: '0.3rem 0.6rem', fontSize: '0.8rem', background: 'transparent' }} onClick={() => { setEditingArticleId(a.id); setEditedArticle(a); }}>Editar</button>
