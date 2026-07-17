@@ -561,6 +561,7 @@ export const DataProvider = ({ children }) => {
       providers, addProvider, updateProvider, deleteProvider,
       seeds, addSeed, updateSeed, deleteSeed,
       seedInventory, addSeedInventory, updateSeedInventory, deleteSeedInventory,
+        articles, stockEntries, addArticle, deleteArticle, addStockEntry, deleteStockEntry,
       crops, addCrop, updateCrop, deleteCrop,
       harvestTargets, addHarvestTarget, updateHarvestTarget, deleteHarvestTarget,
       harvests, addHarvest, updateHarvest, deleteHarvest,
