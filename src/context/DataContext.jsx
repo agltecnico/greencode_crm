@@ -6,6 +6,15 @@ export const DataContext = createContext();
 export const useData = () => useContext(DataContext);
 
 export const DataProvider = ({ children }) => {
+
+    const sanitizeForeignKeys = (obj) => {
+      const copy = { ...obj };
+      ['providerId', 'seedId', 'substrateId', 'containerId', 'articleId', 'clientId'].forEach(k => {
+        if (copy[k] === '') copy[k] = null;
+      });
+      return copy;
+    };
+
   const [clients, setClients] = useState([]);
   const [products, setProducts] = useState([]);
   const [orders, setOrders] = useState([]);
@@ -196,6 +205,7 @@ export const DataProvider = ({ children }) => {
 
     
     const addCropType = async (item) => {
+      item = sanitizeForeignKeys(item);
       const tempId = Date.now().toString();
       const newItem = { ...item, id: tempId };
       setCropTypes(prev => [...prev, newItem]);
@@ -209,6 +219,7 @@ export const DataProvider = ({ children }) => {
       return tempId;
     };
     const updateCropType = async (id, updatedFields) => {
+      updatedFields = sanitizeForeignKeys(updatedFields);
       setCropTypes(prev => prev.map(i => i.id === id ? { ...i, ...updatedFields } : i));
       await supabase.from('crop_types').update(updatedFields).eq('id', id);
     };
