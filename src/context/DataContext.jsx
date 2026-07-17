@@ -571,7 +571,8 @@ export const DataProvider = ({ children }) => {
       orders, addOrder, updateOrderList, deleteOrder, markOrderAsDelivered, saveSignedDeliveryNote,
       deliveryNotes, updateDeliveryNote, deleteDeliveryNote,
       invoices, addInvoice, deleteInvoice, importData, markInvoiceAsPaid,
-      expenses, addExpense, updateExpense, deleteExpense, markExpenseAsPaid
+      expenses, addExpense, updateExpense, deleteExpense, markExpenseAsPaid,
+      refreshData
     }}>
       {children}
     </DataContext.Provider>
