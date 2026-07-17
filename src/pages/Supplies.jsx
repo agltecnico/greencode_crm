@@ -542,6 +542,22 @@ export default function Supplies() {
                             <label className="form-label text-sm">Rendimiento Esperado (g)</label>
                             <input type="number" step="1" min="0" className="form-control" value={editedCropType.expectedYieldGrams} onChange={e => setEditedCropType({...editedCropType, expectedYieldGrams: Number(e.target.value)})} />
                           </div>
+                          <div>
+                            <label className="form-label text-sm">Remojo (h)</label>
+                            <input type="number" min="0" className="form-control" value={editedCropType.soakingHours || ''} onChange={e => setEditedCropType({...editedCropType, soakingHours: parseFloat(e.target.value) || 0})} />
+                          </div>
+                          <div>
+                            <label className="form-label text-sm">Germinación (d)</label>
+                            <input type="number" min="0" className="form-control" value={editedCropType.germinationDays || ''} onChange={e => setEditedCropType({...editedCropType, germinationDays: parseFloat(e.target.value) || 0})} />
+                          </div>
+                          <div>
+                            <label className="form-label text-sm">Oscuridad (d)</label>
+                            <input type="number" min="0" className="form-control" value={editedCropType.darknessDays || ''} onChange={e => setEditedCropType({...editedCropType, darknessDays: parseFloat(e.target.value) || 0})} />
+                          </div>
+                          <div>
+                            <label className="form-label text-sm">Luz (d)</label>
+                            <input type="number" min="0" className="form-control" value={editedCropType.lightDays || ''} onChange={e => setEditedCropType({...editedCropType, lightDays: parseFloat(e.target.value) || 0})} />
+                          </div>
                         </div>
 
                         <div style={{ marginTop: '1rem', padding: '1rem', background: '#fff', borderRadius: '6px', border: '1px solid #cbd5e1', display: 'flex', justifyContent: 'space-around' }}>
