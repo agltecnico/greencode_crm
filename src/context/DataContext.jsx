@@ -27,6 +27,7 @@ export const DataProvider = ({ children }) => {
   const [providers, setProviders] = useState([]);
   const [articles, setArticles] = useState([]);
   const [stockEntries, setStockEntries] = useState([]);
+  const [cropTypes, setCropTypes] = useState([]);
 
   const [crops, setCrops] = useState([]);
   const [harvestTargets, setHarvestTargets] = useState([]);
@@ -63,6 +64,7 @@ export const DataProvider = ({ children }) => {
           supabase.from('providers').select('*').order('createdAt', { ascending: true }),
           supabase.from('articles').select('*').order('createdAt', { ascending: true }),
           supabase.from('stock_entries').select('*').order('createdAt', { ascending: true }),
+          supabase.from('crop_types').select('*').order('createdAt', { ascending: true }),
           supabase.from('crops').select('*').order('createdAt', { ascending: true }),
           supabase.from('harvest_targets').select('*').order('createdAt', { ascending: true }),
           supabase.from('harvests').select('*').order('createdAt', { ascending: true }),
@@ -175,6 +177,24 @@ export const DataProvider = ({ children }) => {
       await supabase.from('stock_entries').delete().eq('id', id);
     };
 
+    
+    const addCropType = async (item) => {
+      const tempId = Date.now().toString();
+      const newItem = { ...item, id: tempId };
+      setCropTypes(prev => [...prev, newItem]);
+      const { data, error } = await supabase.from('crop_types').insert([newItem]).select();
+      if (!error && data) setCropTypes(prev => prev.map(i => i.id === tempId ? data[0] : i));
+      return tempId;
+    };
+    const updateCropType = async (id, updatedFields) => {
+      setCropTypes(prev => prev.map(i => i.id === id ? { ...i, ...updatedFields } : i));
+      await supabase.from('crop_types').update(updatedFields).eq('id', id);
+    };
+    const deleteCropType = async (id) => {
+      setCropTypes(prev => prev.filter(i => i.id !== id));
+      await supabase.from('crop_types').delete().eq('id', id);
+    };
+    
     // Derived Aliases for backwards compatibility in other files
     const seeds = articles.filter(a => a.type === 'SEMILLA');
     const substrates = articles.filter(a => a.type === 'SUSTRATO');
@@ -609,6 +629,7 @@ export const DataProvider = ({ children }) => {
 
       providers, addProvider, updateProvider, deleteProvider,
         articles, stockEntries, addArticle, updateArticle, deleteArticle, addStockEntry, updateStockEntry, deleteStockEntry,
+        cropTypes, addCropType, updateCropType, deleteCropType,
         seeds, addSeed, updateSeed, deleteSeed,
         seedInventory, addSeedInventory, updateSeedInventory, deleteSeedInventory,
       crops, addCrop, updateCrop, deleteCrop,
