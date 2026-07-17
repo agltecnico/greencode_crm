@@ -172,6 +172,58 @@ export default function Crops() {
             </div>
           )}
         </div>
+
+        <div className="mt-12">
+          <div className="flex justify-between items-center mb-6">
+            <div>
+              <h2 className="text-2xl font-bold text-slate-800">📖 Histórico de Siembras</h2>
+              <p className="text-slate-500">Consulta los cultivos que ya han finalizado su ciclo.</p>
+            </div>
+          </div>
+
+          <div className="premium-card">
+            <div style={{ overflowX: 'auto' }}>
+              <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: '600px' }}>
+                <thead>
+                  <tr style={{ borderBottom: '2px solid var(--color-border)', color: '#64748b', textAlign: 'left' }}>
+                    <th style={{ padding: '1rem', fontWeight: '600' }}>Lote / Siembra</th>
+                    <th style={{ padding: '1rem', fontWeight: '600' }}>Ficha de Cultivo</th>
+                    <th style={{ padding: '1rem', fontWeight: '600' }}>Fecha Siembra</th>
+                    <th style={{ padding: '1rem', fontWeight: '600' }}>Bandejas</th>
+                    <th style={{ padding: '1rem', fontWeight: '600' }}>Estado Final</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {(crops?.filter(c => c.status === 'HARVESTED' || c.status === 'DISCARDED') || []).map(crop => {
+                    const cType = cropTypes?.find(c => c.id === crop.seedId || c.id === crop.cropTypeId);
+                    const plantedDate = new Date(crop.datePlanted || crop.plantedAt).toLocaleDateString();
+                    
+                    return (
+                      <tr key={crop.id} style={{ borderBottom: '1px solid var(--color-border)' }}>
+                        <td style={{ padding: '1rem', fontWeight: '500' }}>{crop.batchNumber || 'N/A'}</td>
+                        <td style={{ padding: '1rem' }}>{cType?.name || 'Desconocido'}</td>
+                        <td style={{ padding: '1rem' }}>{plantedDate}</td>
+                        <td style={{ padding: '1rem' }}>{crop.traysCount}</td>
+                        <td style={{ padding: '1rem' }}>
+                          <span style={{ 
+                            padding: '4px 8px', borderRadius: '4px', fontSize: '0.85rem', fontWeight: 'bold',
+                            backgroundColor: crop.status === 'HARVESTED' ? '#dcfce7' : '#fee2e2',
+                            color: crop.status === 'HARVESTED' ? '#166534' : '#991b1b'
+                          }}>
+                            {translateStatus(crop.status)}
+                          </span>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+              {(crops?.filter(c => c.status === 'HARVESTED' || c.status === 'DISCARDED') || []).length === 0 && (
+                <p style={{ textAlign: 'center', padding: '2rem', color: '#94a3b8' }}>No hay registros en el historial.</p>
+              )}
+            </div>
+          </div>
+        </div>
       </div>
     );
   };
@@ -348,14 +400,6 @@ export default function Crops() {
           <div className="hub-card-text">
             <h2 style={{ fontSize: '1.5rem' }}>Planificador</h2>
             <p style={{ fontSize: '1rem' }}>Rutinas automáticas</p>
-          </div>
-        </button>
-
-        <button onClick={() => setActiveTab('historial')} className="hub-card" style={{ border: 'none', width: '100%' }}>
-          <div className="hub-card-icon" style={{ fontSize: '3.5rem' }}>📖</div>
-          <div className="hub-card-text">
-            <h2 style={{ fontSize: '1.5rem' }}>Historial</h2>
-            <p style={{ fontSize: '1rem' }}>Registros pasados</p>
           </div>
         </button>
       </div>
