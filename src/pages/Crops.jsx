@@ -71,6 +71,30 @@ export default function Crops() {
     alert(`Cosecha registrada con el lote Sanidad: ${batchNum}. Generando PDF...`);
   };
 
+  const handleProductSelect = (productId) => {
+    setNewHarvest(prev => ({ ...prev, productId }));
+    const product = products?.find(p => p.id === productId);
+    if (!product) return;
+    
+    if (product.recipeSeeds && product.recipeSeeds.length > 0) {
+      const allowedSeedIds = product.recipeSeeds.map(rs => rs.seedId);
+      const autoSelectedIds = [];
+      
+      allowedSeedIds.forEach(seedId => {
+        // Find all growing crops matching this seedId or cropTypeId (since cropType matches seedId 1-to-1 usually)
+        // Wait, crop.seedId might be null if it's relying on cropTypeId. We need to check both.
+        const matchingCrops = crops.filter(c => c.status === 'GROWING' && (c.seedId === seedId || c.cropTypeId === seedId || cropTypes?.find(ct => ct.id === c.cropTypeId)?.seedId === seedId));
+        
+        matchingCrops.sort((a, b) => new Date(a.datePlanted || a.plantedAt) - new Date(b.datePlanted || b.plantedAt));
+        if (matchingCrops.length > 0) {
+          autoSelectedIds.push(matchingCrops[0].id);
+        }
+      });
+
+      setNewHarvest(prev => ({ ...prev, selectedCropIds: autoSelectedIds }));
+    }
+  };
+
   const generateLabelPDF = (productName, batch, shelfLife, copies) => {
     import('../utils/labelPdf.js').then(module => {
       module.generateAndPrintLabels(productName, batch, shelfLife, copies);
@@ -265,17 +289,36 @@ export default function Crops() {
             </div>
               <form onSubmit={handleRegisterHarvest} className="flex flex-col gap-4">
                 <div>
-                  <label className="text-sm font-semibold mb-2 block">1. Selecciona las bandejas que vas a cortar (para mixes, selecciona varias):</label>
+                  <label className="text-sm font-semibold mb-1 block">1. ¿Qué producto final vas a envasar?</label>
+                  <select className="premium-input w-full" style={{ padding: '0.75rem', borderRadius: '8px', border: '1px solid #cbd5e1' }} required value={newHarvest.productId} onChange={e=>handleProductSelect(e.target.value)}>
+                    <option value="">-- Seleccionar --</option>
+                    {products?.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+                  </select>
+                </div>
+
+                <div>
+                  <label className="text-sm font-semibold mb-2 block flex justify-between">
+                    <span>2. Selecciona las bandejas que vas a cortar:</span>
+                  </label>
                   <div className="max-h-48 overflow-y-auto border border-slate-300 rounded-lg p-2 bg-slate-50 flex flex-col gap-2">
                     {(crops?.filter(c => c.status === 'GROWING') || []).map(crop => {
                       const cType = cropTypes?.find(c => c.id === crop.seedId || c.id === crop.cropTypeId);
                       const isChecked = newHarvest.selectedCropIds.includes(crop.id);
+                      
+                      const harvestProduct = products?.find(p => p.id === newHarvest.productId);
+                      const hasRecipe = harvestProduct?.recipeSeeds && harvestProduct.recipeSeeds.length > 0;
+                      const allowedSeedIds = hasRecipe ? harvestProduct.recipeSeeds.map(rs => rs.seedId) : [];
+                      
+                      const actualSeedId = crop.seedId || cropTypes?.find(ct => ct.id === crop.cropTypeId)?.seedId;
+                      const isAllowed = !hasRecipe || allowedSeedIds.includes(actualSeedId);
+
                       return (
-                        <label key={crop.id} className="flex items-center gap-3 p-2 bg-white rounded border border-slate-200 cursor-pointer hover:bg-slate-50 transition-colors">
+                        <label key={crop.id} className={`flex items-center gap-3 p-2 bg-white rounded border cursor-pointer transition-colors ${!isAllowed ? 'opacity-40 border-red-100 bg-red-50 cursor-not-allowed' : isChecked ? 'border-green-500 bg-green-50' : 'border-slate-200 hover:bg-slate-50'}`}>
                           <input 
                             type="checkbox" 
-                            className="w-5 h-5 text-green-600 rounded focus:ring-green-500"
+                            className="w-5 h-5 text-green-600 rounded focus:ring-green-500 disabled:opacity-50"
                             checked={isChecked}
+                            disabled={!isAllowed}
                             onChange={(e) => {
                               if (e.target.checked) {
                                 setNewHarvest(prev => ({ ...prev, selectedCropIds: [...prev.selectedCropIds, crop.id] }));
@@ -286,7 +329,11 @@ export default function Crops() {
                           />
                           <div className="flex-1 flex justify-between">
                             <span className="font-semibold text-slate-700">{cType?.name || 'Desconocido'} <span className="font-normal text-slate-500 text-sm">({crop.traysCount} bandejas)</span></span>
-                            <span className="text-xs bg-slate-200 text-slate-600 px-2 py-1 rounded font-mono">{crop.batchNumber}</span>
+                            {!isAllowed && hasRecipe ? (
+                              <span className="text-xs text-red-500 font-bold px-2 py-1">No permitido en la receta</span>
+                            ) : (
+                              <span className="text-xs bg-slate-200 text-slate-600 px-2 py-1 rounded font-mono">{crop.batchNumber}</span>
+                            )}
                           </div>
                         </label>
                       );
@@ -298,25 +345,17 @@ export default function Crops() {
                 </div>
 
                 <div>
-                  <label className="text-sm font-semibold mb-1 block">2. ¿Qué producto final has envasado?</label>
-                <select className="premium-input w-full" style={{ padding: '0.75rem', borderRadius: '8px', border: '1px solid #cbd5e1' }} required value={newHarvest.productId} onChange={e=>setNewHarvest({...newHarvest, productId: e.target.value})}>
-                  <option value="">-- Seleccionar --</option>
-                  {products?.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
-                </select>
-              </div>
-              <div>
-                <label className="text-sm font-semibold mb-1 block">¿Cuántos tuppers en total han salido?</label>
-                <input type="number" className="premium-input w-full" style={{ padding: '0.75rem', borderRadius: '8px', border: '1px solid #cbd5e1' }} required min="1" value={newHarvest.tuppersCount} onChange={e=>setNewHarvest({...newHarvest, tuppersCount: e.target.value})}/>
-              </div>
-              <div className="flex justify-end gap-2 mt-4">
-                <button type="button" onClick={() => setIsHarvestModalOpen(false)} className="btn btn-secondary" style={{ padding: '0.75rem 1.5rem', borderRadius: '8px', border: '1px solid #cbd5e1', background: 'white' }}>Cancelar</button>
-                <button type="submit" className="btn btn-primary" style={{ background: '#0f172a', color: 'white', border: 'none', padding: '0.75rem 1.5rem', borderRadius: '8px', fontWeight: 'bold' }}>
-                  🖨️ Registrar e Imprimir
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
+                  <label className="text-sm font-semibold mb-1 block">3. ¿Cuántos tuppers en total han salido?</label>
+                  <input type="number" className="premium-input w-full" style={{ padding: '0.75rem', borderRadius: '8px', border: '1px solid #cbd5e1' }} required min="1" value={newHarvest.tuppersCount} onChange={e=>setNewHarvest({...newHarvest, tuppersCount: e.target.value})}/>
+                </div>
+                <div className="flex justify-end gap-2 mt-4">
+                  <button type="button" onClick={() => setIsHarvestModalOpen(false)} className="btn btn-secondary" style={{ padding: '0.75rem 1.5rem', borderRadius: '8px', border: '1px solid #cbd5e1', background: 'white' }}>Cancelar</button>
+                  <button type="submit" className="btn btn-primary" style={{ background: '#0f172a', color: 'white', border: 'none', padding: '0.75rem 1.5rem', borderRadius: '8px', fontWeight: 'bold' }}>
+                    🖨️ Registrar e Imprimir
+                  </button>
+                </div>
+              </form>
+            </div></div>
       )}
 
       <div className="premium-card mt-6">
