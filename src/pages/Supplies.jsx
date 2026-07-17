@@ -131,9 +131,9 @@ export default function Supplies() {
 
   const seeds = articles?.filter(a => a.type === 'SEMILLA') || [];
   const substrates = articles?.filter(a => a.type === 'SUSTRATO') || [];
-  const containers = articles?.filter(a => a.type === 'ENVASE') || [];
+  const containers = articles?.filter(a => a.type === 'ENVASE' || a.type === 'BANDEJA' || a.type === 'SUMINISTROS') || [];
   const selectedArticleType = newStockEntry.articleId ? articles?.find(a => a.id === newStockEntry.articleId)?.type : null;
-  const isExpenseOnly = ['GASTO_FIJO', 'SUMINISTROS', 'MANTENIMIENTO', 'MARKETING', 'NOMINAS'].includes(selectedArticleType);
+  const isExpenseOnly = ['GASTO_FIJO', 'SUMINISTROS', 'MANTENIMIENTO', 'MARKETING', 'NOMINAS', 'BANDEJA'].includes(selectedArticleType);
 
   const getLiveCosts = (formData) => {
     if (!formData) return { totalTray: 0, perKg: 0 };
@@ -150,7 +150,7 @@ export default function Supplies() {
   const editTypeCosts = getLiveCosts(editedCropType);
 
   const getStockBalance = (article) => {
-    if (['GASTO_FIJO', 'SUMINISTROS', 'MANTENIMIENTO', 'MARKETING', 'NOMINAS'].includes(article.type)) {
+    if (['GASTO_FIJO', 'SUMINISTROS', 'MANTENIMIENTO', 'MARKETING', 'NOMINAS', 'BANDEJA'].includes(article.type)) {
       return '-';
     }
     // Total entradas
@@ -159,7 +159,7 @@ export default function Supplies() {
     return `${totalIn.toFixed(2)} ${getUnitLabel(article.type)}`;
   };
 
-  const totalWarehouseValue = articles?.filter(a => !['GASTO_FIJO', 'SUMINISTROS', 'MANTENIMIENTO', 'MARKETING', 'NOMINAS'].includes(a.type))
+  const totalWarehouseValue = articles?.filter(a => !['GASTO_FIJO', 'SUMINISTROS', 'MANTENIMIENTO', 'MARKETING', 'NOMINAS', 'BANDEJA'].includes(a.type))
     .reduce((sum, a) => {
       const totalIn = stockEntries?.filter(e => e.articleId === a.id).reduce((acc, curr) => acc + Number(curr.quantity || 0), 0) || 0;
       const avgCost = getAverageUnitCost(a.id);
@@ -221,7 +221,7 @@ export default function Supplies() {
                 </tr>
               </thead>
               <tbody>
-                {articles?.filter(a => !['GASTO_FIJO', 'SUMINISTROS', 'MANTENIMIENTO', 'MARKETING', 'NOMINAS'].includes(a.type))
+                {articles?.filter(a => !['GASTO_FIJO', 'SUMINISTROS', 'MANTENIMIENTO', 'MARKETING', 'NOMINAS', 'BANDEJA'].includes(a.type))
                   .filter(a => a.name.toLowerCase().includes(searchTerm.toLowerCase()))
                   .map(a => {
                     const totalIn = stockEntries?.filter(e => e.articleId === a.id).reduce((acc, curr) => acc + Number(curr.quantity || 0), 0) || 0;
@@ -271,7 +271,8 @@ export default function Supplies() {
                           <option value="SUSTRATO">🟤 Sustrato (Stock y Gasto)</option>
                           <option value="ENVASE">📦 Envase / Bandeja (Stock y Gasto)</option>
                           <option value="OTRO">❓ Consumible (Stock y Gasto)</option>
-                          <optgroup label="Gastos (Sin Stock)">
+                          <option value="BANDEJA">🔲 Bandeja Reutilizable (Sin Stock)</option>
+                  <optgroup label="Gastos (Sin Stock)">
                             <option value="GASTO_FIJO">🏢 Gasto Fijo General</option>
                             <option value="SUMINISTROS">💧 Suministros (Luz, Agua, etc)</option>
                             <option value="MANTENIMIENTO">🔧 Reparaciones / Mantenimiento</option>
@@ -625,6 +626,7 @@ export default function Supplies() {
                   <option value="SUSTRATO">🪨 Sustrato (Stock y Gasto)</option>
                   <option value="ENVASE">📦 Envase / Bandeja (Stock y Gasto)</option>
                   <option value="OTRO">🏷️ Consumible (Stock y Gasto)</option>
+                  <option value="BANDEJA">🔲 Bandeja Reutilizable (Sin Stock)</option>
                   <optgroup label="Gastos (Sin Stock)">
                     <option value="GASTO_FIJO">💸 Gasto Fijo General</option>
                     <option value="SUMINISTROS">⚡ Suministros (Luz, Agua, etc)</option>
