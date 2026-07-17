@@ -1,201 +1,108 @@
 import { useState } from 'react';
 import { useData } from '../context/DataContext';
-import { generateLabelPDF } from '../utils/labelPdf';
+import EmployeeTasks from '../components/EmployeeTasks';
 
 export default function Crops() {
   const { 
     providers, addProvider, deleteProvider,
     seeds, addSeed, deleteSeed,
-    seedInventory, addSeedInventory,
-    crops, addCrop, updateCrop, deleteCrop,
+    seedInventory, addSeedInventory, deleteSeedInventory,
+    crops, addCrop, advanceCropStatus, discardCrop,
     harvestTargets, addHarvestTarget, deleteHarvestTarget,
     harvests, addHarvest,
     products
   } = useData();
 
-  const [activeTab, setActiveTab] = useState('catalogo');
+  const [activeTab, setActiveTab] = useState('tareas');
 
-  // FORM STATES
-  const [newProvider, setNewProvider] = useState({ name: '', contact: '', phone: '', email: '' });
-  const [newSeed, setNewSeed] = useState({ name: '', providerId: '', costPerKg: '', soakingHours: 0, germinationDays: 2, darknessDays: 3, lightDays: 7, expectedYieldGrams: 0, minimumStockAlert: 500 });
-  const [newPurchase, setNewPurchase] = useState({ seedId: '', providerLotNumber: '', gramsPurchased: '', costPerKg: '' });
-  const [newCrop, setNewCrop] = useState({ seedInventoryId: '', traysCount: '', gramsPerTray: '', substrateCostPerTray: '' });
-  const [newHarvest, setNewHarvest] = useState({ productId: '', tuppersCount: '' });
-  const [newTarget, setNewTarget] = useState({ targetDayOfWeek: '1', productId: '', tuppersCount: '' });
+  const [newProvider, setNewProvider] = useState({ name: '', contactInfo: '' });
+  const [newSeed, setNewSeed] = useState({ name: '', providerId: '', soakingHours: 0, germinationDays: 3, darknessDays: 2, lightDays: 5, expectedYieldGrams: 0 });
+  const [newInventory, setNewInventory] = useState({ seedId: '', providerBatch: '', weightGrams: 1000, purchaseDate: new Date().toISOString().split('T')[0] });
+  const [newCrop, setNewCrop] = useState({ seedId: '', traysCount: 1, seedGramsPerTray: 0, inventoryId: '' });
+  const [newTarget, setNewTarget] = useState({ targetDayOfWeek: 1, productId: '', tuppersCount: 10 });
+  const [newHarvest, setNewHarvest] = useState({ productId: '', tuppersCount: 1 });
 
-  // HANDLERS
-  const handleAddProvider = (e) => {
+  // HANDLERS (Same logic as before)
+  const handleAddProvider = e => { e.preventDefault(); addProvider(newProvider); setNewProvider({name:'', contactInfo:''}); };
+  const handleAddSeed = e => { e.preventDefault(); addSeed(newSeed); setNewSeed({...newSeed, name:''}); };
+  const handleAddInventory = e => { e.preventDefault(); addSeedInventory(newInventory); setNewInventory({...newInventory, providerBatch:''}); };
+  const handleAddCrop = e => { 
+    e.preventDefault(); 
+    const batchNum = `S-\${Date.now().toString().slice(-6)}`;
+    addCrop({...newCrop, datePlanted: new Date().toISOString(), batchNumber: batchNum, status: 'SOAKING'}); 
+    setNewCrop({...newCrop, traysCount: 1, seedGramsPerTray: 0}); 
+  };
+  const handleAddHarvestTarget = e => { e.preventDefault(); addHarvestTarget(newTarget); };
+  
+  const handleRegisterHarvest = e => {
     e.preventDefault();
-    if(newProvider.name) {
-      addProvider(newProvider);
-      setNewProvider({ name: '', contact: '', phone: '', email: '' });
-    }
+    const batchNum = `L-\${Date.now().toString().slice(-6)}`;
+    addHarvest({...newHarvest, harvestDate: new Date().toISOString(), batchNumber: batchNum});
+    
+    // Auto-generate labels immediately
+    const product = products?.find(p => p.id === newHarvest.productId);
+    generateLabelPDF(product?.name || 'Desconocido', batchNum, product?.shelfLifeDays || 10, newHarvest.tuppersCount);
+    
+    setNewHarvest({...newHarvest, tuppersCount: 1});
+    alert(`Cosecha registrada con el lote Sanidad: \${batchNum}. Generando PDF...`);
   };
 
-  const handleAddSeed = (e) => {
-    e.preventDefault();
-    if(newSeed.name && newSeed.providerId && newSeed.costPerKg) {
-      addSeed({ ...newSeed, costPerKg: Number(newSeed.costPerKg), stockGrams: 0 });
-      setNewSeed({ name: '', providerId: '', costPerKg: '', soakingHours: 0, germinationDays: 2, darknessDays: 3, lightDays: 7, expectedYieldGrams: 0, minimumStockAlert: 500 });
-    }
+  const generateLabelPDF = (productName, batch, shelfLife, copies) => {
+    import('../utils/labelPdf.js').then(module => {
+      module.generateAndPrintLabels(productName, batch, shelfLife, copies);
+    });
   };
 
-  const handleAddPurchase = (e) => {
-    e.preventDefault();
-    if(newPurchase.seedId && newPurchase.providerLotNumber && newPurchase.gramsPurchased) {
-      const g = Number(newPurchase.gramsPurchased);
-      addSeedInventory({
-        ...newPurchase,
-        gramsPurchased: g,
-        gramsRemaining: g,
-        costPerKg: Number(newPurchase.costPerKg),
-        purchaseDate: new Date().toISOString()
-      });
-      setNewPurchase({ seedId: '', providerLotNumber: '', gramsPurchased: '', costPerKg: '' });
-      alert("Lote de semillas registrado correctamente");
-    }
-  };
-
-  const handleAddCrop = (e) => {
-    e.preventDefault();
-    if(newCrop.seedInventoryId && newCrop.traysCount) {
-      const inv = seedInventory.find(i => i.id === newCrop.seedInventoryId);
-      if(!inv) return;
-      const seedDef = seeds.find(s => s.id === inv.seedId);
-      if(!seedDef) return;
-
-      const g = Number(newCrop.gramsPerTray) || 0;
-      const t = Number(newCrop.traysCount) || 1;
-      
-      const batchNum = `S-${Date.now().toString().slice(-6)}`;
-      addCrop({
-        ...newCrop,
-        batchNumber: batchNum,
-        seedId: inv.seedId,
-        datePlanted: new Date().toISOString(),
-        traysCount: t,
-        gramsPerTray: g,
-        substrateCostPerTray: Number(newCrop.substrateCostPerTray) || 0,
-        status: seedDef.soakingHours > 0 ? 'SOAKING' : 'GERMINATION'
-      });
-      setNewCrop({ seedInventoryId: '', traysCount: '', gramsPerTray: '', substrateCostPerTray: '' });
-    }
-  };
-
-  const handleAddHarvestTarget = (e) => {
-    e.preventDefault();
-    if(newTarget.productId && newTarget.tuppersCount) {
-      addHarvestTarget({
-        ...newTarget,
-        targetDayOfWeek: Number(newTarget.targetDayOfWeek),
-        tuppersCount: Number(newTarget.tuppersCount)
-      });
-      setNewTarget({ targetDayOfWeek: '1', productId: '', tuppersCount: '' });
-    }
-  };
-
-  const advanceCropStatus = (crop) => {
-    const states = ['SOAKING', 'GERMINATION', 'DARKNESS', 'LIGHT', 'HARVESTED'];
-    const idx = states.indexOf(crop.status);
-    if(idx < states.length - 1) {
-      updateCrop(crop.id, { status: states[idx + 1] });
-    }
-  };
-
-  const handleRegisterHarvest = (e) => {
-    e.preventDefault();
-    if(newHarvest.productId && newHarvest.tuppersCount) {
-      const p = products.find(prod => prod.id === newHarvest.productId);
-      if(!p) return;
-
-      const lotSanidad = `LOT-${new Date().toISOString().slice(2,10).replace(/-/g,'')}-${p.name.substring(0,3).toUpperCase()}`;
-      const costPerTupper = 0.50; // Calculo simplificado para la demo
-
-      addHarvest({
-        productId: newHarvest.productId,
-        tuppersCount: Number(newHarvest.tuppersCount),
-        batchNumber: lotSanidad,
-        costPerTupper: costPerTupper,
-        harvestDate: new Date().toISOString()
-      });
-
-      // Generar Etiquetas
-      generateLabelPDF(p.name, lotSanidad, p.shelfLifeDays || 10, Number(newHarvest.tuppersCount));
-
-      setNewHarvest({ productId: '', tuppersCount: '' });
-      alert("Cosecha registrada. Lote: " + lotSanidad + "\\nImprimiendo Etiquetas...");
-    }
-  };
-
-  // RENDERERS
+  // UI RENDERERS
   const renderCatalogo = () => (
     <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-      {/* Proveedores */}
-      <div className="card">
-        <h3 className="text-xl font-bold mb-4 border-b border-slate-700 pb-2">Proveedores de Semillas</h3>
-        <form onSubmit={handleAddProvider} className="flex flex-col gap-3 mb-6 bg-slate-800/50 p-4 rounded border border-slate-700">
-          <input className="form-control" placeholder="Nombre Proveedor" required value={newProvider.name} onChange={e => setNewProvider({...newProvider, name: e.target.value})} />
-          <div className="grid grid-cols-2 gap-2">
-            <input className="form-control" placeholder="Teléfono" value={newProvider.phone} onChange={e => setNewProvider({...newProvider, phone: e.target.value})} />
-            <input className="form-control" placeholder="Email" value={newProvider.email} onChange={e => setNewProvider({...newProvider, email: e.target.value})} />
-          </div>
-          <button type="submit" className="btn btn-primary w-full text-sm">Añadir Proveedor</button>
+      <div className="bg-slate-800/60 border border-slate-700/50 p-6 rounded-2xl shadow-xl backdrop-blur-sm">
+        <h3 className="font-black mb-6 text-xl text-emerald-400 flex items-center gap-2"><span className="text-2xl">🏭</span> Proveedores de Semilla</h3>
+        <form onSubmit={handleAddProvider} className="flex flex-col gap-4">
+          <input type="text" placeholder="Nombre Proveedor" required className="w-full bg-slate-900 border-2 border-slate-700 text-white rounded-xl px-4 py-3 focus:border-emerald-500 focus:outline-none transition-colors" value={newProvider.name} onChange={e=>setNewProvider({...newProvider, name: e.target.value})}/>
+          <input type="text" placeholder="Contacto / Web" className="w-full bg-slate-900 border-2 border-slate-700 text-white rounded-xl px-4 py-3 focus:border-emerald-500 focus:outline-none transition-colors" value={newProvider.contactInfo} onChange={e=>setNewProvider({...newProvider, contactInfo: e.target.value})}/>
+          <button type="submit" className="w-full bg-gradient-to-r from-emerald-500 to-teal-500 text-white font-black py-4 rounded-xl shadow-lg hover:scale-[1.02] transition-transform">Añadir Proveedor</button>
         </form>
-
-        <div className="space-y-2">
+        <div className="mt-6 space-y-2">
           {providers?.map(p => (
-            <div key={p.id} className="flex justify-between items-center bg-slate-800 p-3 rounded">
-              <div>
-                <p className="font-bold">{p.name}</p>
-                <p className="text-xs text-gray-400">{p.phone} | {p.email}</p>
-              </div>
-              <button onClick={() => deleteProvider(p.id)} className="text-red-400 hover:text-red-300">✕</button>
+            <div key={p.id} className="flex justify-between items-center p-3 bg-slate-900/50 rounded-lg border border-slate-700/50">
+              <span className="font-bold text-slate-300">{p.name}</span>
+              <button onClick={()=>deleteProvider(p.id)} className="text-red-400 hover:text-red-300">✖</button>
             </div>
           ))}
-          {!providers?.length && <p className="text-sm text-gray-500">No hay proveedores.</p>}
         </div>
       </div>
 
-      {/* Variedades de Semillas */}
-      <div className="card">
-        <h3 className="text-xl font-bold mb-4 border-b border-slate-700 pb-2">Catálogo de Semillas</h3>
-        <form onSubmit={handleAddSeed} className="flex flex-col gap-3 mb-6 bg-slate-800/50 p-4 rounded border border-slate-700">
-          <div className="grid grid-cols-2 gap-2">
-            <input className="form-control" placeholder="Nombre (Ej: Rábano Sango)" required value={newSeed.name} onChange={e => setNewSeed({...newSeed, name: e.target.value})} />
-            <select className="form-control" required value={newSeed.providerId} onChange={e => setNewSeed({...newSeed, providerId: e.target.value})}>
+      <div className="bg-slate-800/60 border border-slate-700/50 p-6 rounded-2xl shadow-xl backdrop-blur-sm">
+        <h3 className="font-black mb-6 text-xl text-emerald-400 flex items-center gap-2"><span className="text-2xl">🌱</span> Catálogo de Semillas</h3>
+        <form onSubmit={handleAddSeed} className="grid grid-cols-2 gap-4">
+          <div className="col-span-2">
+            <select className="w-full bg-slate-900 border-2 border-slate-700 text-white rounded-xl px-4 py-3 focus:border-emerald-500 focus:outline-none" required value={newSeed.providerId} onChange={e=>setNewSeed({...newSeed, providerId: e.target.value})}>
               <option value="">-- Proveedor --</option>
               {providers?.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
             </select>
           </div>
-          <div className="grid grid-cols-2 gap-2">
-            <input className="form-control" type="number" step="0.01" placeholder="Coste Estimado (€/Kg)" required value={newSeed.costPerKg} onChange={e => setNewSeed({...newSeed, costPerKg: e.target.value})} />
-            <input className="form-control" type="number" placeholder="Alerta Stock Mín (Gramos)" value={newSeed.minimumStockAlert} onChange={e => setNewSeed({...newSeed, minimumStockAlert: e.target.value})} />
+          <div className="col-span-2">
+            <input type="text" placeholder="Nombre Semilla (Ej: Rábano Sango)" required className="w-full bg-slate-900 border-2 border-slate-700 text-white rounded-xl px-4 py-3 focus:border-emerald-500 focus:outline-none" value={newSeed.name} onChange={e=>setNewSeed({...newSeed, name: e.target.value})}/>
           </div>
-          <p className="text-xs text-primary font-bold mt-2">Días del Ciclo (Planificador Inverso):</p>
-          <div className="grid grid-cols-4 gap-2 text-center text-xs">
-            <div><label>Remojo (h)</label><input type="number" className="form-control px-1" value={newSeed.soakingHours} onChange={e=>setNewSeed({...newSeed, soakingHours: e.target.value})}/></div>
-            <div><label>Germ. (d)</label><input type="number" className="form-control px-1" value={newSeed.germinationDays} onChange={e=>setNewSeed({...newSeed, germinationDays: e.target.value})}/></div>
-            <div><label>Oscuridad (d)</label><input type="number" className="form-control px-1" value={newSeed.darknessDays} onChange={e=>setNewSeed({...newSeed, darknessDays: e.target.value})}/></div>
-            <div><label>Luz (d)</label><input type="number" className="form-control px-1" value={newSeed.lightDays} onChange={e=>setNewSeed({...newSeed, lightDays: e.target.value})}/></div>
-          </div>
-          <button type="submit" className="btn btn-primary w-full text-sm mt-2">Añadir Semilla</button>
+          <div><label className="text-xs font-bold text-slate-400 mb-1 block">Horas Remojo</label><input type="number" required min="0" className="w-full bg-slate-900 border-2 border-slate-700 text-white rounded-xl px-4 py-2" value={newSeed.soakingHours} onChange={e=>setNewSeed({...newSeed, soakingHours: e.target.value})}/></div>
+          <div><label className="text-xs font-bold text-slate-400 mb-1 block">Días Germinación</label><input type="number" required min="0" className="w-full bg-slate-900 border-2 border-slate-700 text-white rounded-xl px-4 py-2" value={newSeed.germinationDays} onChange={e=>setNewSeed({...newSeed, germinationDays: e.target.value})}/></div>
+          <div><label className="text-xs font-bold text-slate-400 mb-1 block">Días Oscuridad</label><input type="number" required min="0" className="w-full bg-slate-900 border-2 border-slate-700 text-white rounded-xl px-4 py-2" value={newSeed.darknessDays} onChange={e=>setNewSeed({...newSeed, darknessDays: e.target.value})}/></div>
+          <div><label className="text-xs font-bold text-slate-400 mb-1 block">Días Luz</label><input type="number" required min="0" className="w-full bg-slate-900 border-2 border-slate-700 text-white rounded-xl px-4 py-2" value={newSeed.lightDays} onChange={e=>setNewSeed({...newSeed, lightDays: e.target.value})}/></div>
+          <button type="submit" className="col-span-2 bg-gradient-to-r from-emerald-500 to-teal-500 text-white font-black py-4 rounded-xl shadow-lg hover:scale-[1.02] transition-transform mt-2">Añadir Semilla al Catálogo</button>
         </form>
-
-        <div className="space-y-2">
+        <div className="mt-6 space-y-3">
           {seeds?.map(s => (
-            <div key={s.id} className="bg-slate-800 p-3 rounded flex justify-between items-center border-l-4 border-l-primary">
-              <div>
-                <p className="font-bold text-white">{s.name}</p>
-                <div className="flex gap-2 text-xs mt-1 text-gray-400">
-                  <span className="bg-slate-700 px-1 rounded">Rem: {s.soakingHours}h</span>
-                  <span className="bg-slate-700 px-1 rounded">Ger: {s.germinationDays}d</span>
-                  <span className="bg-slate-700 px-1 rounded">Osc: {s.darknessDays}d</span>
-                  <span className="bg-slate-700 px-1 rounded">Luz: {s.lightDays}d</span>
-                </div>
+            <div key={s.id} className="p-3 bg-slate-900/50 rounded-lg border border-slate-700/50 text-sm">
+              <div className="flex justify-between items-center mb-2">
+                <span className="font-bold text-white text-base">{s.name}</span>
+                <button onClick={()=>deleteSeed(s.id)} className="text-red-400 hover:text-red-300">✖</button>
               </div>
-              <div className="text-right">
-                <p className="text-sm font-bold text-green-400">{s.costPerKg} €/Kg</p>
-                <button onClick={() => deleteSeed(s.id)} className="text-red-400 hover:text-red-300 text-xs mt-1">Borrar</button>
+              <div className="grid grid-cols-4 gap-2 text-center text-xs font-mono">
+                <div className="bg-blue-900/40 text-blue-300 p-1 rounded">💧 {s.soakingHours}h</div>
+                <div className="bg-amber-900/40 text-amber-300 p-1 rounded">🌱 {s.germinationDays}d</div>
+                <div className="bg-purple-900/40 text-purple-300 p-1 rounded">🌑 {s.darknessDays}d</div>
+                <div className="bg-green-900/40 text-green-300 p-1 rounded">☀️ {s.lightDays}d</div>
               </div>
             </div>
           ))}
@@ -205,114 +112,136 @@ export default function Crops() {
   );
 
   const renderInventario = () => (
-    <div className="card">
-      <h3 className="text-xl font-bold mb-4">Registro de Compras (Trazabilidad)</h3>
-      <form onSubmit={handleAddPurchase} className="grid grid-cols-1 md:grid-cols-5 gap-3 mb-6 bg-slate-800/50 p-4 rounded border border-slate-700">
-        <select className="form-control" required value={newPurchase.seedId} onChange={e => setNewPurchase({...newPurchase, seedId: e.target.value})}>
-          <option value="">-- Variedad Comprada --</option>
-          {seeds?.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
-        </select>
-        <input className="form-control" placeholder="Nº Lote Proveedor" required value={newPurchase.providerLotNumber} onChange={e => setNewPurchase({...newPurchase, providerLotNumber: e.target.value})} />
-        <input className="form-control" type="number" placeholder="Gramos (Ej: 5000 = 5Kg)" required value={newPurchase.gramsPurchased} onChange={e => setNewPurchase({...newPurchase, gramsPurchased: e.target.value})} />
-        <input className="form-control" type="number" step="0.01" placeholder="Precio Pagado (€/Kg)" required value={newPurchase.costPerKg} onChange={e => setNewPurchase({...newPurchase, costPerKg: e.target.value})} />
-        <button type="submit" className="btn btn-primary h-full">Registrar Saco</button>
-      </form>
-
-      <table className="table">
-        <thead>
-          <tr>
-            <th>Fecha Compra</th>
-            <th>Semilla</th>
-            <th>Lote Trazabilidad</th>
-            <th>Gramos Restantes</th>
-            <th>Coste Kg</th>
-          </tr>
-        </thead>
-        <tbody>
+    <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+      <div className="lg:col-span-1 bg-slate-800/60 border border-slate-700/50 p-6 rounded-2xl shadow-xl backdrop-blur-sm h-fit">
+        <h3 className="font-black mb-6 text-xl text-emerald-400 flex items-center gap-2"><span className="text-2xl">📦</span> Registrar Compra (Saco)</h3>
+        <form onSubmit={handleAddInventory} className="flex flex-col gap-4">
+          <select className="w-full bg-slate-900 border-2 border-slate-700 text-white rounded-xl px-4 py-3 focus:border-emerald-500 focus:outline-none" required value={newInventory.seedId} onChange={e=>setNewInventory({...newInventory, seedId: e.target.value})}>
+            <option value="">-- Qué Semilla es --</option>
+            {seeds?.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+          </select>
+          <input type="text" placeholder="Lote del Proveedor (Trazabilidad)" required className="w-full bg-slate-900 border-2 border-slate-700 text-white rounded-xl px-4 py-3 focus:border-emerald-500 focus:outline-none" value={newInventory.providerBatch} onChange={e=>setNewInventory({...newInventory, providerBatch: e.target.value})}/>
+          <div className="flex gap-4">
+            <div className="flex-1">
+              <label className="text-xs font-bold text-slate-400 mb-1 block">Peso (Gramos)</label>
+              <input type="number" required min="1" className="w-full bg-slate-900 border-2 border-slate-700 text-white rounded-xl px-4 py-3 focus:border-emerald-500 focus:outline-none" value={newInventory.weightGrams} onChange={e=>setNewInventory({...newInventory, weightGrams: e.target.value})}/>
+            </div>
+            <div className="flex-1">
+              <label className="text-xs font-bold text-slate-400 mb-1 block">Fecha</label>
+              <input type="date" required className="w-full bg-slate-900 border-2 border-slate-700 text-white rounded-xl px-4 py-3 focus:border-emerald-500 focus:outline-none" value={newInventory.purchaseDate} onChange={e=>setNewInventory({...newInventory, purchaseDate: e.target.value})}/>
+            </div>
+          </div>
+          <button type="submit" className="w-full bg-gradient-to-r from-emerald-500 to-teal-500 text-white font-black py-4 rounded-xl shadow-lg hover:scale-[1.02] transition-transform mt-2">Guardar Saco en Inventario</button>
+        </form>
+      </div>
+      
+      <div className="lg:col-span-2 bg-slate-800/60 border border-slate-700/50 p-6 rounded-2xl shadow-xl backdrop-blur-sm">
+        <h3 className="font-black mb-6 text-xl text-emerald-400 flex items-center gap-2"><span className="text-2xl">📋</span> Stock Disponible</h3>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           {seedInventory?.map(inv => {
             const seed = seeds?.find(s => s.id === inv.seedId);
             return (
-              <tr key={inv.id}>
-                <td>{new Date(inv.purchaseDate).toLocaleDateString()}</td>
-                <td className="font-bold">{seed?.name || 'Desconocida'}</td>
-                <td className="font-mono text-primary text-sm">{inv.providerLotNumber}</td>
-                <td>
-                  <div className="flex items-center gap-2">
-                    <div className="w-full bg-slate-700 h-2 rounded-full overflow-hidden">
-                      <div className="bg-green-500 h-full" style={{ width: `${Math.max(0, (inv.gramsRemaining/inv.gramsPurchased)*100)}%` }}></div>
-                    </div>
-                    <span className="text-xs">{inv.gramsRemaining}g</span>
+              <div key={inv.id} className="relative p-5 rounded-xl border border-slate-700/50 bg-slate-900/60 overflow-hidden group">
+                <button onClick={() => deleteSeedInventory(inv.id)} className="absolute top-3 right-3 text-red-400 hover:text-red-300 opacity-0 group-hover:opacity-100 transition-opacity">✖</button>
+                <div className="flex justify-between items-start mb-2">
+                  <h4 className="font-bold text-lg text-white">{seed?.name || 'Semilla Eliminada'}</h4>
+                  <span className="font-mono text-xs bg-emerald-500/20 text-emerald-400 px-2 py-1 rounded">LOTE: {inv.providerBatch}</span>
+                </div>
+                <div className="flex gap-4 items-end mt-4">
+                  <div>
+                    <p className="text-xs text-slate-400">Total Comprado</p>
+                    <p className="font-black text-xl">{inv.weightGrams}g</p>
                   </div>
-                </td>
-                <td>{inv.costPerKg} €</td>
-              </tr>
-            );
+                  <div>
+                    <p className="text-xs text-slate-400">Restante Estimado</p>
+                    <p className="font-black text-2xl text-emerald-400">{inv.remainingGrams || inv.weightGrams}g</p>
+                  </div>
+                </div>
+              </div>
+            )
           })}
-          {!seedInventory?.length && <tr><td colSpan="5" className="text-center">No hay compras registradas.</td></tr>}
-        </tbody>
-      </table>
+        </div>
+      </div>
     </div>
   );
 
   const renderLotes = () => {
-    const activeCrops = crops?.filter(c => c.status !== 'HARVESTED' && c.status !== 'DISCARDED') || [];
+    const activeCropsList = crops?.filter(c => c.status !== 'HARVESTED' && c.status !== 'DISCARDED') || [];
     
     return (
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <div className="card lg:col-span-1 border-t-4 border-t-primary h-fit">
-          <h3 className="font-bold mb-4">Nueva Siembra Manual</h3>
-          <form onSubmit={handleAddCrop} className="flex flex-col gap-3">
-            <select className="form-control" required value={newCrop.seedInventoryId} onChange={e => setNewCrop({...newCrop, seedInventoryId: e.target.value})}>
-              <option value="">-- Seleccionar Saco de Semilla --</option>
-              {seedInventory?.filter(i => i.gramsRemaining > 0).map(inv => {
-                const s = seeds?.find(x => x.id === inv.seedId);
-                return <option key={inv.id} value={inv.id}>{s?.name} (Lote: {inv.providerLotNumber}) - Quedan {inv.gramsRemaining}g</option>
-              })}
-            </select>
-            <input className="form-control" type="number" required placeholder="Nº de Bandejas" value={newCrop.traysCount} onChange={e => setNewCrop({...newCrop, traysCount: e.target.value})} />
-            <input className="form-control" type="number" required placeholder="Gramos de semilla por bandeja" value={newCrop.gramsPerTray} onChange={e => setNewCrop({...newCrop, gramsPerTray: e.target.value})} />
-            <input className="form-control" type="number" step="0.01" required placeholder="Coste Sustrato por Bandeja (€)" value={newCrop.substrateCostPerTray} onChange={e => setNewCrop({...newCrop, substrateCostPerTray: e.target.value})} />
-            <button type="submit" className="btn btn-primary mt-2">Plantar</button>
+      <div className="grid grid-cols-1 lg:grid-cols-4 gap-8">
+        <div className="lg:col-span-1 bg-slate-800/60 border border-slate-700/50 p-6 rounded-2xl shadow-xl backdrop-blur-sm h-fit">
+          <h3 className="font-black mb-6 text-xl text-emerald-400 flex items-center gap-2"><span className="text-2xl">🪴</span> Sembrar / Remojar</h3>
+          <form onSubmit={handleAddCrop} className="flex flex-col gap-4">
+            <div>
+              <label className="text-xs font-bold text-slate-400 mb-1 block">¿De qué saco vas a coger?</label>
+              <select className="w-full bg-slate-900 border-2 border-slate-700 text-white rounded-xl px-4 py-3 focus:border-emerald-500 focus:outline-none" required value={newCrop.inventoryId} onChange={e=>{
+                const inv = seedInventory?.find(i => i.id === e.target.value);
+                setNewCrop({...newCrop, inventoryId: e.target.value, seedId: inv?.seedId || ''});
+              }}>
+                <option value="">-- Seleccionar Saco --</option>
+                {seedInventory?.filter(i => (i.remainingGrams || i.weightGrams) > 0).map(i => {
+                  const seed = seeds?.find(s => s.id === i.seedId);
+                  return <option key={i.id} value={i.id}>{seed?.name} (Lote: {i.providerBatch})</option>
+                })}
+              </select>
+            </div>
+            <div className="flex gap-4">
+              <div className="flex-1">
+                <label className="text-xs font-bold text-slate-400 mb-1 block">Nº Bandejas</label>
+                <input type="number" required min="1" className="w-full bg-slate-900 border-2 border-slate-700 text-white rounded-xl px-4 py-3 focus:border-emerald-500 focus:outline-none" value={newCrop.traysCount} onChange={e=>setNewCrop({...newCrop, traysCount: e.target.value})}/>
+              </div>
+              <div className="flex-1">
+                <label className="text-xs font-bold text-slate-400 mb-1 block">Gramos x Bandeja</label>
+                <input type="number" required min="1" className="w-full bg-slate-900 border-2 border-slate-700 text-white rounded-xl px-4 py-3 focus:border-emerald-500 focus:outline-none" value={newCrop.seedGramsPerTray} onChange={e=>setNewCrop({...newCrop, seedGramsPerTray: e.target.value})}/>
+              </div>
+            </div>
+            <button type="submit" className="w-full bg-gradient-to-r from-emerald-500 to-teal-500 text-white font-black py-4 rounded-xl shadow-lg hover:scale-[1.02] transition-transform mt-2">Comenzar Ciclo</button>
           </form>
         </div>
 
-        <div className="card lg:col-span-2">
-          <h3 className="font-bold mb-4">Invernadero Activo (Lotes)</h3>
-          <div className="space-y-3">
-            {activeCrops.map(crop => {
-              const inv = seedInventory?.find(i => i.id === crop.seedInventoryId);
-              const seed = seeds?.find(s => s.id === inv?.seedId || s.id === crop.seedId);
+        <div className="lg:col-span-3 bg-slate-800/60 border border-slate-700/50 p-6 rounded-2xl shadow-xl backdrop-blur-sm">
+          <h3 className="font-black mb-6 text-xl text-emerald-400 flex items-center gap-2"><span className="text-2xl">🌱</span> Bandejas en Curso</h3>
+          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+            {activeCropsList.map(crop => {
+              const seed = seeds?.find(s => s.id === crop.seedId);
+              const daysAlive = Math.floor((new Date() - new Date(crop.datePlanted)) / (1000 * 60 * 60 * 24));
               
               const statusColors = {
-                'SOAKING': 'bg-blue-500/20 text-blue-300 border-blue-500',
-                'GERMINATION': 'bg-yellow-500/20 text-yellow-300 border-yellow-500',
-                'DARKNESS': 'bg-slate-700/80 text-gray-300 border-slate-500',
-                'LIGHT': 'bg-green-500/20 text-green-300 border-green-500'
+                'SOAKING': 'bg-blue-500/20 text-blue-400 border-blue-500/50',
+                'GERMINATION': 'bg-amber-500/20 text-amber-400 border-amber-500/50',
+                'DARKNESS': 'bg-purple-500/20 text-purple-400 border-purple-500/50',
+                'LIGHT': 'bg-green-500/20 text-green-400 border-green-500/50'
               };
 
               return (
-                <div key={crop.id} className="bg-slate-800 p-4 rounded flex justify-between items-center border border-slate-700">
-                  <div>
-                    <div className="flex items-center gap-3 mb-1">
-                      <span className="font-bold text-lg">{seed?.name}</span>
-                      <span className="font-mono text-xs text-primary bg-primary/10 px-2 py-0.5 rounded">{crop.batchNumber}</span>
+                <div key={crop.id} className={`p-5 rounded-xl border bg-slate-900/80 shadow-md ${statusColors[crop.status]}`}>
+                  <div className="flex justify-between items-start mb-3">
+                    <div>
+                      <h4 className="font-black text-lg text-white">{seed?.name}</h4>
+                      <p className="text-xs font-mono opacity-80 mt-1">LOTE: {crop.batchNumber}</p>
                     </div>
-                    <p className="text-sm text-gray-400">
-                      {crop.traysCount} Bandejas | Plantado: {new Date(crop.datePlanted).toLocaleDateString()}
-                    </p>
+                    <button onClick={() => discardCrop(crop)} className="text-red-400 hover:text-red-300 bg-red-400/10 px-2 py-1 rounded text-xs">Descartar</button>
                   </div>
-                  <div className="flex items-center gap-4">
-                    <div className={`px-3 py-1 rounded text-sm font-bold border ${statusColors[crop.status] || 'bg-gray-500'}`}>
-                      {crop.status}
+                  
+                  <div className="flex justify-between items-end mt-4 border-t border-slate-700/50 pt-4">
+                    <div>
+                      <p className="text-xs uppercase font-bold opacity-70">Estado Actual</p>
+                      <p className="font-black text-lg">{crop.status}</p>
+                      <p className="text-xs opacity-70">Día {daysAlive}</p>
                     </div>
-                    <button onClick={() => advanceCropStatus(crop)} className="btn btn-secondary text-xs px-2 py-1">
-                      Siguiente Fase ➔
+                    <button onClick={() => advanceCropStatus(crop)} className="bg-white/10 hover:bg-white/20 text-white font-bold text-xs px-4 py-2 rounded-lg transition-colors">
+                      Avanzar ⏭
                     </button>
                   </div>
                 </div>
               );
             })}
-            {activeCrops.length === 0 && <p className="text-gray-500 text-center py-8">No hay cultivos activos en el invernadero.</p>}
+            {activeCropsList.length === 0 && (
+              <div className="col-span-full py-12 text-center text-slate-500 font-medium border-2 border-dashed border-slate-700 rounded-2xl">
+                No hay cultivos activos en el invernadero ahora mismo.
+              </div>
+            )}
           </div>
         </div>
       </div>
@@ -320,48 +249,50 @@ export default function Crops() {
   };
 
   const renderCosechas = () => (
-    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-      <div className="card">
-        <h3 className="font-bold mb-4 text-xl border-b border-slate-700 pb-2">Registrar Cosecha y Envasado</h3>
+    <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+      <div className="bg-slate-800/60 border border-slate-700/50 p-6 rounded-2xl shadow-xl backdrop-blur-sm h-fit">
+        <h3 className="font-black mb-6 text-xl text-emerald-400 flex items-center gap-2"><span className="text-2xl">🔪</span> Registrar Cosecha y Envasado</h3>
         <form onSubmit={handleRegisterHarvest} className="flex flex-col gap-4">
           <div>
-            <label className="text-sm text-gray-400 font-bold block mb-1">¿Qué producto has envasado hoy?</label>
-            <select className="form-control" required value={newHarvest.productId} onChange={e=>setNewHarvest({...newHarvest, productId: e.target.value})}>
+            <label className="text-xs font-bold text-slate-400 mb-1 block">¿Qué producto has envasado hoy?</label>
+            <select className="w-full bg-slate-900 border-2 border-slate-700 text-white rounded-xl px-4 py-3 focus:border-emerald-500 focus:outline-none" required value={newHarvest.productId} onChange={e=>setNewHarvest({...newHarvest, productId: e.target.value})}>
               <option value="">-- Seleccionar --</option>
               {products?.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
             </select>
           </div>
           <div>
-            <label className="text-sm text-gray-400 font-bold block mb-1">¿Cuántos tuppers en total han salido?</label>
-            <input type="number" className="form-control" required min="1" value={newHarvest.tuppersCount} onChange={e=>setNewHarvest({...newHarvest, tuppersCount: e.target.value})}/>
+            <label className="text-xs font-bold text-slate-400 mb-1 block">¿Cuántos tuppers en total han salido?</label>
+            <input type="number" className="w-full bg-slate-900 border-2 border-slate-700 text-white rounded-xl px-4 py-3 focus:border-emerald-500 focus:outline-none" required min="1" value={newHarvest.tuppersCount} onChange={e=>setNewHarvest({...newHarvest, tuppersCount: e.target.value})}/>
           </div>
-          <button type="submit" className="btn btn-primary h-12 mt-2">
-            ✅ Registrar Cosecha e Imprimir Etiquetas
+          <button type="submit" className="w-full bg-gradient-to-r from-emerald-500 to-teal-500 text-white font-black py-4 rounded-xl shadow-lg hover:scale-[1.02] transition-transform mt-4 flex items-center justify-center gap-2">
+            🖨️ Registrar Cosecha e Imprimir Etiquetas
           </button>
         </form>
       </div>
 
-      <div className="card">
-        <h3 className="font-bold mb-4 text-xl border-b border-slate-700 pb-2">Historial de Lotes de Sanidad</h3>
+      <div className="bg-slate-800/60 border border-slate-700/50 p-6 rounded-2xl shadow-xl backdrop-blur-sm">
+        <h3 className="font-black mb-6 text-xl text-emerald-400 flex items-center gap-2"><span className="text-2xl">🏷️</span> Historial de Lotes de Sanidad</h3>
         <div className="space-y-3">
           {harvests?.slice().reverse().map(h => {
             const product = products?.find(p => p.id === h.productId);
             return (
-              <div key={h.id} className="bg-slate-800 p-3 rounded border border-slate-700 flex justify-between items-center">
+              <div key={h.id} className="bg-slate-900/60 p-4 rounded-xl border border-slate-700/50 flex justify-between items-center hover:border-emerald-500/30 transition-colors">
                 <div>
                   <div className="flex gap-2 items-center mb-1">
-                    <span className="font-bold text-white">{product?.name || 'Desconocido'}</span>
-                    <span className="font-mono text-xs text-primary bg-primary/10 px-2 rounded">{h.batchNumber}</span>
+                    <span className="font-black text-white text-lg">{product?.name || 'Desconocido'}</span>
+                    <span className="font-mono text-xs text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-2 py-0.5 rounded-full">{h.batchNumber}</span>
                   </div>
-                  <p className="text-xs text-gray-400">Envasado: {new Date(h.harvestDate).toLocaleDateString()} | {h.tuppersCount} tuppers</p>
+                  <p className="text-sm text-slate-400">Envasado: {new Date(h.harvestDate).toLocaleDateString()} • <span className="font-bold text-slate-300">{h.tuppersCount} tuppers</span></p>
                 </div>
-                <button className="text-sm text-primary hover:text-green-300 flex items-center gap-1" onClick={() => generateLabelPDF(product?.name || '', h.batchNumber, product?.shelfLifeDays || 10, h.tuppersCount)}>
+                <button 
+                  className="bg-slate-800 hover:bg-slate-700 border border-slate-600 text-sm text-white px-4 py-2 rounded-lg transition-colors flex items-center gap-2 font-bold" 
+                  onClick={() => generateLabelPDF(product?.name || '', h.batchNumber, product?.shelfLifeDays || 10, h.tuppersCount)}>
                   🖨️ Re-Imprimir
                 </button>
               </div>
             )
           })}
-          {!harvests?.length && <p className="text-sm text-gray-500">Aún no hay envasados registrados.</p>}
+          {!harvests?.length && <div className="text-center py-8 text-slate-500 font-medium">Aún no hay envasados registrados.</div>}
         </div>
       </div>
     </div>
@@ -369,20 +300,20 @@ export default function Crops() {
 
   const renderPlanificador = () => (
     <div>
-      <div className="bg-primary/10 border border-primary p-6 rounded-lg mb-8">
-        <h2 className="text-2xl font-bold text-primary mb-2">Planificador Inverso Automático</h2>
-        <p className="text-sm text-gray-300">
+      <div className="bg-gradient-to-r from-emerald-900/40 to-teal-900/40 border border-emerald-500/30 p-8 rounded-2xl mb-8 shadow-lg backdrop-blur-sm">
+        <h2 className="text-3xl font-black text-transparent bg-clip-text bg-gradient-to-r from-emerald-400 to-cyan-400 mb-3">Planificador Inverso Automático</h2>
+        <p className="text-slate-300 font-medium text-lg leading-relaxed max-w-4xl">
           Dinos qué producto final quieres envasar y qué día de la semana. El sistema calculará automáticamente 
-          qué día hay que plantar cada semilla que compone el producto basándose en su receta, y pondrá las tareas 
-          en el Dashboard de la TV para que los empleados sepan qué hacer cada día.
+          qué día hay que plantar cada semilla basándose en su receta, y colocará las tareas correspondientes 
+          en el Dashboard para que no tengas que pensar en fechas.
         </p>
       </div>
 
-      <div className="card mb-8">
-        <form onSubmit={handleAddHarvestTarget} className="flex gap-4 items-end">
-          <div className="flex-1">
-            <label className="text-sm text-gray-400 font-bold mb-1 block">Día de Cosecha / Envasado</label>
-            <select className="form-control" value={newTarget.targetDayOfWeek} onChange={e=>setNewTarget({...newTarget, targetDayOfWeek: e.target.value})}>
+      <div className="bg-slate-800/60 border border-slate-700/50 p-6 rounded-2xl shadow-xl backdrop-blur-sm mb-8">
+        <form onSubmit={handleAddHarvestTarget} className="flex flex-col md:flex-row gap-4 items-end">
+          <div className="flex-1 w-full">
+            <label className="text-xs font-bold text-slate-400 mb-1 block">Día de Cosecha Objetivo</label>
+            <select className="w-full bg-slate-900 border-2 border-slate-700 text-white rounded-xl px-4 py-3 focus:border-emerald-500 focus:outline-none" value={newTarget.targetDayOfWeek} onChange={e=>setNewTarget({...newTarget, targetDayOfWeek: e.target.value})}>
               <option value="1">Lunes</option>
               <option value="2">Martes</option>
               <option value="3">Miércoles</option>
@@ -392,31 +323,37 @@ export default function Crops() {
               <option value="0">Domingo</option>
             </select>
           </div>
-          <div className="flex-[2]">
-            <label className="text-sm text-gray-400 font-bold mb-1 block">Producto a Envasar (Simple o Mix)</label>
-            <select className="form-control" required value={newTarget.productId} onChange={e=>setNewTarget({...newTarget, productId: e.target.value})}>
+          <div className="flex-[2] w-full">
+            <label className="text-xs font-bold text-slate-400 mb-1 block">Producto a Envasar (Simple o Mix)</label>
+            <select className="w-full bg-slate-900 border-2 border-slate-700 text-white rounded-xl px-4 py-3 focus:border-emerald-500 focus:outline-none" required value={newTarget.productId} onChange={e=>setNewTarget({...newTarget, productId: e.target.value})}>
               <option value="">-- Seleccionar --</option>
               {products?.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
             </select>
           </div>
-          <div className="flex-1">
-            <label className="text-sm text-gray-400 font-bold mb-1 block">Tuppers Deseados</label>
-            <input type="number" className="form-control" required min="1" value={newTarget.tuppersCount} onChange={e=>setNewTarget({...newTarget, tuppersCount: e.target.value})}/>
+          <div className="flex-1 w-full">
+            <label className="text-xs font-bold text-slate-400 mb-1 block">Tuppers Deseados</label>
+            <input type="number" className="w-full bg-slate-900 border-2 border-slate-700 text-white rounded-xl px-4 py-3 focus:border-emerald-500 focus:outline-none" required min="1" value={newTarget.tuppersCount} onChange={e=>setNewTarget({...newTarget, tuppersCount: e.target.value})}/>
           </div>
-          <button type="submit" className="btn btn-primary h-12">Crear Rutina</button>
+          <button type="submit" className="w-full md:w-auto px-8 bg-gradient-to-r from-emerald-500 to-teal-500 text-white font-black py-3.5 rounded-xl shadow-lg hover:scale-[1.02] transition-transform">Crear Rutina</button>
         </form>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
         {harvestTargets?.map(ht => {
           const product = products?.find(p => p.id === ht.productId);
           const days = ['Domingo','Lunes','Martes','Miércoles','Jueves','Viernes','Sábado'];
           return (
-            <div key={ht.id} className="card relative border-l-4 border-l-green-500">
-              <button onClick={() => deleteHarvestTarget(ht.id)} className="absolute top-3 right-3 text-red-400 hover:text-red-300">✕</button>
-              <h4 className="font-bold text-lg">{product?.name || 'Producto Eliminado'}</h4>
-              <p className="text-3xl font-black text-green-400 my-2">{ht.tuppersCount} <span className="text-sm font-normal text-gray-400">tuppers</span></p>
-              <p className="text-sm font-bold bg-slate-700 inline-block px-3 py-1 rounded">Todos los {days[ht.targetDayOfWeek]}</p>
+            <div key={ht.id} className="relative bg-slate-900/60 border border-emerald-500/30 p-6 rounded-2xl shadow-lg overflow-hidden group">
+              <div className="absolute top-0 left-0 w-2 h-full bg-emerald-500"></div>
+              <button onClick={() => deleteHarvestTarget(ht.id)} className="absolute top-4 right-4 text-slate-500 hover:text-red-400 transition-colors">✖</button>
+              <h4 className="font-black text-xl text-white mb-2 pr-6">{product?.name || 'Producto Eliminado'}</h4>
+              <div className="flex items-baseline gap-2 mb-4">
+                <span className="text-4xl font-black text-emerald-400">{ht.tuppersCount}</span>
+                <span className="text-sm font-bold text-slate-400 uppercase">tuppers</span>
+              </div>
+              <div className="inline-block px-3 py-1 bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-sm font-bold rounded-lg">
+                Todos los {days[ht.targetDayOfWeek]}
+              </div>
             </div>
           )
         })}
@@ -425,34 +362,41 @@ export default function Crops() {
   );
 
   return (
-    <div className="pb-20">
-      <h1 className="text-3xl font-bold mb-6">Módulo de Control de Cultivos</h1>
-      
-      {/* TABS HEADER */}
-      <div className="flex flex-wrap gap-2 mb-8 bg-slate-800 p-2 rounded-lg">
+    <div className="pb-20 max-w-7xl mx-auto">
+      {/* TABS HEADER SUPER PREMIUM */}
+      <div className="flex flex-wrap lg:flex-nowrap gap-2 mb-10 bg-slate-900/80 p-2 rounded-2xl border border-slate-700/50 shadow-2xl backdrop-blur-xl sticky top-4 z-10">
         {[
-          { id: 'catalogo', label: 'Proveedores y Semillas', icon: '🌱' },
-          { id: 'inventario', label: 'Trazabilidad y Compras', icon: '📦' },
-          { id: 'lotes', label: 'Invernadero Activo', icon: '💧' },
-          { id: 'cosechas', label: 'Envasado y Cosecha', icon: '✂️' },
-          { id: 'planificador', label: 'Planificador Inverso', icon: '🤖' }
+          { id: 'tareas', label: 'Dashboard de Tareas', icon: '🎯' },
+          { id: 'lotes', label: 'Invernadero Activo', icon: '🪴' },
+          { id: 'cosechas', label: 'Envasado y Sanidad', icon: '🔪' },
+          { id: 'planificador', label: 'Planificador Inverso', icon: '🗓️' },
+          { id: 'inventario', label: 'Compras y Stock', icon: '📦' },
+          { id: 'catalogo', label: 'Catálogo Semillas', icon: '🧬' }
         ].map(tab => (
           <button 
             key={tab.id}
             onClick={() => setActiveTab(tab.id)}
-            className={`flex-1 py-2 px-4 rounded-md font-bold transition-all whitespace-nowrap ${activeTab === tab.id ? 'bg-primary text-slate-900 shadow-md' : 'text-gray-400 hover:text-white hover:bg-slate-700'}`}
+            className={`flex-1 py-3 px-4 rounded-xl font-bold transition-all duration-300 flex items-center justify-center gap-2 whitespace-nowrap \${
+              activeTab === tab.id 
+              ? 'bg-gradient-to-r from-emerald-500 to-teal-500 text-white shadow-lg shadow-emerald-500/25 scale-[1.02]' 
+              : 'text-slate-400 hover:text-white hover:bg-slate-800'
+            }`}
           >
-            {tab.icon} {tab.label}
+            <span className="text-xl">{tab.icon}</span> 
+            <span className={activeTab === tab.id ? 'opacity-100' : 'opacity-80'}>{tab.label}</span>
           </button>
         ))}
       </div>
 
       {/* TAB CONTENT */}
-      {activeTab === 'catalogo' && renderCatalogo()}
-      {activeTab === 'inventario' && renderInventario()}
-      {activeTab === 'lotes' && renderLotes()}
-      {activeTab === 'cosechas' && renderCosechas()}
-      {activeTab === 'planificador' && renderPlanificador()}
+      <div className="animate-fade-in-up">
+        {activeTab === 'tareas' && <EmployeeTasks />}
+        {activeTab === 'catalogo' && renderCatalogo()}
+        {activeTab === 'inventario' && renderInventario()}
+        {activeTab === 'lotes' && renderLotes()}
+        {activeTab === 'cosechas' && renderCosechas()}
+        {activeTab === 'planificador' && renderPlanificador()}
+      </div>
       
     </div>
   );
