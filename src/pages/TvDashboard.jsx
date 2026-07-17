@@ -86,12 +86,14 @@ export default function TvDashboard() {
           📦 ESTADO PEDIDOS
         </button>
       </div>
-
-      {tvTab === 'tasks' ? (
-        <EmployeeTasks />
-      ) : (
-        <div style={{ animation: 'fadeIn 0.4s ease' }}>
-          <div className="tasks-header" style={{ marginBottom: '3rem' }}>
+  
+        {tvTab === 'tasks' && (
+          <EmployeeTasks />
+        )}
+        
+        {tvTab === 'greenhouse' && (
+          <div style={{ animation: 'fadeIn 0.4s ease' }}>
+            <div className="tasks-header" style={{ marginBottom: '3rem' }}>
             <h2>Visión General del Invernadero</h2>
             <p style={{ color: '#94a3b8', fontSize: '1.25rem' }}>Estado en tiempo real de todas las bandejas cultivadas.</p>
           </div>
