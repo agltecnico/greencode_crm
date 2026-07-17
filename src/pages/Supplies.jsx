@@ -122,7 +122,7 @@ export default function Supplies() {
 
       <div className="admin-tabs" style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem' }}>
         <button className={`admin-tab ${activeTab === 'CATALOG' ? 'active' : ''}`} onClick={() => setActiveTab('CATALOG')}>Catálogo de Artículos</button>
-        <button className={`admin-tab ${activeTab === 'STOCK' ? 'active' : ''}`} onClick={() => setActiveTab('STOCK')}>Compras / Facturas</button>
+        <button className={`admin-tab ${activeTab === 'STOCK' ? 'active' : ''}`} onClick={() => setActiveTab('STOCK')}>Albarán de Entrada / Gasto</button>
         <button className={`admin-tab ${activeTab === 'EXPENSES' ? 'active' : ''}`} onClick={() => setActiveTab('EXPENSES')}>Historial de Gastos</button>
         <button className={`admin-tab ${activeTab === 'CROP_TYPES_CREATE' ? 'active' : ''}`} onClick={() => setActiveTab('CROP_TYPES_CREATE')}>Nueva Ficha</button>
         <button className={`admin-tab ${activeTab === 'CROP_TYPES_LIST' ? 'active' : ''}`} onClick={() => setActiveTab('CROP_TYPES_LIST')}>Ver Escandallos</button>
@@ -195,7 +195,7 @@ export default function Supplies() {
       {activeTab === 'STOCK' && (
         <div style={{ animation: 'fadeIn 0.3s ease' }}>
           <div className="card" style={{ marginBottom: '2rem' }}>
-            <h3 className="font-bold mb-4">Registro de Compras y Facturas</h3>
+            <h3 className="font-bold mb-4">Registro de Albaranes de Entrada y Gastos</h3>
             
             <form onSubmit={handleAddStockEntry} style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: '1rem', alignItems: 'flex-end' }}>
               <div>
