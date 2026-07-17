@@ -13,6 +13,11 @@ export default function Supplies() {
   const [activeTab, setActiveTab] = useState('CATALOG');
   const [searchTerm, setSearchTerm] = useState('');
 
+  // Expenses Filters
+  const [expMonth, setExpMonth] = useState('');
+  const [expType, setExpType] = useState('');
+  const [expProvider, setExpProvider] = useState('');
+
   // Forms State
   const [newArticle, setNewArticle] = useState({ name: '', type: 'SEMILLA' });
   const [editingArticleId, setEditingArticleId] = useState(null);
@@ -25,20 +30,31 @@ export default function Supplies() {
     name: '', seedId: '', seedGrams: 0, substrateId: '', substrateLiters: 0, containerId: '', expectedYieldGrams: 0, providerId: ''
   });
 
+  // Modal States
+  const [showArticleModal, setShowArticleModal] = useState(false);
+  const [showStockModal, setShowStockModal] = useState(false);
+  const [showCropTypeModal, setShowCropTypeModal] = useState(false);
+
   // Handlers
-  const handleAddArticle = e => { e.preventDefault(); addArticle(newArticle); setNewArticle({...newArticle, name:''}); };
+  const handleAddArticle = e => { 
+    e.preventDefault(); 
+    addArticle(newArticle); 
+    setNewArticle({name:'', type:'SEMILLA'}); 
+    setShowArticleModal(false);
+  };
   
   const handleAddStockEntry = e => { 
     e.preventDefault(); 
     addStockEntry(newStockEntry); 
     setNewStockEntry({...newStockEntry, deliveryNote: '', batchNumber: '', providerId: '', quantity: 1, price: 0}); 
+    setShowStockModal(false);
   };
 
   const handleAddCropType = e => {
     e.preventDefault();
     addCropType(newType);
     setNewType({ name: '', seedId: '', seedGrams: 0, substrateId: '', substrateLiters: 0, containerId: '', expectedYieldGrams: 0, providerId: '' });
-    setActiveTab('CROP_TYPES_LIST');
+    setShowCropTypeModal(false);
   };
 
   // Filtration logic
@@ -110,6 +126,10 @@ export default function Supplies() {
   const containers = articles?.filter(a => a.type === 'ENVASE') || [];
   const selectedArticleType = newStockEntry.articleId ? articles?.find(a => a.id === newStockEntry.articleId)?.type : null;
 
+  // Modal Styles
+  const modalOverlayStyle = { position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 50 };
+  const modalCardStyle = { width: '100%', maxWidth: '700px', margin: '20px', maxHeight: '90vh', overflowY: 'auto', backgroundColor: '#fff', padding: '2rem', borderRadius: '8px', border: '1px solid var(--color-border)' };
+
   return (
     <div className="admin-container">
       <div className="admin-header">
@@ -121,10 +141,9 @@ export default function Supplies() {
 
       <div className="admin-tabs" style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem' }}>
         <button className={`admin-tab ${activeTab === 'CATALOG' ? 'active' : ''}`} onClick={() => setActiveTab('CATALOG')}>Catálogo de Artículos</button>
-        <button className={`admin-tab ${activeTab === 'STOCK' ? 'active' : ''}`} onClick={() => setActiveTab('STOCK')}>Albarán de Entrada / Gasto</button>
+        <button className={`admin-tab ${activeTab === 'STOCK' ? 'active' : ''}`} onClick={() => setActiveTab('STOCK')}>Albaranes de Entrada / Gasto</button>
         <button className={`admin-tab ${activeTab === 'EXPENSES' ? 'active' : ''}`} onClick={() => setActiveTab('EXPENSES')}>Historial de Gastos</button>
-        <button className={`admin-tab ${activeTab === 'CROP_TYPES_CREATE' ? 'active' : ''}`} onClick={() => setActiveTab('CROP_TYPES_CREATE')}>Nueva Ficha</button>
-        <button className={`admin-tab ${activeTab === 'CROP_TYPES_LIST' ? 'active' : ''}`} onClick={() => setActiveTab('CROP_TYPES_LIST')}>Ver Escandallos</button>
+        <button className={`admin-tab ${activeTab === 'CROP_TYPES_LIST' ? 'active' : ''}`} onClick={() => setActiveTab('CROP_TYPES_LIST')}>Fichas (Escandallos)</button>
       </div>
 
       {activeTab !== 'EXPENSES' && (
@@ -138,25 +157,9 @@ export default function Supplies() {
 
       {activeTab === 'CATALOG' && (
         <div style={{ animation: 'fadeIn 0.3s ease' }}>
-          <div className="card" style={{ marginBottom: '2rem' }}>
-            <h3 className="font-bold mb-4">Crear Artículo para el Almacén / Gasto</h3>
-            <form onSubmit={handleAddArticle} style={{ display: 'flex', gap: '1rem', alignItems: 'flex-end', flexWrap: 'wrap' }}>
-              <div style={{ width: '280px' }}>
-                <label className="form-label">Tipo de Artículo</label>
-                <select className="form-control" value={newArticle.type} onChange={e => setNewArticle({...newArticle, type: e.target.value})}>
-                  <option value="SEMILLA">🌱 Semilla (Stock y Gasto)</option>
-                  <option value="SUSTRATO">🪨 Sustrato (Stock y Gasto)</option>
-                  <option value="ENVASE">📦 Envase / Bandeja (Stock y Gasto)</option>
-                  <option value="OTRO">🏷️ Consumible (Stock y Gasto)</option>
-                  <option value="GASTO_FIJO">💸 Gasto General / Servicio (SOLO GASTO)</option>
-                </select>
-              </div>
-              <div style={{ flex: '1 1 250px' }}>
-                <label className="form-label">Nombre (Ej: Bandeja 1020, Recibo Luz, Semilla X)</label>
-                <input required type="text" className="form-control" value={newArticle.name} onChange={e => setNewArticle({...newArticle, name: e.target.value})} />
-              </div>
-              <button type="submit" className="btn btn-secondary" style={{ height: '42px', padding: '0 1.5rem' }}>Añadir al Catálogo</button>
-            </form>
+          <div className="flex justify-between items-center mb-4">
+             <h3 className="font-bold text-lg">Catálogo de Artículos y Consumibles</h3>
+             <button className="btn btn-primary shadow-sm" onClick={() => setShowArticleModal(true)}>+ Nuevo Artículo</button>
           </div>
 
           <div className="table-container">
@@ -221,46 +224,9 @@ export default function Supplies() {
 
       {activeTab === 'STOCK' && (
         <div style={{ animation: 'fadeIn 0.3s ease' }}>
-          <div className="card" style={{ marginBottom: '2rem' }}>
-            <h3 className="font-bold mb-4">Registro de Albaranes de Entrada y Gastos</h3>
-            
-            <form onSubmit={handleAddStockEntry} style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: '1rem', alignItems: 'flex-end' }}>
-              <div>
-                <label className="form-label">Proveedor / Acreedor</label>
-                <select required className="form-control" value={newStockEntry.providerId} onChange={e => setNewStockEntry({...newStockEntry, providerId: e.target.value})}>
-                  <option value="">Selecciona...</option>
-                  {providers?.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
-                </select>
-              </div>
-              <div>
-                <label className="form-label">Fecha Factura/Albarán</label>
-                <input required type="date" className="form-control" value={newStockEntry.purchaseDate} onChange={e => setNewStockEntry({...newStockEntry, purchaseDate: e.target.value})} />
-              </div>
-              <div>
-                <label className="form-label">Artículo (Semilla, Luz...)</label>
-                <select required className="form-control" value={newStockEntry.articleId} onChange={e => setNewStockEntry({...newStockEntry, articleId: e.target.value})}>
-                  <option value="">Selecciona...</option>
-                  {articles?.map(a => <option key={a.id} value={a.id}>{getTypeLabel(a.type)} - {a.name}</option>)}
-                </select>
-              </div>
-              <div>
-                <label className="form-label">Nº Factura / Albarán</label>
-                <input type="text" className="form-control" placeholder="Opcional" value={newStockEntry.deliveryNote} onChange={e => setNewStockEntry({...newStockEntry, deliveryNote: e.target.value})} />
-              </div>
-              <div>
-                <label className="form-label">Lote (Para Trazabilidad)</label>
-                <input type="text" className="form-control" placeholder="Solo si aplica" disabled={selectedArticleType === 'GASTO_FIJO'} value={newStockEntry.batchNumber} onChange={e => setNewStockEntry({...newStockEntry, batchNumber: e.target.value})} />
-              </div>
-              <div>
-                <label className="form-label">Cant. ({selectedArticleType ? getUnitLabel(selectedArticleType) : 'Uds'})</label>
-                <input required type="number" min="0.01" step="0.01" className="form-control" value={newStockEntry.quantity} onChange={e => setNewStockEntry({...newStockEntry, quantity: Number(e.target.value)})} />
-              </div>
-              <div>
-                <label className="form-label">Coste Total (€)</label>
-                <input required type="number" step="0.01" min="0" className="form-control" value={newStockEntry.price} onChange={e => setNewStockEntry({...newStockEntry, price: Number(e.target.value)})} />
-              </div>
-              <button type="submit" className="btn btn-primary" style={{ height: '42px' }}>Añadir Gasto</button>
-            </form>
+          <div className="flex justify-between items-center mb-4">
+             <h3 className="font-bold text-lg">Registro de Albaranes de Entrada y Gastos</h3>
+             <button className="btn btn-primary shadow-sm" onClick={() => setShowStockModal(true)}>+ Nuevo Registro</button>
           </div>
 
           <div className="table-container">
@@ -383,83 +349,13 @@ export default function Supplies() {
         </div>
       )}
 
-      {activeTab === 'CROP_TYPES_CREATE' && (
-        /* OMITIDO POR BREVEDAD, LO INYECTO EXACTAMENTE IGUAL QUE ANTES */
-        <div style={{ animation: 'fadeIn 0.3s ease' }}>
-          <div className="card">
-            <h3 className="font-bold mb-4">Nueva Ficha de Cultivo</h3>
-            <form onSubmit={handleAddCropType} style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.5rem' }}>
-              
-              <div style={{ gridColumn: 'span 2' }}>
-                <label className="form-label">Nombre de la Ficha (Ej: Rábano en Bandeja 1020)</label>
-                <input required type="text" className="form-control" value={newType.name} onChange={e => setNewType({...newType, name: e.target.value})} />
-              </div>
-
-              <div style={{ gridColumn: 'span 2' }}>
-                <label className="form-label">Proveedor Predilecto (Opcional - Si quieres el coste específico de uno)</label>
-                <select className="form-control" value={newType.providerId} onChange={e => setNewType({...newType, providerId: e.target.value})}>
-                  <option value="">Indiferente / Cualquier Proveedor</option>
-                  {providers?.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
-                </select>
-              </div>
-
-              {/* Seed Section */}
-              <div className="card" style={{ background: '#f8fafc', border: '1px solid #e2e8f0', boxShadow: 'none' }}>
-                <h4 className="font-semibold text-slate-700 mb-3">🌱 Semilla a utilizar</h4>
-                <div style={{ marginBottom: '1rem' }}>
-                  <label className="form-label">Seleccionar Semilla</label>
-                  <select required className="form-control" value={newType.seedId} onChange={e => setNewType({...newType, seedId: e.target.value})}>
-                    <option value="">Selecciona...</option>
-                    {seeds.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
-                  </select>
-                </div>
-                <div>
-                  <label className="form-label">Gramos por Bandeja</label>
-                  <input required type="number" step="0.1" min="0" className="form-control" value={newType.seedGrams} onChange={e => setNewType({...newType, seedGrams: Number(e.target.value)})} />
-                </div>
-              </div>
-
-              {/* Substrate Section */}
-              <div className="card" style={{ background: '#f8fafc', border: '1px solid #e2e8f0', boxShadow: 'none' }}>
-                <h4 className="font-semibold text-slate-700 mb-3">🪨 Sustrato a utilizar</h4>
-                <div style={{ marginBottom: '1rem' }}>
-                  <label className="form-label">Seleccionar Sustrato</label>
-                  <select className="form-control" value={newType.substrateId} onChange={e => setNewType({...newType, substrateId: e.target.value})}>
-                    <option value="">Ninguno / Hidropónico</option>
-                    {substrates.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
-                  </select>
-                </div>
-                <div>
-                  <label className="form-label">Litros por Bandeja</label>
-                  <input type="number" step="0.1" min="0" className="form-control" value={newType.substrateLiters} onChange={e => setNewType({...newType, substrateLiters: Number(e.target.value)})} />
-                </div>
-              </div>
-
-              {/* Container and Yield Section */}
-              <div className="card" style={{ gridColumn: 'span 2', background: '#f8fafc', border: '1px solid #e2e8f0', boxShadow: 'none', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
-                <div>
-                  <label className="form-label">📦 Envase / Bandeja</label>
-                  <select required className="form-control" value={newType.containerId} onChange={e => setNewType({...newType, containerId: e.target.value})}>
-                    <option value="">Selecciona...</option>
-                    {containers.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
-                  </select>
-                </div>
-                <div>
-                  <label className="form-label">⚖️ Rendimiento Esperado (Gramos por Bandeja)</label>
-                  <input required type="number" step="1" min="0" className="form-control" value={newType.expectedYieldGrams} onChange={e => setNewType({...newType, expectedYieldGrams: Number(e.target.value)})} />
-                </div>
-              </div>
-
-              <div style={{ gridColumn: 'span 2', display: 'flex', justifyContent: 'flex-end', marginTop: '1rem' }}>
-                <button type="submit" className="btn btn-primary" style={{ height: '48px', padding: '0 2rem', fontSize: '1.1rem' }}>Crear Ficha de Cultivo</button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
-
       {activeTab === 'CROP_TYPES_LIST' && (
         <div style={{ animation: 'fadeIn 0.3s ease' }}>
+          <div className="flex justify-between items-center mb-4">
+             <h3 className="font-bold text-lg">Fichas de Cultivo (Escandallos)</h3>
+             <button className="btn btn-primary shadow-sm" onClick={() => setShowCropTypeModal(true)}>+ Nueva Ficha</button>
+          </div>
+
           <div className="table-container">
             <table className="admin-table">
               <thead>
@@ -585,6 +481,159 @@ export default function Supplies() {
               <button className="page-btn" onClick={tNext} disabled={tPage === tTotal}>Sig &gt;</button>
             </div>
           )}
+        </div>
+      )}
+
+      {/* --- MODALS --- */}
+      
+      {showArticleModal && (
+        <div style={modalOverlayStyle}>
+          <div style={modalCardStyle}>
+            <h3 className="font-bold mb-4 text-xl">Crear Artículo para el Almacén / Gasto</h3>
+            <form onSubmit={handleAddArticle} style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+              <div>
+                <label className="form-label">Tipo de Artículo</label>
+                <select className="form-control" value={newArticle.type} onChange={e => setNewArticle({...newArticle, type: e.target.value})}>
+                  <option value="SEMILLA">🌱 Semilla (Stock y Gasto)</option>
+                  <option value="SUSTRATO">🪨 Sustrato (Stock y Gasto)</option>
+                  <option value="ENVASE">📦 Envase / Bandeja (Stock y Gasto)</option>
+                  <option value="OTRO">🏷️ Consumible (Stock y Gasto)</option>
+                  <option value="GASTO_FIJO">💸 Gasto General / Servicio (SOLO GASTO)</option>
+                </select>
+              </div>
+              <div>
+                <label className="form-label">Nombre (Ej: Bandeja 1020, Recibo Luz, Semilla X)</label>
+                <input required type="text" className="form-control" value={newArticle.name} onChange={e => setNewArticle({...newArticle, name: e.target.value})} />
+              </div>
+              <div className="flex justify-end gap-3 mt-4">
+                <button type="button" className="btn btn-secondary" onClick={() => setShowArticleModal(false)}>Cancelar</button>
+                <button type="submit" className="btn btn-primary">Añadir al Catálogo</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {showStockModal && (
+        <div style={modalOverlayStyle}>
+          <div style={modalCardStyle}>
+            <h3 className="font-bold mb-4 text-xl">Registrar Albarán de Entrada / Gasto</h3>
+            <form onSubmit={handleAddStockEntry} style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '1rem', alignItems: 'start' }}>
+              <div>
+                <label className="form-label">Proveedor / Acreedor</label>
+                <select required className="form-control" value={newStockEntry.providerId} onChange={e => setNewStockEntry({...newStockEntry, providerId: e.target.value})}>
+                  <option value="">Selecciona...</option>
+                  {providers?.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+                </select>
+              </div>
+              <div>
+                <label className="form-label">Fecha Factura/Albarán</label>
+                <input required type="date" className="form-control" value={newStockEntry.purchaseDate} onChange={e => setNewStockEntry({...newStockEntry, purchaseDate: e.target.value})} />
+              </div>
+              <div style={{ gridColumn: 'span 2' }}>
+                <label className="form-label">Artículo (Semilla, Luz...)</label>
+                <select required className="form-control" value={newStockEntry.articleId} onChange={e => setNewStockEntry({...newStockEntry, articleId: e.target.value})}>
+                  <option value="">Selecciona...</option>
+                  {articles?.map(a => <option key={a.id} value={a.id}>{getTypeLabel(a.type)} - {a.name}</option>)}
+                </select>
+              </div>
+              <div>
+                <label className="form-label">Nº Factura / Albarán</label>
+                <input type="text" className="form-control" placeholder="Opcional" value={newStockEntry.deliveryNote} onChange={e => setNewStockEntry({...newStockEntry, deliveryNote: e.target.value})} />
+              </div>
+              <div>
+                <label className="form-label">Lote (Para Trazabilidad)</label>
+                <input type="text" className="form-control" placeholder="Solo si aplica" disabled={selectedArticleType === 'GASTO_FIJO'} value={newStockEntry.batchNumber} onChange={e => setNewStockEntry({...newStockEntry, batchNumber: e.target.value})} />
+              </div>
+              <div>
+                <label className="form-label">Cant. ({selectedArticleType ? getUnitLabel(selectedArticleType) : 'Uds'})</label>
+                <input required type="number" min="0.01" step="0.01" className="form-control" value={newStockEntry.quantity} onChange={e => setNewStockEntry({...newStockEntry, quantity: Number(e.target.value)})} />
+              </div>
+              <div>
+                <label className="form-label">Coste Total (€)</label>
+                <input required type="number" step="0.01" min="0" className="form-control" value={newStockEntry.price} onChange={e => setNewStockEntry({...newStockEntry, price: Number(e.target.value)})} />
+              </div>
+              
+              <div style={{ gridColumn: 'span 2', display: 'flex', justifyContent: 'flex-end', gap: '0.75rem', marginTop: '1rem' }}>
+                <button type="button" className="btn btn-secondary" onClick={() => setShowStockModal(false)}>Cancelar</button>
+                <button type="submit" className="btn btn-primary">Guardar Entrada</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {showCropTypeModal && (
+        <div style={modalOverlayStyle}>
+          <div style={modalCardStyle}>
+            <h3 className="font-bold mb-4 text-xl">Nueva Ficha de Cultivo</h3>
+            <form onSubmit={handleAddCropType} style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.5rem' }}>
+              <div style={{ gridColumn: 'span 2' }}>
+                <label className="form-label">Nombre de la Ficha (Ej: Rábano en Bandeja 1020)</label>
+                <input required type="text" className="form-control" value={newType.name} onChange={e => setNewType({...newType, name: e.target.value})} />
+              </div>
+
+              <div style={{ gridColumn: 'span 2' }}>
+                <label className="form-label">Proveedor Predilecto (Opcional - Si quieres el coste específico de uno)</label>
+                <select className="form-control" value={newType.providerId} onChange={e => setNewType({...newType, providerId: e.target.value})}>
+                  <option value="">Indiferente / Cualquier Proveedor</option>
+                  {providers?.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+                </select>
+              </div>
+
+              {/* Seed Section */}
+              <div className="card" style={{ background: '#f8fafc', border: '1px solid #e2e8f0', boxShadow: 'none', padding: '1.25rem' }}>
+                <h4 className="font-semibold text-slate-700 mb-3">🌱 Semilla a utilizar</h4>
+                <div style={{ marginBottom: '1rem' }}>
+                  <label className="form-label">Seleccionar Semilla</label>
+                  <select required className="form-control" value={newType.seedId} onChange={e => setNewType({...newType, seedId: e.target.value})}>
+                    <option value="">Selecciona...</option>
+                    {seeds.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <label className="form-label">Gramos por Bandeja</label>
+                  <input required type="number" step="0.1" min="0" className="form-control" value={newType.seedGrams} onChange={e => setNewType({...newType, seedGrams: Number(e.target.value)})} />
+                </div>
+              </div>
+
+              {/* Substrate Section */}
+              <div className="card" style={{ background: '#f8fafc', border: '1px solid #e2e8f0', boxShadow: 'none', padding: '1.25rem' }}>
+                <h4 className="font-semibold text-slate-700 mb-3">🪨 Sustrato a utilizar</h4>
+                <div style={{ marginBottom: '1rem' }}>
+                  <label className="form-label">Seleccionar Sustrato</label>
+                  <select className="form-control" value={newType.substrateId} onChange={e => setNewType({...newType, substrateId: e.target.value})}>
+                    <option value="">Ninguno / Hidropónico</option>
+                    {substrates.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <label className="form-label">Litros por Bandeja</label>
+                  <input type="number" step="0.1" min="0" className="form-control" value={newType.substrateLiters} onChange={e => setNewType({...newType, substrateLiters: Number(e.target.value)})} />
+                </div>
+              </div>
+
+              {/* Container and Yield Section */}
+              <div className="card" style={{ gridColumn: 'span 2', background: '#f8fafc', border: '1px solid #e2e8f0', boxShadow: 'none', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', padding: '1.25rem' }}>
+                <div>
+                  <label className="form-label">📦 Envase / Bandeja</label>
+                  <select required className="form-control" value={newType.containerId} onChange={e => setNewType({...newType, containerId: e.target.value})}>
+                    <option value="">Selecciona...</option>
+                    {containers.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <label className="form-label">⚖️ Rendimiento Esperado (Gramos por Bandeja)</label>
+                  <input required type="number" step="1" min="0" className="form-control" value={newType.expectedYieldGrams} onChange={e => setNewType({...newType, expectedYieldGrams: Number(e.target.value)})} />
+                </div>
+              </div>
+
+              <div style={{ gridColumn: 'span 2', display: 'flex', justifyContent: 'flex-end', gap: '0.75rem', marginTop: '1rem' }}>
+                <button type="button" className="btn btn-secondary" onClick={() => setShowCropTypeModal(false)}>Cancelar</button>
+                <button type="submit" className="btn btn-primary" style={{ padding: '0 2rem' }}>Crear Ficha</button>
+              </div>
+            </form>
+          </div>
         </div>
       )}
     </div>
