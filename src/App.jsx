@@ -3,11 +3,11 @@ import Layout from './components/Layout';
 import Hub from './pages/Hub';
 import Dashboard from './pages/Dashboard';
 import Clients from './pages/Clients';
+import Providers from './pages/Providers';
 import Products from './pages/Products';
 import Orders from './pages/Orders';
 import DeliveryNotes from './pages/DeliveryNotes';
 import Invoices from './pages/Invoices';
-import Expenses from './pages/Expenses';
 import Supplies from './pages/Supplies';
 import Crops from './pages/Crops';
 import TvDashboard from './pages/TvDashboard';
@@ -22,11 +22,11 @@ function App() {
       <Route path="/admin" element={<Layout />}>
         <Route index element={<Dashboard />} />
         <Route path="clients" element={<Clients />} />
+        <Route path="providers" element={<Providers />} />
         <Route path="products" element={<Products />} />
         <Route path="orders" element={<Orders />} />
         <Route path="delivery-notes" element={<DeliveryNotes />} />
         <Route path="invoices" element={<Invoices />} />
-        <Route path="expenses" element={<Expenses />} />
         <Route path="supplies" element={<Supplies />} />
               </Route>
       <Route path="/crops" element={<Crops />} />
