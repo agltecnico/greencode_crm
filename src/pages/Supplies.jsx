@@ -1,10 +1,9 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useData } from '../context/DataContext';
-import EmployeeTasks from '../components/EmployeeTasks';
 import '../crops.css';
 
-export default function Crops() {
+export default function Supplies() {
   const navigate = useNavigate();
   const { 
     providers, addProvider, deleteProvider,
@@ -16,36 +15,18 @@ export default function Crops() {
     products
   } = useData();
 
-  const [activeTab, setActiveTab] = useState('tareas');
+  const [activeTab, setActiveTab] = useState('catalogo');
 
-        const [newCrop, setNewCrop] = useState({ seedId: '', traysCount: 1, seedGramsPerTray: 0, inventoryId: '' });
-  const [newTarget, setNewTarget] = useState({ targetDayOfWeek: 1, productId: '', tuppersCount: 10 });
-  const [newHarvest, setNewHarvest] = useState({ productId: '', tuppersCount: 1 });
-
-        const handleAddCrop = e => { 
-    e.preventDefault(); 
-    const batchNum = `S-${Date.now().toString().slice(-6)}`;
-    addCrop({...newCrop, datePlanted: new Date().toISOString(), batchNumber: batchNum, status: 'SOAKING'}); 
-    setNewCrop({...newCrop, traysCount: 1, seedGramsPerTray: 0}); 
-  };
-  const handleAddHarvestTarget = e => { e.preventDefault(); addHarvestTarget(newTarget); };
+  const [newProvider, setNewProvider] = useState({ name: '', contactInfo: '' });
+  const [newSeed, setNewSeed] = useState({ name: '', providerId: '', soakingHours: 0, germinationDays: 3, darknessDays: 2, lightDays: 5, expectedYieldGrams: 0 });
+  const [newInventory, setNewInventory] = useState({ seedId: '', providerBatch: '', weightGrams: 1000, purchaseDate: new Date().toISOString().split('T')[0] });
+      
+  const handleAddProvider = e => { e.preventDefault(); addProvider(newProvider); setNewProvider({name:'', contactInfo:''}); };
+  const handleAddSeed = e => { e.preventDefault(); addSeed(newSeed); setNewSeed({...newSeed, name:''}); };
+  const handleAddInventory = e => { e.preventDefault(); addSeedInventory(newInventory); setNewInventory({...newInventory, providerBatch:''}); };
+      
   
-  const handleRegisterHarvest = e => {
-    e.preventDefault();
-    const batchNum = `L-${Date.now().toString().slice(-6)}`;
-    addHarvest({...newHarvest, harvestDate: new Date().toISOString(), batchNumber: batchNum});
-    const product = products?.find(p => p.id === newHarvest.productId);
-    generateLabelPDF(product?.name || 'Desconocido', batchNum, product?.shelfLifeDays || 10, newHarvest.tuppersCount);
-    setNewHarvest({...newHarvest, tuppersCount: 1});
-    alert(`Cosecha registrada con el lote Sanidad: ${batchNum}. Generando PDF...`);
-  };
-
-  const generateLabelPDF = (productName, batch, shelfLife, copies) => {
-    import('../utils/labelPdf.js').then(module => {
-      module.generateAndPrintLabels(productName, batch, shelfLife, copies);
-    });
-  };
-
+  
   const renderCatalogo = () => (
     <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
       <div className="premium-card">
@@ -140,77 +121,6 @@ export default function Crops() {
       </div>
     </div>
   );
-
-  const renderLotes = () => {
-    const activeCropsList = crops?.filter(c => c.status !== 'HARVESTED' && c.status !== 'DISCARDED') || [];
-    
-    return (
-      <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
-        <div className="premium-card" style={{ height: 'fit-content' }}>
-          <h3 className="premium-card-title">🪴 Sembrar / Remojar</h3>
-          <form onSubmit={handleAddCrop} className="flex flex-col gap-4">
-            <div>
-              <label className="premium-label">¿De qué saco vas a coger?</label>
-              <select className="premium-input" required value={newCrop.inventoryId} onChange={e=>{
-                const inv = seedInventory?.find(i => i.id === e.target.value);
-                setNewCrop({...newCrop, inventoryId: e.target.value, seedId: inv?.seedId || ''});
-              }}>
-                <option value="">-- Seleccionar Saco --</option>
-                {seedInventory?.filter(i => (i.remainingGrams || i.weightGrams) > 0).map(i => {
-                  const seed = seeds?.find(s => s.id === i.seedId);
-                  return <option key={i.id} value={i.id}>{seed?.name} (Lote: {i.providerBatch})</option>
-                })}
-              </select>
-            </div>
-            <div className="grid-form">
-              <div>
-                <label className="premium-label">Nº Bandejas</label>
-                <input type="number" required min="1" className="premium-input" value={newCrop.traysCount} onChange={e=>setNewCrop({...newCrop, traysCount: e.target.value})}/>
-              </div>
-              <div>
-                <label className="premium-label">g x Bandeja</label>
-                <input type="number" required min="1" className="premium-input" value={newCrop.seedGramsPerTray} onChange={e=>setNewCrop({...newCrop, seedGramsPerTray: e.target.value})}/>
-              </div>
-            </div>
-            <button type="submit" className="climate-btn">Comenzar Ciclo</button>
-          </form>
-        </div>
-
-        <div className="premium-card lg:col-span-3">
-          <h3 className="premium-card-title">🌱 Bandejas en Curso</h3>
-          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-            {activeCropsList.map(crop => {
-              const seed = seeds?.find(s => s.id === crop.seedId);
-              const daysAlive = Math.floor((new Date() - new Date(crop.datePlanted)) / (1000 * 60 * 60 * 24));
-              
-              return (
-                <div key={crop.id} className={`status-card \${crop.status}`}>
-                  <div className="status-header">
-                    <div>
-                      <h4 className="status-title">{seed?.name}</h4>
-                      <span className="status-batch">LOTE: {crop.batchNumber}</span>
-                    </div>
-                    <button onClick={() => discardCrop(crop)} style={{ background: '#fee2e2', color: '#ef4444', border: 'none', padding: '4px 8px', borderRadius: '4px', cursor: 'pointer', fontSize: '0.75rem', fontWeight: 'bold' }}>Descartar</button>
-                  </div>
-                  
-                  <div className="status-footer">
-                    <div>
-                      <p style={{ margin: '0 0 2px 0', fontSize: '0.65rem', fontWeight: 'bold', color: '#94a3b8', textTransform: 'uppercase' }}>Estado Actual</p>
-                      <p className="status-current">{crop.status}</p>
-                      <p className="status-days">Día {daysAlive}</p>
-                    </div>
-                    <button onClick={() => advanceCropStatus(crop)} style={{ background: '#f1f5f9', color: '#334155', border: '1px solid #e2e8f0', padding: '8px 12px', borderRadius: '8px', cursor: 'pointer', fontSize: '0.8rem', fontWeight: 'bold' }}>
-                      Avanzar ⏭
-                    </button>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        </div>
-      </div>
-    );
-  };
 
   const renderCosechas = () => (
     <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -363,7 +273,9 @@ export default function Crops() {
             <EmployeeTasks />
           </div>
         )}
-                        {activeTab === 'lotes' && renderLotes()}
+        {activeTab === 'catalogo' && renderCatalogo()}
+        {activeTab === 'inventario' && renderInventario()}
+        {activeTab === 'lotes' && renderLotes()}
         {activeTab === 'cosechas' && renderCosechas()}
         {activeTab === 'planificador' && renderPlanificador()}
       </div>
