@@ -129,7 +129,7 @@ export default function TvDashboard() {
           
           {activeCropsList.length === 0 && (
             <div style={{ textAlign: 'center', padding: '5rem', color: '#64748b', fontSize: '1.5rem' }}>
-              🪴 El invernadero está completamente vacío en este momento.
+              🪴 El cultivo está completamente vacío en este momento.
             </div>
           )}
         </div>

@@ -27,6 +27,10 @@ export const DataProvider = ({ children }) => {
   const [providers, setProviders] = useState([]);
   const [seeds, setSeeds] = useState([]);
   const [seedInventory, setSeedInventory] = useState([]);
+
+  const [substrates, setSubstrates] = useState([]);
+  const [substrateInventory, setSubstrateInventory] = useState([]);
+
   const [crops, setCrops] = useState([]);
   const [harvestTargets, setHarvestTargets] = useState([]);
   const [harvests, setHarvests] = useState([]);

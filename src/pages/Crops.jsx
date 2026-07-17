@@ -471,7 +471,7 @@ export default function Crops() {
       
       {activeTab !== 'menu' && (
         <button onClick={() => setActiveTab('menu')} style={{ background: 'transparent', border: '1px solid var(--crop-border)', color: 'var(--crop-text-main)', padding: '0.5rem 1rem', borderRadius: '8px', fontWeight: 'bold', cursor: 'pointer', marginBottom: '2rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-          <span>🔙</span> Volver al Menú Invernadero
+          <span>🔙</span> Volver al Menú Cultivo
         </button>
       )}
 
