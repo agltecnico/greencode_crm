@@ -34,8 +34,7 @@ export const DataProvider = ({ children }) => {
 
 
   // Load Initial Data from Supabase
-  useEffect(() => {
-    const fetchData = async () => {
+  const refreshData = async () => {
       try {
         const [
           { data: clientsData },
@@ -116,7 +115,10 @@ export const DataProvider = ({ children }) => {
         console.error("Error loading data from Supabase:", err);
       }
     };
-    fetchData();
+    };
+
+  useEffect(() => {
+    refreshData();
   }, []);
 
   

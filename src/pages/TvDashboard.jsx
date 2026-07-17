@@ -1,11 +1,20 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import EmployeeTasks from '../components/EmployeeTasks';
 import { useData } from '../context/DataContext';
 import '../crops.css';
 
 export default function TvDashboard() {
   const [tvTab, setTvTab] = useState('tasks');
-  const { crops, seeds, advanceCropStatus } = useData();
+  const { crops, seeds, advanceCropStatus, refreshData } = useData();
+
+  useEffect(() => {
+    // Auto-refresh data every 30 seconds for TV Mode
+    const interval = setInterval(() => {
+      if (refreshData) refreshData();
+    }, 30000);
+    return () => clearInterval(interval);
+  }, [refreshData]);
+
 
   const activeCropsList = crops?.filter(c => c.status !== 'HARVESTED' && c.status !== 'DISCARDED') || [];
 
