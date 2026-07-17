@@ -16,7 +16,7 @@ export default function Crops() {
     products
   } = useData();
 
-  const [activeTab, setActiveTab] = useState('tareas');
+  const [activeTab, setActiveTab] = useState('menu');
 
         const [newCrop, setNewCrop] = useState({ seedId: '', traysCount: 1, seedGramsPerTray: 0, inventoryId: '' });
   const [newTarget, setNewTarget] = useState({ targetDayOfWeek: 1, productId: '', tuppersCount: 10 });
@@ -324,33 +324,67 @@ export default function Crops() {
     </div>
   );
 
+
+  const renderCropsHub = () => (
+    <div className="hub-container" style={{ padding: '1rem', animation: 'fadeIn 0.3s ease' }}>
+      <div className="hub-header" style={{ marginBottom: '3rem', textAlign: 'center' }}>
+        <h1 style={{ fontSize: '2.5rem', marginBottom: '1rem', color: '#1e293b' }}>🌱 Central del Invernadero</h1>
+        <p style={{ color: '#64748b', fontSize: '1.2rem' }}>Selecciona tu zona de trabajo</p>
+      </div>
+      
+      <div className="hub-grid">
+        <button onClick={() => setActiveTab('tareas')} className="hub-card crops-card" style={{ border: 'none', width: '100%' }}>
+          <div className="hub-card-icon" style={{ fontSize: '3.5rem' }}>🎯</div>
+          <div className="hub-card-text">
+            <h2 style={{ fontSize: '1.5rem' }}>Tareas</h2>
+            <p style={{ fontSize: '1rem' }}>Día / Semana / Mes</p>
+          </div>
+        </button>
+
+        <button onClick={() => setActiveTab('lotes')} className="hub-card tv-card" style={{ border: 'none', width: '100%' }}>
+          <div className="hub-card-icon" style={{ fontSize: '3.5rem' }}>🪴</div>
+          <div className="hub-card-text">
+            <h2 style={{ fontSize: '1.5rem' }}>Invernadero Activo</h2>
+            <p style={{ fontSize: '1rem' }}>Bandejas y Riegos</p>
+          </div>
+        </button>
+
+        <button onClick={() => setActiveTab('cosechas')} className="hub-card admin-card" style={{ border: 'none', width: '100%' }}>
+          <div className="hub-card-icon" style={{ fontSize: '3.5rem' }}>🔪</div>
+          <div className="hub-card-text">
+            <h2 style={{ fontSize: '1.5rem' }}>Envasado y Sanidad</h2>
+            <p style={{ fontSize: '1rem' }}>Mermas y Etiquetas</p>
+          </div>
+        </button>
+
+        <button onClick={() => setActiveTab('planificador')} className="hub-card driver-card" style={{ border: 'none', width: '100%' }}>
+          <div className="hub-card-icon" style={{ fontSize: '3.5rem' }}>📅</div>
+          <div className="hub-card-text">
+            <h2 style={{ fontSize: '1.5rem' }}>Planificador Inverso</h2>
+            <p style={{ fontSize: '1rem' }}>Próximas Siembras</p>
+          </div>
+        </button>
+      </div>
+    </div>
+  );
+
   return (
     <div className="crops-module" style={{ paddingBottom: '5rem', maxWidth: '1400px', margin: '0 auto', paddingTop: '1rem' }}>
-      <button onClick={() => navigate('/')} style={{ background: 'transparent', border: '1px solid var(--crop-border)', color: 'var(--crop-text-main)', padding: '0.5rem 1rem', borderRadius: '8px', fontWeight: 'bold', cursor: 'pointer', marginBottom: '1rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-        <span>←</span> Volver al Hub
-      </button>
+      {activeTab === 'menu' && (
+        <button onClick={() => navigate('/')} style={{ background: 'transparent', border: '1px solid var(--crop-border)', color: 'var(--crop-text-main)', padding: '0.5rem 1rem', borderRadius: '8px', fontWeight: 'bold', cursor: 'pointer', marginBottom: '1rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+          <span>🏠</span> Volver al Hub Central
+        </button>
+      )}
       
-      <div className="crops-tabs-container">
-        {[
-          { id: 'tareas', label: 'Dashboard de Tareas', icon: '🎯' },
-          { id: 'lotes', label: 'Invernadero Activo', icon: '🪴' },
-          { id: 'cosechas', label: 'Envasado y Sanidad', icon: '🔪' },
-          { id: 'planificador', label: 'Planificador Inverso', icon: '🗓️' },
-          { id: 'inventario', label: 'Compras y Stock', icon: '📦' },
-          { id: 'catalogo', label: 'Catálogo Semillas', icon: '🧬' }
-        ].map(tab => (
-          <button 
-            key={tab.id}
-            onClick={() => setActiveTab(tab.id)}
-            className={`crops-tab \${activeTab === tab.id ? 'active' : ''}`}
-          >
-            <span className="crops-tab-icon">{tab.icon}</span> 
-            {tab.label}
-          </button>
-        ))}
-      </div>
+      {activeTab !== 'menu' && (
+        <button onClick={() => setActiveTab('menu')} style={{ background: 'transparent', border: '1px solid var(--crop-border)', color: 'var(--crop-text-main)', padding: '0.5rem 1rem', borderRadius: '8px', fontWeight: 'bold', cursor: 'pointer', marginBottom: '2rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+          <span>🔙</span> Volver al Menú Invernadero
+        </button>
+      )}
 
       <div style={{ animation: 'fadeIn 0.3s ease' }}>
+        {activeTab === 'menu' && renderCropsHub()}
+        
         {activeTab === 'tareas' && (
           <div>
             <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '-4rem', position: 'relative', zIndex: 50 }}>
@@ -363,7 +397,7 @@ export default function Crops() {
             <EmployeeTasks />
           </div>
         )}
-                        {activeTab === 'lotes' && renderLotes()}
+        {activeTab === 'lotes' && renderLotes()}
         {activeTab === 'cosechas' && renderCosechas()}
         {activeTab === 'planificador' && renderPlanificador()}
       </div>
