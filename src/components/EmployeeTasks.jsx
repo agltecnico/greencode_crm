@@ -5,6 +5,7 @@ import '../crops.css';
 export default function EmployeeTasks() {
   const { harvestTargets, crops, seeds, cropTypes, dailyLogs, addDailyLog } = useData();
   const [timeFilter, setTimeFilter] = useState(1);
+  const [selectedDayTasks, setSelectedDayTasks] = useState(null);
 
   const activeCrops = crops?.filter(c => c.status !== 'HARVESTED' && c.status !== 'DISCARDED') || [];
   
@@ -112,6 +113,35 @@ export default function EmployeeTasks() {
     allTasks.push({ date: targetDate, isToday, items: tasksForDate });
   });
 
+  
+  const renderDetailedDay = (dayGroup) => (
+    <div className={`task-day-group ${dayGroup.isToday ? 'is-today' : ''}`}>
+      <div className="task-day-header">
+        <span className="task-day-title">
+          {dayGroup.isToday ? '📅 TAREAS DE HOY' : dayGroup.date.toLocaleDateString('es-ES', { weekday: 'long', day: 'numeric', month: 'short' })}
+        </span>
+      </div>
+      {dayGroup.items.length === 0 ? (
+        <div style={{ padding: '2rem', textAlign: 'center', color: 'var(--crop-text-muted)' }}>
+          🍃 Todo despejado para este día.
+        </div>
+      ) : (
+        <div className="task-grid">
+          {dayGroup.items.map((task, i) => (
+            <div key={i} className={`task-card ${task.className}`}>
+              <div className="task-icon">{task.icon}</div>
+              <div className="task-content">
+                <h4>{task.title}</h4>
+                <p>{task.desc}</p>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+
+
   return (
     <div className="crops-module">
       <div className="tasks-header">
@@ -139,35 +169,71 @@ export default function EmployeeTasks() {
 
       <div className="dashboard-layout">
         
+        
         <div className="tasks-list-area">
-          {allTasks.map((dayGroup, idx) => (
-            <div key={idx} className={`task-day-group \${dayGroup.isToday ? 'is-today' : ''}`}>
-              <div className="task-day-header">
-                <span className="task-day-title">
-                  {dayGroup.isToday ? '🎯 TAREAS DE HOY' : dayGroup.date.toLocaleDateString('es-ES', { weekday: 'long', day: 'numeric', month: 'short' })}
-                </span>
-              </div>
-
-              {dayGroup.items.length === 0 ? (
-                <div style={{ padding: '2rem', textAlign: 'center', color: 'var(--crop-text-muted)' }}>
-                  ✨ Todo despejado para este día.
-                </div>
-              ) : (
-                <div className="task-grid">
-                  {dayGroup.items.map((task, i) => (
-                    <div key={i} className={`task-card \${task.className}`}>
-                      <div className="task-icon">{task.icon}</div>
-                      <div className="task-content">
-                        <h4>{task.title}</h4>
-                        <p>{task.desc}</p>
-                      </div>
+          {timeFilter === 1 ? (
+            // TODAY VIEW (Detailed)
+            allTasks.map((dayGroup, idx) => (
+              <React.Fragment key={idx}>
+                {renderDetailedDay(dayGroup)}
+              </React.Fragment>
+            ))
+          ) : (
+            // CALENDAR GRID VIEW (7 or 30 days)
+            <div style={{ 
+              display: 'grid', 
+              gridTemplateColumns: timeFilter === 7 ? 'repeat(auto-fit, minmax(120px, 1fr))' : 'repeat(auto-fill, minmax(100px, 1fr))', 
+              gap: '1rem' 
+            }}>
+              {allTasks.map((dayGroup, idx) => {
+                const dayName = dayGroup.date.toLocaleDateString('es-ES', { weekday: 'short' });
+                const dayNum = dayGroup.date.getDate();
+                const taskCount = dayGroup.items.length;
+                
+                return (
+                  <div 
+                    key={idx} 
+                    onClick={() => setSelectedDayTasks(dayGroup)}
+                    style={{
+                      background: dayGroup.isToday ? '#f0fdf4' : 'white',
+                      border: dayGroup.isToday ? '2px solid #22c55e' : '1px solid #cbd5e1',
+                      borderRadius: '12px',
+                      padding: '1rem',
+                      cursor: 'pointer',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      alignItems: 'center',
+                      gap: '0.5rem',
+                      transition: 'transform 0.2s, boxShadow 0.2s',
+                      boxShadow: '0 4px 6px -1px rgba(0,0,0,0.05)'
+                    }}
+                    onMouseEnter={(e) => { e.currentTarget.style.transform = 'translateY(-2px)'; e.currentTarget.style.boxShadow = '0 10px 15px -3px rgba(0,0,0,0.1)'; }}
+                    onMouseLeave={(e) => { e.currentTarget.style.transform = 'none'; e.currentTarget.style.boxShadow = '0 4px 6px -1px rgba(0,0,0,0.05)'; }}
+                  >
+                    <div style={{ fontWeight: 'bold', color: dayGroup.isToday ? '#166534' : '#64748b', textTransform: 'capitalize' }}>
+                      {dayName}
                     </div>
-                  ))}
-                </div>
-              )}
+                    <div style={{ fontSize: '2rem', fontWeight: '900', color: dayGroup.isToday ? '#15803d' : '#1e293b' }}>
+                      {dayNum}
+                    </div>
+                    
+                    {taskCount > 0 ? (
+                      <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap', justifyContent: 'center' }}>
+                        {dayGroup.items.slice(0,3).map((t, i) => (
+                          <span key={i} title={t.title} style={{ fontSize: '1.2rem' }}>{t.icon}</span>
+                        ))}
+                        {taskCount > 3 && <span style={{ fontSize: '0.8rem', fontWeight: 'bold', color: '#64748b' }}>+{taskCount - 3}</span>}
+                      </div>
+                    ) : (
+                      <div style={{ fontSize: '0.8rem', color: '#cbd5e1' }}>Libre</div>
+                    )}
+                  </div>
+                )
+              })}
             </div>
-          ))}
+          )}
         </div>
+
 
         <div className="climate-sidebar">
           <div className="climate-widget">
@@ -211,6 +277,29 @@ export default function EmployeeTasks() {
         </div>
 
       </div>
+
+      {selectedDayTasks && (
+        <div style={{
+          position: 'fixed', top: 0, left: 0, width: '100vw', height: '100vh',
+          background: 'rgba(15, 23, 42, 0.7)', backdropFilter: 'blur(4px)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 9999
+        }} onClick={() => setSelectedDayTasks(null)}>
+          <div style={{
+            background: '#f8fafc', width: '90%', maxWidth: '800px', maxHeight: '90vh',
+            borderRadius: '24px', padding: '2rem', overflowY: 'auto', position: 'relative',
+            boxShadow: '0 25px 50px -12px rgba(0,0,0,0.25)'
+          }} onClick={e => e.stopPropagation()}>
+            <button 
+              onClick={() => setSelectedDayTasks(null)}
+              style={{ position: 'absolute', top: '1rem', right: '1rem', background: '#e2e8f0', border: 'none', width: '40px', height: '40px', borderRadius: '50%', fontSize: '1.5rem', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+            >
+              ×
+            </button>
+            {renderDetailedDay(selectedDayTasks)}
+          </div>
+        </div>
+      )}
+
     </div>
   );
 }
