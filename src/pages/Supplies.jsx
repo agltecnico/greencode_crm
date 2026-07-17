@@ -143,7 +143,7 @@ export default function Supplies() {
         <button className={`admin-tab ${activeTab === 'CATALOG' ? 'active' : ''}`} onClick={() => setActiveTab('CATALOG')}>Catálogo de Artículos</button>
         <button className={`admin-tab ${activeTab === 'STOCK' ? 'active' : ''}`} onClick={() => setActiveTab('STOCK')}>Albaranes de Entrada / Gasto</button>
         <button className={`admin-tab ${activeTab === 'EXPENSES' ? 'active' : ''}`} onClick={() => setActiveTab('EXPENSES')}>Historial de Gastos</button>
-        <button className={`admin-tab ${activeTab === 'CROP_TYPES_LIST' ? 'active' : ''}`} onClick={() => setActiveTab('CROP_TYPES_LIST')}>Fichas (Escandallos)</button>
+        <button className={`admin-tab ${activeTab === 'CROP_TYPES_LIST' ? 'active' : ''}`} onClick={() => setActiveTab('CROP_TYPES_LIST')}>Fichas de Cultivo</button>
       </div>
 
       {activeTab !== 'EXPENSES' && (
@@ -352,7 +352,7 @@ export default function Supplies() {
       {activeTab === 'CROP_TYPES_LIST' && (
         <div style={{ animation: 'fadeIn 0.3s ease' }}>
           <div className="flex justify-between items-center mb-4">
-             <h3 className="font-bold text-lg">Fichas de Cultivo (Escandallos)</h3>
+             <h3 className="font-bold text-lg">Fichas de Cultivo</h3>
              <button className="btn btn-primary shadow-sm" onClick={() => setShowCropTypeModal(true)}>+ Nueva Ficha</button>
           </div>
 
