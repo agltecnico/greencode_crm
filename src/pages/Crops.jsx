@@ -11,6 +11,7 @@ export default function Crops() {
     seeds, addSeed, deleteSeed,
     seedInventory, addSeedInventory, deleteSeedInventory,
     crops, addCrop, sowCrop, advanceCropStatus, discardCrop,
+    stockEntries,
     cropTypes,
     harvestTargets, addHarvestTarget, deleteHarvestTarget,
     harvests, addHarvest,
@@ -20,7 +21,15 @@ export default function Crops() {
 
   const [activeTab, setActiveTab] = useState('menu');
 
-        const [newCrop, setNewCrop] = useState({ cropTypeId: '', traysCount: 1 });
+        const [newCrop, setNewCrop] = useState({ cropTypeId: '', traysCount: 1, selectedSeedBatchId: '' });
+
+  // Computed properties for seed batch selection
+  const selectedCropType = cropTypes?.find(c => c.id === newCrop.cropTypeId);
+  const availableSeedBatches = stockEntries?.filter(e => e.articleId === selectedCropType?.seedId && Number(e.remainingQuantity) > 0).sort((a,b) => new Date(a.purchaseDate) - new Date(b.purchaseDate)) || [];
+  // Set default batch if empty but available
+  if (availableSeedBatches.length > 0 && !newCrop.selectedSeedBatchId) {
+    setNewCrop(prev => ({...prev, selectedSeedBatchId: availableSeedBatches[0].id}));
+  }
   const [newTarget, setNewTarget] = useState({ targetDayOfWeek: 1, productId: '', tuppersCount: 10 });
   const [newHarvest, setNewHarvest] = useState({ productId: '', tuppersCount: 1 });
 
@@ -166,29 +175,41 @@ export default function Crops() {
           <h3 className="premium-card-title">🪴 Sembrar / Remojar</h3>
           <form onSubmit={handleAddCrop} className="flex flex-col gap-4">
             <div>
-              <label className="premium-label">¿De qué saco vas a coger?</label>
-              <select className="premium-input" required value={newCrop.inventoryId} onChange={e=>{
-                const inv = seedInventory?.find(i => i.id === e.target.value);
-                setNewCrop({...newCrop, inventoryId: e.target.value, seedId: inv?.seedId || ''});
-              }}>
-                <option value="">-- Seleccionar Saco --</option>
-                {seedInventory?.filter(i => (i.remainingGrams || i.weightGrams) > 0).map(i => {
-                  const seed = seeds?.find(s => s.id === i.seedId);
-                  return <option key={i.id} value={i.id}>{seed?.name} (Lote: {i.providerBatch})</option>
-                })}
+              <label className="text-sm font-semibold mb-1 block">Tipo de Cultivo (Ficha)</label>
+              <select className="premium-input" required value={newCrop.cropTypeId} onChange={e=>setNewCrop({...newCrop, cropTypeId: e.target.value, selectedSeedBatchId: ''})}>
+                <option value="">Selecciona...</option>
+                {cropTypes?.map(c => (
+                  <option key={c.id} value={c.id}>{c.name}</option>
+                ))}
               </select>
             </div>
-            <div className="grid-form">
-              <div>
-                <label className="premium-label">Nº Bandejas</label>
-                <input type="number" required min="1" className="premium-input" value={newCrop.traysCount} onChange={e=>setNewCrop({...newCrop, traysCount: e.target.value})}/>
+            
+            {selectedCropType && (
+              <div style={{ background: '#fffbeb', padding: '1rem', borderRadius: '8px', border: '1px solid #fde68a' }}>
+                <label className="text-sm font-semibold mb-1 block text-amber-900">Lote Físico de Semilla a utilizar</label>
+                <select className="premium-input" style={{ borderColor: '#fcd34d' }} value={newCrop.selectedSeedBatchId} onChange={e=>setNewCrop({...newCrop, selectedSeedBatchId: e.target.value})}>
+                  {availableSeedBatches.length === 0 && <option value="">No hay stock de esta semilla</option>}
+                  {availableSeedBatches.map((b, idx) => (
+                    <option key={b.id} value={b.id}>
+                      {idx === 0 ? '🟢 Lote Más Antiguo (Recomendado) - ' : '⚪ '}
+                      {new Date(b.purchaseDate).toLocaleDateString()} | Lote: {b.batchNumber || 'N/A'} | Quedan: {b.remainingQuantity}g
+                    </option>
+                  ))}
+                </select>
+                <p className="text-xs text-amber-700 mt-1">Si este lote no tiene suficientes gramos, se completará con el siguiente más antiguo.</p>
               </div>
-              <div>
-                <label className="premium-label">g x Bandeja</label>
-                <input type="number" required min="1" className="premium-input" value={newCrop.seedGramsPerTray} onChange={e=>setNewCrop({...newCrop, seedGramsPerTray: e.target.value})}/>
+            )}
+
+            <div className="flex gap-4">
+              <div className="flex-1">
+                <label className="text-sm font-semibold mb-1 block">Número de Bandejas</label>
+                <input type="number" required min="1" className="premium-input" value={newCrop.traysCount} onChange={e=>setNewCrop({...newCrop, traysCount: Number(e.target.value)})}/>
               </div>
             </div>
-            <button type="submit" className="climate-btn">Comenzar Ciclo</button>
+
+            <button type="submit" className="premium-btn primary-btn mt-2" disabled={selectedCropType && availableSeedBatches.length === 0}>
+              {selectedCropType && availableSeedBatches.length === 0 ? 'Sin Stock de Semilla' : 'Plantar Cultivo'}
+            </button>
           </form>
         </div>
 
