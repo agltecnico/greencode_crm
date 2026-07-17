@@ -108,9 +108,8 @@ export default function EmployeeTasks() {
       }
     });
 
-    if (tasksForDate.length > 0 || isToday) {
-      allTasks.push({ date: targetDate, isToday, items: tasksForDate });
-    }
+    // Always push the date so the user sees empty days as requested
+    allTasks.push({ date: targetDate, isToday, items: tasksForDate });
   });
 
   return (
