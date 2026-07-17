@@ -1,5 +1,6 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
+import StockAlerts from '../components/StockAlerts';
 
 export default function Hub() {
   const navigate = useNavigate();
@@ -12,6 +13,8 @@ export default function Hub() {
           <h1>Central de Operaciones</h1>
           <p>Selecciona el módulo al que deseas acceder</p>
         </div>
+
+        <StockAlerts />
 
         <div className="hub-grid">
           
