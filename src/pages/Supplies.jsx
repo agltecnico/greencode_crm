@@ -281,7 +281,27 @@ export default function Supplies() {
                         </select>
                       </td>
                       <td>
-                        <input type="text" className="form-control" value={editedArticle.name} onChange={e => setEditedArticle({...editedArticle, name: e.target.value})} />
+                        <input type="text" className="form-control" style={{ marginBottom: editedArticle.type === 'SEMILLA' ? '0.5rem' : '0' }} value={editedArticle.name} onChange={e => setEditedArticle({...editedArticle, name: e.target.value})} />
+                        {editedArticle.type === 'SEMILLA' && (
+                          <div style={{ display: 'flex', gap: '0.5rem', background: '#f8fafc', padding: '0.5rem', borderRadius: '6px', border: '1px solid #e2e8f0' }}>
+                            <div>
+                              <label style={{ fontSize: '0.65rem', color: '#64748b', display: 'block' }}>Remojo(h)</label>
+                              <input type="number" min="0" className="form-control" style={{ padding: '2px 4px', fontSize: '0.8rem' }} value={editedArticle.soakingHours || 0} onChange={e => setEditedArticle({...editedArticle, soakingHours: parseFloat(e.target.value) || 0})} />
+                            </div>
+                            <div>
+                              <label style={{ fontSize: '0.65rem', color: '#64748b', display: 'block' }}>Germ.(d)</label>
+                              <input type="number" min="0" className="form-control" style={{ padding: '2px 4px', fontSize: '0.8rem' }} value={editedArticle.germinationDays || 0} onChange={e => setEditedArticle({...editedArticle, germinationDays: parseFloat(e.target.value) || 0})} />
+                            </div>
+                            <div>
+                              <label style={{ fontSize: '0.65rem', color: '#64748b', display: 'block' }}>Osc.(d)</label>
+                              <input type="number" min="0" className="form-control" style={{ padding: '2px 4px', fontSize: '0.8rem' }} value={editedArticle.darknessDays || 0} onChange={e => setEditedArticle({...editedArticle, darknessDays: parseFloat(e.target.value) || 0})} />
+                            </div>
+                            <div>
+                              <label style={{ fontSize: '0.65rem', color: '#64748b', display: 'block' }}>Luz(d)</label>
+                              <input type="number" min="0" className="form-control" style={{ padding: '2px 4px', fontSize: '0.8rem' }} value={editedArticle.lightDays || 0} onChange={e => setEditedArticle({...editedArticle, lightDays: parseFloat(e.target.value) || 0})} />
+                            </div>
+                          </div>
+                        )}
                       </td>
                       <td>
                         {['SEMILLA', 'SUSTRATO', 'ENVASE', 'OTRO'].includes(editedArticle.type) ? (
@@ -635,6 +655,27 @@ export default function Supplies() {
                 <div>
                   <label className="form-label">Stock de Seguridad (Aviso si baja de esta cantidad)</label>
                   <input type="number" min="0" className="form-control" value={newArticle.minStock} onChange={e => setNewArticle({...newArticle, minStock: parseFloat(e.target.value) || 0})} />
+                </div>
+              )}
+              {newArticle.type === 'SEMILLA' && (
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '1rem', background: '#f8fafc', padding: '1rem', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
+                  <div style={{ gridColumn: '1 / -1' }}><h4 style={{ margin: 0, fontSize: '0.9rem', color: '#64748b', fontWeight: 'bold' }}>Parámetros de Cultivo</h4></div>
+                  <div>
+                    <label className="form-label" style={{ fontSize: '0.8rem' }}>Remojo (h)</label>
+                    <input type="number" min="0" className="form-control" value={newArticle.soakingHours || 0} onChange={e => setNewArticle({...newArticle, soakingHours: parseFloat(e.target.value) || 0})} />
+                  </div>
+                  <div>
+                    <label className="form-label" style={{ fontSize: '0.8rem' }}>Germinación (d)</label>
+                    <input type="number" min="0" className="form-control" value={newArticle.germinationDays || 0} onChange={e => setNewArticle({...newArticle, germinationDays: parseFloat(e.target.value) || 0})} />
+                  </div>
+                  <div>
+                    <label className="form-label" style={{ fontSize: '0.8rem' }}>Oscuridad (d)</label>
+                    <input type="number" min="0" className="form-control" value={newArticle.darknessDays || 0} onChange={e => setNewArticle({...newArticle, darknessDays: parseFloat(e.target.value) || 0})} />
+                  </div>
+                  <div>
+                    <label className="form-label" style={{ fontSize: '0.8rem' }}>Luz (d)</label>
+                    <input type="number" min="0" className="form-control" value={newArticle.lightDays || 0} onChange={e => setNewArticle({...newArticle, lightDays: parseFloat(e.target.value) || 0})} />
+                  </div>
                 </div>
               )}
               <div className="flex justify-end gap-3 mt-4">
