@@ -1,5 +1,6 @@
 ﻿import { useState, useRef } from 'react';
 import { useData } from '../context/DataContext';
+import EmployeeTasks from '../components/EmployeeTasks';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts';
 
 export default function Dashboard() {

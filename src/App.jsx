@@ -7,6 +7,7 @@ import Orders from './pages/Orders';
 import DeliveryNotes from './pages/DeliveryNotes';
 import Invoices from './pages/Invoices';
 import Expenses from './pages/Expenses';
+import Crops from './pages/Crops';
 import DriverView from './pages/DriverView';
 import PublicTicket from './pages/PublicTicket';
 import './App.css';
@@ -22,6 +23,7 @@ function App() {
         <Route path="delivery-notes" element={<DeliveryNotes />} />
         <Route path="invoices" element={<Invoices />} />
         <Route path="expenses" element={<Expenses />} />
+        <Route path="crops" element={<Crops />} />
       </Route>
 
       {/* Rutas sin Layout (Pantalla completa) */}

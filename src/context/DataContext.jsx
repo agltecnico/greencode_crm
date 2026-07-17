@@ -24,6 +24,15 @@ export const DataProvider = ({ children }) => {
   });
   const [companyLogo, setCompanyLogo] = useState(null);
 
+  const [providers, setProviders] = useState([]);
+  const [seeds, setSeeds] = useState([]);
+  const [seedInventory, setSeedInventory] = useState([]);
+  const [crops, setCrops] = useState([]);
+  const [harvestTargets, setHarvestTargets] = useState([]);
+  const [harvests, setHarvests] = useState([]);
+  const [dailyLogs, setDailyLogs] = useState([]);
+
+
   // Load Initial Data from Supabase
   useEffect(() => {
     const fetchData = async () => {
@@ -35,7 +44,14 @@ export const DataProvider = ({ children }) => {
           { data: notesData },
           { data: invoicesData },
           { data: expensesData },
-          { data: profileData }
+          { data: profileData },
+          { data: providersData },
+          { data: seedsData },
+          { data: seedInventoryData },
+          { data: cropsData },
+          { data: harvestTargetsData },
+          { data: harvestsData },
+          { data: dailyLogsData }
         ] = await Promise.all([
           supabase.from('clients').select('*').order('createdAt', { ascending: true }),
           supabase.from('products').select('*').order('createdAt', { ascending: true }),
@@ -43,7 +59,14 @@ export const DataProvider = ({ children }) => {
           supabase.from('delivery_notes').select('*').order('createdAt', { ascending: true }),
           supabase.from('invoices').select('*').order('createdAt', { ascending: true }),
           supabase.from('expenses').select('*').order('createdAt', { ascending: true }),
-          supabase.from('company_profile').select('*').limit(1)
+          supabase.from('company_profile').select('*').limit(1),
+          supabase.from('providers').select('*').order('createdAt', { ascending: true }),
+          supabase.from('seeds').select('*').order('createdAt', { ascending: true }),
+          supabase.from('seed_inventory').select('*').order('createdAt', { ascending: true }),
+          supabase.from('crops').select('*').order('createdAt', { ascending: true }),
+          supabase.from('harvest_targets').select('*').order('createdAt', { ascending: true }),
+          supabase.from('harvests').select('*').order('createdAt', { ascending: true }),
+          supabase.from('daily_logs').select('*').order('date', { ascending: true }),
         ]);
 
         if (clientsData) setClients(clientsData);
@@ -76,6 +99,15 @@ export const DataProvider = ({ children }) => {
             });
             setExpenses(mappedExpenses);
           }
+        
+        if (providersData) setProviders(providersData);
+        if (seedsData) setSeeds(seedsData);
+        if (seedInventoryData) setSeedInventory(seedInventoryData);
+        if (cropsData) setCrops(cropsData);
+        if (harvestTargetsData) setHarvestTargets(harvestTargetsData);
+        if (harvestsData) setHarvests(harvestsData);
+        if (dailyLogsData) setDailyLogs(dailyLogsData);
+
         if (profileData && profileData.length > 0) {
           setCompanyProfile(profileData[0]);
           localStorage.setItem('crm_company_profile', JSON.stringify(profileData[0]));
@@ -86,6 +118,133 @@ export const DataProvider = ({ children }) => {
     };
     fetchData();
   }, []);
+
+  
+  // Provider
+  const addProvider = async (item) => {
+    const tempId = Date.now().toString();
+    const newItem = { ...item, id: tempId };
+    setProviders(prev => [...prev, newItem]);
+    const { data, error } = await supabase.from('providers').insert([newItem]).select();
+    if (!error && data) setProviders(prev => prev.map(i => i.id === tempId ? data[0] : i));
+    return tempId;
+  };
+  const updateProvider = async (id, updatedFields) => {
+    setProviders(prev => prev.map(i => i.id === id ? { ...i, ...updatedFields } : i));
+    await supabase.from('providers').update(updatedFields).eq('id', id);
+  };
+  const deleteProvider = async (id) => {
+    setProviders(prev => prev.filter(i => i.id !== id));
+    await supabase.from('providers').delete().eq('id', id);
+  };
+
+  // Seed
+  const addSeed = async (item) => {
+    const tempId = Date.now().toString();
+    const newItem = { ...item, id: tempId };
+    setSeeds(prev => [...prev, newItem]);
+    const { data, error } = await supabase.from('seeds').insert([newItem]).select();
+    if (!error && data) setSeeds(prev => prev.map(i => i.id === tempId ? data[0] : i));
+    return tempId;
+  };
+  const updateSeed = async (id, updatedFields) => {
+    setSeeds(prev => prev.map(i => i.id === id ? { ...i, ...updatedFields } : i));
+    await supabase.from('seeds').update(updatedFields).eq('id', id);
+  };
+  const deleteSeed = async (id) => {
+    setSeeds(prev => prev.filter(i => i.id !== id));
+    await supabase.from('seeds').delete().eq('id', id);
+  };
+
+  // SeedInventory
+  const addSeedInventory = async (item) => {
+    const tempId = Date.now().toString();
+    const newItem = { ...item, id: tempId };
+    setSeedInventory(prev => [...prev, newItem]);
+    const { data, error } = await supabase.from('seed_inventory').insert([newItem]).select();
+    if (!error && data) setSeedInventory(prev => prev.map(i => i.id === tempId ? data[0] : i));
+    return tempId;
+  };
+  const updateSeedInventory = async (id, updatedFields) => {
+    setSeedInventory(prev => prev.map(i => i.id === id ? { ...i, ...updatedFields } : i));
+    await supabase.from('seed_inventory').update(updatedFields).eq('id', id);
+  };
+  const deleteSeedInventory = async (id) => {
+    setSeedInventory(prev => prev.filter(i => i.id !== id));
+    await supabase.from('seed_inventory').delete().eq('id', id);
+  };
+
+  // Crop
+  const addCrop = async (item) => {
+    const tempId = Date.now().toString();
+    const newItem = { ...item, id: tempId };
+    setCrops(prev => [...prev, newItem]);
+    const { data, error } = await supabase.from('crops').insert([newItem]).select();
+    if (!error && data) setCrops(prev => prev.map(i => i.id === tempId ? data[0] : i));
+    return tempId;
+  };
+  const updateCrop = async (id, updatedFields) => {
+    setCrops(prev => prev.map(i => i.id === id ? { ...i, ...updatedFields } : i));
+    await supabase.from('crops').update(updatedFields).eq('id', id);
+  };
+  const deleteCrop = async (id) => {
+    setCrops(prev => prev.filter(i => i.id !== id));
+    await supabase.from('crops').delete().eq('id', id);
+  };
+
+  // HarvestTarget
+  const addHarvestTarget = async (item) => {
+    const tempId = Date.now().toString();
+    const newItem = { ...item, id: tempId };
+    setHarvestTargets(prev => [...prev, newItem]);
+    const { data, error } = await supabase.from('harvest_targets').insert([newItem]).select();
+    if (!error && data) setHarvestTargets(prev => prev.map(i => i.id === tempId ? data[0] : i));
+    return tempId;
+  };
+  const updateHarvestTarget = async (id, updatedFields) => {
+    setHarvestTargets(prev => prev.map(i => i.id === id ? { ...i, ...updatedFields } : i));
+    await supabase.from('harvest_targets').update(updatedFields).eq('id', id);
+  };
+  const deleteHarvestTarget = async (id) => {
+    setHarvestTargets(prev => prev.filter(i => i.id !== id));
+    await supabase.from('harvest_targets').delete().eq('id', id);
+  };
+
+  // Harvest
+  const addHarvest = async (item) => {
+    const tempId = Date.now().toString();
+    const newItem = { ...item, id: tempId };
+    setHarvests(prev => [...prev, newItem]);
+    const { data, error } = await supabase.from('harvests').insert([newItem]).select();
+    if (!error && data) setHarvests(prev => prev.map(i => i.id === tempId ? data[0] : i));
+    return tempId;
+  };
+  const updateHarvest = async (id, updatedFields) => {
+    setHarvests(prev => prev.map(i => i.id === id ? { ...i, ...updatedFields } : i));
+    await supabase.from('harvests').update(updatedFields).eq('id', id);
+  };
+  const deleteHarvest = async (id) => {
+    setHarvests(prev => prev.filter(i => i.id !== id));
+    await supabase.from('harvests').delete().eq('id', id);
+  };
+
+  // DailyLog
+  const addDailyLog = async (item) => {
+    const tempId = Date.now().toString();
+    const newItem = { ...item, id: tempId };
+    setDailyLogs(prev => [...prev, newItem]);
+    const { data, error } = await supabase.from('daily_logs').insert([newItem]).select();
+    if (!error && data) setDailyLogs(prev => prev.map(i => i.id === tempId ? data[0] : i));
+    return tempId;
+  };
+  const updateDailyLog = async (id, updatedFields) => {
+    setDailyLogs(prev => prev.map(i => i.id === id ? { ...i, ...updatedFields } : i));
+    await supabase.from('daily_logs').update(updatedFields).eq('id', id);
+  };
+  const deleteDailyLog = async (id) => {
+    setDailyLogs(prev => prev.filter(i => i.id !== id));
+    await supabase.from('daily_logs').delete().eq('id', id);
+  };
 
   // Company Profile
   const updateCompanyProfile = async (newProfile) => {
@@ -396,6 +555,15 @@ export const DataProvider = ({ children }) => {
   return (
     <DataContext.Provider value={{
       companyProfile, updateCompanyProfile, companyLogo, updateCompanyLogo,
+
+      providers, addProvider, updateProvider, deleteProvider,
+      seeds, addSeed, updateSeed, deleteSeed,
+      seedInventory, addSeedInventory, updateSeedInventory, deleteSeedInventory,
+      crops, addCrop, updateCrop, deleteCrop,
+      harvestTargets, addHarvestTarget, updateHarvestTarget, deleteHarvestTarget,
+      harvests, addHarvest, updateHarvest, deleteHarvest,
+      dailyLogs, addDailyLog, updateDailyLog, deleteDailyLog,
+
       clients, addClient, updateClient, deleteClient,
       products, addProduct, updateProduct, deleteProduct,
       orders, addOrder, updateOrderList, deleteOrder, markOrderAsDelivered, saveSignedDeliveryNote,
