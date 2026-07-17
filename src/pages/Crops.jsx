@@ -328,24 +328,24 @@ export default function Crops() {
         <button onClick={() => setActiveTab('lotes')} className="hub-card tv-card" style={{ border: 'none', width: '100%' }}>
           <div className="hub-card-icon" style={{ fontSize: '3.5rem' }}>🪴</div>
           <div className="hub-card-text">
-            <h2 style={{ fontSize: '1.5rem' }}>Invernadero Activo</h2>
-            <p style={{ fontSize: '1rem' }}>Bandejas y Riegos</p>
+            <h2 style={{ fontSize: '1.5rem' }}>Siembra</h2>
+            <p style={{ fontSize: '1rem' }}>Bandejas en curso</p>
           </div>
         </button>
 
         <button onClick={() => setActiveTab('cosechas')} className="hub-card admin-card" style={{ border: 'none', width: '100%' }}>
           <div className="hub-card-icon" style={{ fontSize: '3.5rem' }}>🔪</div>
           <div className="hub-card-text">
-            <h2 style={{ fontSize: '1.5rem' }}>Envasado y Sanidad</h2>
-            <p style={{ fontSize: '1rem' }}>Mermas y Etiquetas</p>
+            <h2 style={{ fontSize: '1.5rem' }}>Cosecha</h2>
+            <p style={{ fontSize: '1rem' }}>Envasado y etiquetas</p>
           </div>
         </button>
 
         <button onClick={() => setActiveTab('planificador')} className="hub-card driver-card" style={{ border: 'none', width: '100%' }}>
           <div className="hub-card-icon" style={{ fontSize: '3.5rem' }}>📅</div>
           <div className="hub-card-text">
-            <h2 style={{ fontSize: '1.5rem' }}>Planificador Inverso</h2>
-            <p style={{ fontSize: '1rem' }}>Próximas Siembras</p>
+            <h2 style={{ fontSize: '1.5rem' }}>Planificador</h2>
+            <p style={{ fontSize: '1rem' }}>Rutinas automáticas</p>
           </div>
         </button>
       </div>
