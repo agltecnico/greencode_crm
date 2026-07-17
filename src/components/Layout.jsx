@@ -15,7 +15,7 @@ export default function Layout() {
           <img src="/logo.png" alt="GreenCode" className="sidebar-logo" />
         </div>
         <nav className="sidebar-nav">
-          <NavLink onClick={() => setSidebarOpen(false)} to="/" className="nav-item" end style={{ background: "#f8fafc", color: "#0ea5e9", fontWeight: "bold", border: "1px solid #e0f2fe", marginBottom: "1rem" }}>
+          <NavLink onClick={() => setSidebarOpen(false)} to="/" className="nav-item" end style={{ background: "#f8fafc", color: "#0ea5e9", fontWeight: "bold", border: "1px solid #e0f2fe", marginBottom: '0.5rem' }}>
             <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" className="w-5 h-5"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" /></svg> Volver al Hub
           </NavLink>
           
@@ -23,7 +23,7 @@ export default function Layout() {
             <LayoutDashboard /> Dashboard
           </NavLink>
 
-          <div className="sidebar-group-title" style={{ marginTop: '1.5rem', marginBottom: '0.5rem', fontSize: '0.75rem', fontWeight: 'bold', color: '#94a3b8', letterSpacing: '0.05em', paddingLeft: '1rem' }}>BASE DE DATOS</div>
+          <div className="sidebar-group-title" style={{ marginTop: '0.75rem', marginBottom: '0.25rem', fontSize: '0.75rem', fontWeight: 'bold', color: '#94a3b8', letterSpacing: '0.05em', paddingLeft: '1rem' }}>BASE DE DATOS</div>
           
           <NavLink onClick={() => setSidebarOpen(false)} to="/admin/clients" className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}>
             <Users /> Clientes
@@ -35,7 +35,7 @@ export default function Layout() {
             <FileBox /> Productos
           </NavLink>
 
-          <div className="sidebar-group-title" style={{ marginTop: '1.5rem', marginBottom: '0.5rem', fontSize: '0.75rem', fontWeight: 'bold', color: '#94a3b8', letterSpacing: '0.05em', paddingLeft: '1rem' }}>VENTAS</div>
+          <div className="sidebar-group-title" style={{ marginTop: '0.75rem', marginBottom: '0.25rem', fontSize: '0.75rem', fontWeight: 'bold', color: '#94a3b8', letterSpacing: '0.05em', paddingLeft: '1rem' }}>VENTAS</div>
 
           <NavLink onClick={() => setSidebarOpen(false)} to="/admin/orders" className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}>
             <ShoppingBag /> Pedidos
@@ -47,7 +47,7 @@ export default function Layout() {
             <Receipt /> Facturación
           </NavLink>
 
-          <div className="sidebar-group-title" style={{ marginTop: '1.5rem', marginBottom: '0.5rem', fontSize: '0.75rem', fontWeight: 'bold', color: '#94a3b8', letterSpacing: '0.05em', paddingLeft: '1rem' }}>OPERACIONES</div>
+          <div className="sidebar-group-title" style={{ marginTop: '0.75rem', marginBottom: '0.25rem', fontSize: '0.75rem', fontWeight: 'bold', color: '#94a3b8', letterSpacing: '0.05em', paddingLeft: '1rem' }}>OPERACIONES</div>
 
           <NavLink onClick={() => setSidebarOpen(false)} to="/admin/supplies" className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}>
             <Sprout /> Gestión de Cultivo
