@@ -564,6 +564,12 @@ export default function Supplies() {
                           <span>🌱 {c.seedGrams}g ({seedCost.toFixed(2)}€)</span>
                           {Number(c.substrateLiters) > 0 && <span>🪨 {c.substrateLiters}L ({subCost.toFixed(2)}€)</span>}
                           <span>📦 1 ud ({contCost.toFixed(2)}€)</span>
+                          <div style={{ marginTop: '0.5rem', background: '#f1f5f9', padding: '0.2rem 0.5rem', borderRadius: '4px', display: 'flex', gap: '0.5rem', fontSize: '0.75rem', width: 'fit-content' }}>
+                            <span title="Remojo">💧 {c.soakingHours || 0}h</span>
+                            <span title="Germinación">🌱 {c.germinationDays || 0}d</span>
+                            <span title="Oscuridad">🌑 {c.darknessDays || 0}d</span>
+                            <span title="Luz">☀️ {c.lightDays || 0}d</span>
+                          </div>
                         </div>
                       </td>
                       <td className="font-bold text-amber-600 text-lg">
@@ -731,7 +737,30 @@ export default function Supplies() {
                 </div>
               </div>
 
-              {/* Substrate Section */}
+                              {/* Cultivation Parameters Section */}
+                <div className="card" style={{ background: '#f8fafc', border: '1px solid #e2e8f0', boxShadow: 'none', padding: '1.25rem', gridColumn: 'span 2' }}>
+                  <h4 className="font-semibold text-slate-700 mb-3">⏱️ Parámetros de Ciclo</h4>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '1rem' }}>
+                    <div>
+                      <label className="form-label">Remojo (h)</label>
+                      <input type="number" min="0" className="form-control" value={newType.soakingHours || ''} onChange={e => setNewType({...newType, soakingHours: parseFloat(e.target.value) || 0})} />
+                    </div>
+                    <div>
+                      <label className="form-label">Germinación (d)</label>
+                      <input type="number" min="0" className="form-control" value={newType.germinationDays || ''} onChange={e => setNewType({...newType, germinationDays: parseFloat(e.target.value) || 0})} />
+                    </div>
+                    <div>
+                      <label className="form-label">Oscuridad (d)</label>
+                      <input type="number" min="0" className="form-control" value={newType.darknessDays || ''} onChange={e => setNewType({...newType, darknessDays: parseFloat(e.target.value) || 0})} />
+                    </div>
+                    <div>
+                      <label className="form-label">Luz (d)</label>
+                      <input type="number" min="0" className="form-control" value={newType.lightDays || ''} onChange={e => setNewType({...newType, lightDays: parseFloat(e.target.value) || 0})} />
+                    </div>
+                  </div>
+                </div>
+                
+                {/* Substrate Section */}
               <div className="card" style={{ background: '#f8fafc', border: '1px solid #e2e8f0', boxShadow: 'none', padding: '1.25rem' }}>
                 <h4 className="font-semibold text-slate-700 mb-3">🪨 Sustrato a utilizar</h4>
                 <div style={{ marginBottom: '1rem' }}>
