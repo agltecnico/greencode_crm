@@ -115,7 +115,6 @@ export const DataProvider = ({ children }) => {
         console.error("Error loading data from Supabase:", err);
       }
     };
-    };
 
   useEffect(() => {
     refreshData();
