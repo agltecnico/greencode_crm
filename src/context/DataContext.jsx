@@ -276,6 +276,48 @@ export const DataProvider = ({ children }) => {
     if (!error && data) setCrops(prev => prev.map(i => i.id === tempId ? data[0] : i));
     return tempId;
   };
+
+  const sowCrop = async (newCrop) => {
+    // 1. Get the CropType definition
+    const cType = cropTypes.find(c => c.id === newCrop.cropTypeId);
+    if (!cType) throw new Error("Ficha de cultivo no encontrada.");
+
+    const trays = Number(newCrop.traysCount || 1);
+    
+    // 2. Create the Crop Record
+    const cropRecord = {
+      cropTypeId: cType.id,
+      traysCount: trays,
+      status: cType.soakingHours > 0 ? 'SOAKING' : 'SOWED',
+      seedBatchId: newCrop.selectedSeedBatchId || null,
+      plantedAt: new Date().toISOString()
+    };
+    
+    await addCrop(cropRecord);
+
+    // 3. Deduct Stock (Seeds)
+    if (cType.seedId && cType.seedGrams > 0) {
+      await addStockEntry({
+        articleId: cType.seedId,
+        quantity: -(Number(cType.seedGrams) * trays),
+        batchNumber: 'USO_CULTIVO',
+        purchaseDate: new Date().toISOString(),
+        price: 0
+      });
+    }
+
+    // 4. Deduct Stock (Substrate)
+    if (cType.substrateId && cType.substrateGrams > 0) {
+      await addStockEntry({
+        articleId: cType.substrateId,
+        quantity: -(Number(cType.substrateGrams) * trays),
+        batchNumber: 'USO_CULTIVO',
+        purchaseDate: new Date().toISOString(),
+        price: 0
+      });
+    }
+  };
+
   const updateCrop = async (id, updatedFields) => {
     setCrops(prev => prev.map(i => i.id === id ? { ...i, ...updatedFields } : i));
     await supabase.from('crops').update(updatedFields).eq('id', id);
@@ -654,7 +696,7 @@ export const DataProvider = ({ children }) => {
         cropTypes, addCropType, updateCropType, deleteCropType,
         seeds, addSeed, updateSeed, deleteSeed,
         seedInventory, addSeedInventory, updateSeedInventory, deleteSeedInventory,
-      crops, addCrop, updateCrop, deleteCrop,
+      crops, addCrop, sowCrop, updateCrop, deleteCrop,
       harvestTargets, addHarvestTarget, updateHarvestTarget, deleteHarvestTarget,
       harvests, addHarvest, updateHarvest, deleteHarvest,
       dailyLogs, addDailyLog, updateDailyLog, deleteDailyLog,

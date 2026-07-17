@@ -7,11 +7,8 @@ import '../crops.css';
 export default function Crops() {
   const navigate = useNavigate();
   const { 
-    providers, addProvider, deleteProvider,
-    seeds, addSeed, deleteSeed,
-    seedInventory, addSeedInventory, deleteSeedInventory,
-    crops, addCrop, sowCrop, advanceCropStatus, discardCrop,
-    stockEntries,
+    crops, sowCrop, advanceCropStatus, discardCrop,
+    stockEntries, articles,
     cropTypes,
     harvestTargets, addHarvestTarget, deleteHarvestTarget,
     harvests, addHarvest,
@@ -21,25 +18,29 @@ export default function Crops() {
 
   const [activeTab, setActiveTab] = useState('menu');
 
-        const [newCrop, setNewCrop] = useState({ cropTypeId: '', traysCount: 1, selectedSeedBatchId: '' });
+  // Modals state
+  const [isSowModalOpen, setIsSowModalOpen] = useState(false);
+  const [isHarvestModalOpen, setIsHarvestModalOpen] = useState(false);
+
+  const [newCrop, setNewCrop] = useState({ cropTypeId: '', traysCount: 1, selectedSeedBatchId: '' });
+  const [newTarget, setNewTarget] = useState({ targetDayOfWeek: 1, productId: '', tuppersCount: 10 });
+  const [newHarvest, setNewHarvest] = useState({ productId: '', tuppersCount: 1 });
 
   // Computed properties for seed batch selection
   const selectedCropType = cropTypes?.find(c => c.id === newCrop.cropTypeId);
   const availableSeedBatches = stockEntries?.filter(e => e.articleId === selectedCropType?.seedId && Number(e.remainingQuantity) > 0).sort((a,b) => new Date(a.purchaseDate) - new Date(b.purchaseDate)) || [];
-  // Set default batch if empty but available
+  
   if (availableSeedBatches.length > 0 && !newCrop.selectedSeedBatchId) {
     setNewCrop(prev => ({...prev, selectedSeedBatchId: availableSeedBatches[0].id}));
   }
-  const [newTarget, setNewTarget] = useState({ targetDayOfWeek: 1, productId: '', tuppersCount: 10 });
-  const [newHarvest, setNewHarvest] = useState({ productId: '', tuppersCount: 1 });
 
-        
   const handleAddCrop = async (e) => { 
     e.preventDefault(); 
     try {
       await sowCrop(newCrop);
-      setNewCrop({ cropTypeId: '', traysCount: 1 }); 
-      alert("Cultivo plantado con éxito. Stock descontado.");
+      setNewCrop({ cropTypeId: '', traysCount: 1, selectedSeedBatchId: '' }); 
+      setIsSowModalOpen(false);
+      alert("Cultivo plantado con éxito. Stock de semillas y sustrato descontado.");
     } catch (error) {
       alert(error.message);
     }
@@ -54,6 +55,7 @@ export default function Crops() {
     const product = products?.find(p => p.id === newHarvest.productId);
     generateLabelPDF(product?.name || 'Desconocido', batchNum, product?.shelfLifeDays || 10, newHarvest.tuppersCount);
     setNewHarvest({...newHarvest, tuppersCount: 1});
+    setIsHarvestModalOpen(false);
     alert(`Cosecha registrada con el lote Sanidad: ${batchNum}. Generando PDF...`);
   };
 
@@ -63,215 +65,158 @@ export default function Crops() {
     });
   };
 
-  const renderCatalogo = () => (
-    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-      <div className="premium-card">
-        <h3 className="premium-card-title">🏭 Proveedores de Semilla</h3>
-        <form onSubmit={handleAddProvider} className="flex flex-col gap-4">
-          <input type="text" placeholder="Nombre Proveedor" required className="premium-input" value={newProvider.name} onChange={e=>setNewProvider({...newProvider, name: e.target.value})}/>
-          <input type="text" placeholder="Contacto / Web" className="premium-input" value={newProvider.contactInfo} onChange={e=>setNewProvider({...newProvider, contactInfo: e.target.value})}/>
-          <button type="submit" className="climate-btn mt-4">Añadir Proveedor</button>
-        </form>
-        <div style={{ marginTop: '1.5rem', display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-          {providers?.map(p => (
-            <div key={p.id} style={{ display: 'flex', justifyContent: 'space-between', padding: '1rem', background: '#f8fafc', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
-              <span style={{ fontWeight: 'bold' }}>{p.name}</span>
-              <button onClick={()=>deleteProvider(p.id)} style={{ color: 'red', border: 'none', background: 'none', cursor: 'pointer' }}>✖</button>
-            </div>
-          ))}
-        </div>
-      </div>
-
-      <div className="premium-card">
-        <h3 className="premium-card-title">🌱 Catálogo de Semillas</h3>
-        <form onSubmit={handleAddSeed} className="grid-form">
-          <div className="col-span-2">
-            <select className="premium-input" required value={newSeed.providerId} onChange={e=>setNewSeed({...newSeed, providerId: e.target.value})}>
-              <option value="">-- Proveedor --</option>
-              {providers?.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
-            </select>
-          </div>
-          <div className="col-span-2">
-            <input type="text" placeholder="Nombre Semilla (Ej: Rábano Sango)" required className="premium-input" value={newSeed.name} onChange={e=>setNewSeed({...newSeed, name: e.target.value})}/>
-          </div>
-          <div><label className="premium-label">Horas Remojo</label><input type="number" required min="0" className="premium-input" value={newSeed.soakingHours} onChange={e=>setNewSeed({...newSeed, soakingHours: e.target.value})}/></div>
-          <div><label className="premium-label">Días Germinación</label><input type="number" required min="0" className="premium-input" value={newSeed.germinationDays} onChange={e=>setNewSeed({...newSeed, germinationDays: e.target.value})}/></div>
-          <div><label className="premium-label">Días Oscuridad</label><input type="number" required min="0" className="premium-input" value={newSeed.darknessDays} onChange={e=>setNewSeed({...newSeed, darknessDays: e.target.value})}/></div>
-          <div><label className="premium-label">Días Luz</label><input type="number" required min="0" className="premium-input" value={newSeed.lightDays} onChange={e=>setNewSeed({...newSeed, lightDays: e.target.value})}/></div>
-          <div className="col-span-2"><button type="submit" className="climate-btn mt-4">Añadir Semilla al Catálogo</button></div>
-        </form>
-
-        <button onClick={() => setActiveTab('pedidos')} className="hub-card driver-card" style={{ border: 'none', width: '100%' }}>
-          <div className="hub-card-icon" style={{ fontSize: '3.5rem' }}>📦</div>
-          <div className="hub-card-text">
-            <h2 style={{ fontSize: '1.5rem' }}>Pedidos y Reparto</h2>
-            <p style={{ fontSize: '1rem' }}>Preparar y Enviar</p>
-          </div>
-        </button>
-      </div>
-    </div>
-  );
-
-  const renderInventario = () => (
-    <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-      <div className="premium-card" style={{ height: 'fit-content' }}>
-        <h3 className="premium-card-title">📦 Registrar Compra (Saco)</h3>
-        <form onSubmit={handleAddInventory} className="flex flex-col gap-4">
-          <select className="premium-input" required value={newInventory.seedId} onChange={e=>setNewInventory({...newInventory, seedId: e.target.value})}>
-            <option value="">-- Qué Semilla es --</option>
-            {seeds?.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
-          </select>
-          <input type="text" placeholder="Lote del Proveedor" required className="premium-input" value={newInventory.providerBatch} onChange={e=>setNewInventory({...newInventory, providerBatch: e.target.value})}/>
-          <div className="grid-form">
-            <div>
-              <label className="premium-label">Peso (g)</label>
-              <input type="number" required min="1" className="premium-input" value={newInventory.weightGrams} onChange={e=>setNewInventory({...newInventory, weightGrams: e.target.value})}/>
-            </div>
-            <div>
-              <label className="premium-label">Fecha</label>
-              <input type="date" required className="premium-input" value={newInventory.purchaseDate} onChange={e=>setNewInventory({...newInventory, purchaseDate: e.target.value})}/>
-            </div>
-          </div>
-          <button type="submit" className="climate-btn">Guardar Saco en Inventario</button>
-        </form>
-      </div>
-      
-      <div className="premium-card col-span-2">
-        <h3 className="premium-card-title">📋 Stock Disponible</h3>
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          {seedInventory?.map(inv => {
-            const seed = seeds?.find(s => s.id === inv.seedId);
-            return (
-              <div key={inv.id} style={{ padding: '1.5rem', background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '12px', position: 'relative' }}>
-                <button onClick={() => deleteSeedInventory(inv.id)} style={{ position: 'absolute', top: '10px', right: '10px', background: 'none', border: 'none', color: 'red', cursor: 'pointer' }}>✖</button>
-                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '1rem' }}>
-                  <h4 style={{ margin: 0, fontWeight: 800 }}>{seed?.name || 'Semilla Eliminada'}</h4>
-                  <span style={{ fontSize: '0.75rem', background: '#e2e8f0', padding: '2px 6px', borderRadius: '4px', fontFamily: 'monospace' }}>{inv.providerBatch}</span>
-                </div>
-                <div style={{ display: 'flex', gap: '1rem', marginTop: '1rem' }}>
-                  <div>
-                    <p style={{ margin: 0, fontSize: '0.75rem', color: '#64748b' }}>Comprado</p>
-                    <p style={{ margin: 0, fontWeight: 'bold' }}>{inv.weightGrams}g</p>
-                  </div>
-                  <div>
-                    <p style={{ margin: 0, fontSize: '0.75rem', color: '#64748b' }}>Restante</p>
-                    <p style={{ margin: 0, fontWeight: 900, color: 'var(--crop-primary)', fontSize: '1.25rem' }}>{inv.remainingGrams || inv.weightGrams}g</p>
-                  </div>
-                </div>
-              </div>
-            )
-          })}
-        </div>
-      </div>
-    </div>
-  );
+  // Modal Styles
+  const modalOverlayStyle = { position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 50 };
+  const modalCardStyle = { width: '100%', maxWidth: '600px', margin: '20px', maxHeight: '90vh', overflowY: 'auto', backgroundColor: '#fff', padding: '2rem', borderRadius: '12px', border: '1px solid var(--color-border)', boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)' };
 
   const renderLotes = () => {
     const activeCropsList = crops?.filter(c => c.status !== 'HARVESTED' && c.status !== 'DISCARDED') || [];
     
     return (
-      <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
-        <div className="premium-card" style={{ height: 'fit-content' }}>
-          <h3 className="premium-card-title">🪴 Sembrar / Remojar</h3>
-          <form onSubmit={handleAddCrop} className="flex flex-col gap-4">
-            <div>
-              <label className="text-sm font-semibold mb-1 block">Tipo de Cultivo (Ficha)</label>
-              <select className="premium-input" required value={newCrop.cropTypeId} onChange={e=>setNewCrop({...newCrop, cropTypeId: e.target.value, selectedSeedBatchId: ''})}>
-                <option value="">Selecciona...</option>
-                {cropTypes?.map(c => (
-                  <option key={c.id} value={c.id}>{c.name}</option>
-                ))}
-              </select>
-            </div>
-            
-            {selectedCropType && (
-              <div style={{ background: '#fffbeb', padding: '1rem', borderRadius: '8px', border: '1px solid #fde68a' }}>
-                <label className="text-sm font-semibold mb-1 block text-amber-900">Lote Físico de Semilla a utilizar</label>
-                <select className="premium-input" style={{ borderColor: '#fcd34d' }} value={newCrop.selectedSeedBatchId} onChange={e=>setNewCrop({...newCrop, selectedSeedBatchId: e.target.value})}>
-                  {availableSeedBatches.length === 0 && <option value="">No hay stock de esta semilla</option>}
-                  {availableSeedBatches.map((b, idx) => (
-                    <option key={b.id} value={b.id}>
-                      {idx === 0 ? '🟢 Lote Más Antiguo (Recomendado) - ' : '⚪ '}
-                      {new Date(b.purchaseDate).toLocaleDateString()} | Lote: {b.batchNumber || 'N/A'} | Quedan: {b.remainingQuantity}g
-                    </option>
-                  ))}
-                </select>
-                <p className="text-xs text-amber-700 mt-1">Si este lote no tiene suficientes gramos, se completará con el siguiente más antiguo.</p>
-              </div>
-            )}
-
-            <div className="flex gap-4">
-              <div className="flex-1">
-                <label className="text-sm font-semibold mb-1 block">Número de Bandejas</label>
-                <input type="number" required min="1" className="premium-input" value={newCrop.traysCount} onChange={e=>setNewCrop({...newCrop, traysCount: Number(e.target.value)})}/>
-              </div>
-            </div>
-
-            <button type="submit" className="premium-btn primary-btn mt-2" disabled={selectedCropType && availableSeedBatches.length === 0}>
-              {selectedCropType && availableSeedBatches.length === 0 ? 'Sin Stock de Semilla' : 'Plantar Cultivo'}
-            </button>
-          </form>
+      <div style={{ animation: 'fadeIn 0.3s ease' }}>
+        <div className="flex justify-between items-center mb-6">
+          <div>
+            <h2 className="text-2xl font-bold text-gray-800">🪴 Invernadero Activo</h2>
+            <p className="text-gray-500">Gestión de bandejas en curso.</p>
+          </div>
+          <button onClick={() => setIsSowModalOpen(true)} className="btn btn-primary" style={{ background: 'var(--crop-primary)', color: 'white', border: 'none', padding: '0.75rem 1.5rem', borderRadius: '8px', fontWeight: 'bold', cursor: 'pointer' }}>
+            + Nueva Siembra
+          </button>
         </div>
 
-        <div className="premium-card lg:col-span-3">
-          <h3 className="premium-card-title">🌱 Bandejas en Curso</h3>
-          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-            {activeCropsList.map(crop => {
-              const seed = seeds?.find(s => s.id === crop.seedId);
-              const daysAlive = Math.floor((new Date() - new Date(crop.datePlanted)) / (1000 * 60 * 60 * 24));
-              
-              return (
-                <div key={crop.id} className={`status-card \${crop.status}`}>
-                  <div className="status-header">
-                    <div>
-                      <h4 className="status-title">{seed?.name}</h4>
-                      <span className="status-batch">LOTE: {crop.batchNumber}</span>
-                    </div>
-                    <button onClick={() => discardCrop(crop)} style={{ background: '#fee2e2', color: '#ef4444', border: 'none', padding: '4px 8px', borderRadius: '4px', cursor: 'pointer', fontSize: '0.75rem', fontWeight: 'bold' }}>Descartar</button>
+        {isSowModalOpen && (
+          <div style={modalOverlayStyle}>
+            <div style={modalCardStyle}>
+              <div className="flex justify-between items-center mb-4">
+                <h3 className="font-bold text-xl">🪴 Sembrar / Remojar</h3>
+                <button onClick={() => setIsSowModalOpen(false)} style={{ background: 'none', border: 'none', fontSize: '1.5rem', cursor: 'pointer' }}>&times;</button>
+              </div>
+              <form onSubmit={handleAddCrop} className="flex flex-col gap-4">
+                <div>
+                  <label className="text-sm font-semibold mb-1 block">Tipo de Cultivo (Ficha)</label>
+                  <select className="premium-input w-full" style={{ padding: '0.75rem', borderRadius: '8px', border: '1px solid #cbd5e1' }} required value={newCrop.cropTypeId} onChange={e=>setNewCrop({...newCrop, cropTypeId: e.target.value, selectedSeedBatchId: ''})}>
+                    <option value="">Selecciona...</option>
+                    {cropTypes?.map(c => (
+                      <option key={c.id} value={c.id}>{c.name}</option>
+                    ))}
+                  </select>
+                </div>
+                
+                {selectedCropType && (
+                  <div style={{ background: '#fffbeb', padding: '1rem', borderRadius: '8px', border: '1px solid #fde68a' }}>
+                    <label className="text-sm font-semibold mb-1 block text-amber-900">Lote Físico de Semilla a utilizar</label>
+                    <select className="premium-input w-full" style={{ padding: '0.75rem', borderRadius: '8px', border: '1px solid #fcd34d' }} value={newCrop.selectedSeedBatchId} onChange={e=>setNewCrop({...newCrop, selectedSeedBatchId: e.target.value})}>
+                      {availableSeedBatches.length === 0 && <option value="">No hay stock de esta semilla</option>}
+                      {availableSeedBatches.map((b, idx) => (
+                        <option key={b.id} value={b.id}>
+                          {idx === 0 ? '🟢 Lote Más Antiguo (Recomendado) - ' : '⚪ '}
+                          {new Date(b.purchaseDate).toLocaleDateString()} | Lote: {b.batchNumber || 'N/A'} | Quedan: {b.remainingQuantity}g
+                        </option>
+                      ))}
+                    </select>
+                    <p className="text-xs text-amber-700 mt-1">Si este lote no tiene suficientes gramos, se completará con el siguiente más antiguo.</p>
                   </div>
-                  
-                  <div className="status-footer">
-                    <div>
-                      <p style={{ margin: '0 0 2px 0', fontSize: '0.65rem', fontWeight: 'bold', color: '#94a3b8', textTransform: 'uppercase' }}>Estado Actual</p>
-                      <p className="status-current">{crop.status}</p>
-                      <p className="status-days">Día {daysAlive}</p>
-                    </div>
-                    <button onClick={() => advanceCropStatus(crop)} style={{ background: '#f1f5f9', color: '#334155', border: '1px solid #e2e8f0', padding: '8px 12px', borderRadius: '8px', cursor: 'pointer', fontSize: '0.8rem', fontWeight: 'bold' }}>
-                      Avanzar ⏭
-                    </button>
+                )}
+
+                <div className="flex gap-4">
+                  <div className="flex-1">
+                    <label className="text-sm font-semibold mb-1 block">Número de Bandejas</label>
+                    <input type="number" required min="1" className="premium-input w-full" style={{ padding: '0.75rem', borderRadius: '8px', border: '1px solid #cbd5e1' }} value={newCrop.traysCount} onChange={e=>setNewCrop({...newCrop, traysCount: Number(e.target.value)})}/>
                   </div>
                 </div>
-              );
-            })}
+
+                <div className="flex justify-end gap-2 mt-4">
+                  <button type="button" onClick={() => setIsSowModalOpen(false)} className="btn btn-secondary" style={{ padding: '0.75rem 1.5rem', borderRadius: '8px', border: '1px solid #cbd5e1', background: 'white' }}>Cancelar</button>
+                  <button type="submit" className="btn btn-primary" style={{ padding: '0.75rem 1.5rem', borderRadius: '8px', background: 'var(--crop-primary)', color: 'white', border: 'none', fontWeight: 'bold' }} disabled={selectedCropType && availableSeedBatches.length === 0}>
+                    {selectedCropType && availableSeedBatches.length === 0 ? 'Sin Stock de Semilla' : 'Plantar Cultivo'}
+                  </button>
+                </div>
+              </form>
+            </div>
           </div>
+        )}
+
+        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4 mt-6">
+          {activeCropsList.map(crop => {
+            const cType = cropTypes?.find(c => c.id === crop.cropTypeId);
+            const daysAlive = Math.floor((new Date() - new Date(crop.plantedAt || crop.datePlanted)) / (1000 * 60 * 60 * 24));
+            
+            return (
+              <div key={crop.id} className={`status-card \${crop.status}`}>
+                <div className="status-header">
+                  <div>
+                    <h4 className="status-title">{cType?.name || 'Desconocido'}</h4>
+                    <span className="status-batch">{crop.traysCount} Bandejas</span>
+                  </div>
+                  <button onClick={() => discardCrop(crop)} style={{ background: '#fee2e2', color: '#ef4444', border: 'none', padding: '4px 8px', borderRadius: '4px', cursor: 'pointer', fontSize: '0.75rem', fontWeight: 'bold' }}>Descartar</button>
+                </div>
+                
+                <div className="status-footer">
+                  <div>
+                    <p style={{ margin: '0 0 2px 0', fontSize: '0.65rem', fontWeight: 'bold', color: '#94a3b8', textTransform: 'uppercase' }}>Estado Actual</p>
+                    <p className="status-current">{crop.status}</p>
+                    <p className="status-days">Día {daysAlive >= 0 ? daysAlive : 0}</p>
+                  </div>
+                  <button onClick={() => advanceCropStatus(crop)} style={{ background: '#f1f5f9', color: '#334155', border: '1px solid #e2e8f0', padding: '8px 12px', borderRadius: '8px', cursor: 'pointer', fontSize: '0.8rem', fontWeight: 'bold' }}>
+                    Avanzar ⏭
+                  </button>
+                </div>
+              </div>
+            );
+          })}
+          {activeCropsList.length === 0 && (
+            <div className="col-span-full text-center py-12 bg-gray-50 rounded-xl border border-dashed border-gray-300">
+              <p className="text-gray-500">No hay cultivos activos. ¡Siembra tu primera bandeja!</p>
+            </div>
+          )}
         </div>
       </div>
     );
   };
 
   const renderCosechas = () => (
-    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-      <div className="premium-card" style={{ height: 'fit-content' }}>
-        <h3 className="premium-card-title">🔪 Registrar Cosecha y Envasado</h3>
-        <form onSubmit={handleRegisterHarvest} className="flex flex-col gap-4">
-          <div>
-            <label className="premium-label">¿Qué producto has envasado hoy?</label>
-            <select className="premium-input" required value={newHarvest.productId} onChange={e=>setNewHarvest({...newHarvest, productId: e.target.value})}>
-              <option value="">-- Seleccionar --</option>
-              {products?.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
-            </select>
-          </div>
-          <div>
-            <label className="premium-label">¿Cuántos tuppers en total han salido?</label>
-            <input type="number" className="premium-input" required min="1" value={newHarvest.tuppersCount} onChange={e=>setNewHarvest({...newHarvest, tuppersCount: e.target.value})}/>
-          </div>
-          <button type="submit" className="climate-btn" style={{ display: 'flex', justifyContent: 'center', gap: '0.5rem' }}>
-            🖨️ Registrar Cosecha e Imprimir Etiquetas
-          </button>
-        </form>
+    <div style={{ animation: 'fadeIn 0.3s ease' }}>
+      <div className="flex justify-between items-center mb-6">
+        <div>
+          <h2 className="text-2xl font-bold text-gray-800">🔪 Envasado y Sanidad</h2>
+          <p className="text-gray-500">Registra lo cosechado y genera etiquetas.</p>
+        </div>
+        <button onClick={() => setIsHarvestModalOpen(true)} className="btn btn-primary" style={{ background: '#0f172a', color: 'white', border: 'none', padding: '0.75rem 1.5rem', borderRadius: '8px', fontWeight: 'bold', cursor: 'pointer' }}>
+          + Registrar Cosecha
+        </button>
       </div>
 
-      <div className="premium-card">
+      {isHarvestModalOpen && (
+        <div style={modalOverlayStyle}>
+          <div style={modalCardStyle}>
+            <div className="flex justify-between items-center mb-4">
+              <h3 className="font-bold text-xl">🔪 Registrar Cosecha y Envasado</h3>
+              <button onClick={() => setIsHarvestModalOpen(false)} style={{ background: 'none', border: 'none', fontSize: '1.5rem', cursor: 'pointer' }}>&times;</button>
+            </div>
+            <form onSubmit={handleRegisterHarvest} className="flex flex-col gap-4">
+              <div>
+                <label className="text-sm font-semibold mb-1 block">¿Qué producto has envasado hoy?</label>
+                <select className="premium-input w-full" style={{ padding: '0.75rem', borderRadius: '8px', border: '1px solid #cbd5e1' }} required value={newHarvest.productId} onChange={e=>setNewHarvest({...newHarvest, productId: e.target.value})}>
+                  <option value="">-- Seleccionar --</option>
+                  {products?.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+                </select>
+              </div>
+              <div>
+                <label className="text-sm font-semibold mb-1 block">¿Cuántos tuppers en total han salido?</label>
+                <input type="number" className="premium-input w-full" style={{ padding: '0.75rem', borderRadius: '8px', border: '1px solid #cbd5e1' }} required min="1" value={newHarvest.tuppersCount} onChange={e=>setNewHarvest({...newHarvest, tuppersCount: e.target.value})}/>
+              </div>
+              <div className="flex justify-end gap-2 mt-4">
+                <button type="button" onClick={() => setIsHarvestModalOpen(false)} className="btn btn-secondary" style={{ padding: '0.75rem 1.5rem', borderRadius: '8px', border: '1px solid #cbd5e1', background: 'white' }}>Cancelar</button>
+                <button type="submit" className="btn btn-primary" style={{ background: '#0f172a', color: 'white', border: 'none', padding: '0.75rem 1.5rem', borderRadius: '8px', fontWeight: 'bold' }}>
+                  🖨️ Registrar e Imprimir
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      <div className="premium-card mt-6">
         <h3 className="premium-card-title">🏷️ Historial de Lotes de Sanidad</h3>
         <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
           {harvests?.slice().reverse().map(h => {
@@ -293,6 +238,9 @@ export default function Crops() {
               </div>
             )
           })}
+          {(!harvests || harvests.length === 0) && (
+            <p className="text-center text-gray-500 py-4">No hay cosechas registradas.</p>
+          )}
         </div>
       </div>
     </div>
@@ -361,7 +309,6 @@ export default function Crops() {
     </div>
   );
 
-
   const renderCropsHub = () => (
     <div className="hub-container" style={{ padding: '1rem', animation: 'fadeIn 0.3s ease' }}>
       <div className="hub-header" style={{ marginBottom: '3rem', textAlign: 'center' }}>
@@ -404,7 +351,6 @@ export default function Crops() {
       </div>
     </div>
   );
-
 
   const renderPedidos = () => {
     const handleStatusChange = (orderId, newStatus) => {
