@@ -134,6 +134,66 @@ export default function TvDashboard() {
           )}
         </div>
       )}
+
+      {tvTab === 'orders' && (
+        <div style={{ animation: 'fadeIn 0.4s ease' }}>
+          <div className="tasks-header" style={{ marginBottom: '3rem' }}>
+            <h2>Panel Logístico de Pedidos</h2>
+            <p style={{ color: '#94a3b8', fontSize: '1.25rem' }}>Estado en tiempo real de los envíos de hoy.</p>
+          </div>
+          
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '2rem' }}>
+            <div style={{ background: '#1e293b', borderRadius: '24px', padding: '2rem', border: '2px solid #334155' }}>
+              <h3 style={{ color: '#fbbf24', fontSize: '1.8rem', textAlign: 'center', marginBottom: '2rem' }}>🟡 PENDIENTES</h3>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                {orders?.filter(o => o.status === 'PENDING').map(o => {
+                  const client = clients?.find(c => c.id === o.clientId);
+                  return (
+                    <div key={o.id} style={{ background: '#0f172a', padding: '1.5rem', borderRadius: '16px', borderLeft: '6px solid #fbbf24' }}>
+                      <h4 style={{ color: 'white', fontSize: '1.3rem', margin: '0 0 0.5rem 0' }}>{client?.name || 'Desconocido'}</h4>
+                      <p style={{ color: '#94a3b8', margin: 0 }}>{o.items?.length || 0} productos</p>
+                    </div>
+                  );
+                })}
+                {(!orders || orders.filter(o => o.status === 'PENDING').length === 0) && <p style={{ textAlign: 'center', color: '#64748b' }}>No hay pedidos pendientes</p>}
+              </div>
+            </div>
+
+            <div style={{ background: '#1e293b', borderRadius: '24px', padding: '2rem', border: '2px solid #334155' }}>
+              <h3 style={{ color: '#38bdf8', fontSize: '1.8rem', textAlign: 'center', marginBottom: '2rem' }}>🔵 PREPARADOS</h3>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                {orders?.filter(o => o.status === 'PREPARED').map(o => {
+                  const client = clients?.find(c => c.id === o.clientId);
+                  return (
+                    <div key={o.id} style={{ background: '#0f172a', padding: '1.5rem', borderRadius: '16px', borderLeft: '6px solid #38bdf8' }}>
+                      <h4 style={{ color: 'white', fontSize: '1.3rem', margin: '0 0 0.5rem 0' }}>{client?.name || 'Desconocido'}</h4>
+                      <p style={{ color: '#94a3b8', margin: 0 }}>Listo para la furgoneta</p>
+                    </div>
+                  );
+                })}
+                {(!orders || orders.filter(o => o.status === 'PREPARED').length === 0) && <p style={{ textAlign: 'center', color: '#64748b' }}>Nada preparado ahora mismo</p>}
+              </div>
+            </div>
+
+            <div style={{ background: '#1e293b', borderRadius: '24px', padding: '2rem', border: '2px solid #334155' }}>
+              <h3 style={{ color: '#a855f7', fontSize: '1.8rem', textAlign: 'center', marginBottom: '2rem' }}>🟣 EN REPARTO</h3>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                {orders?.filter(o => o.status === 'IN_TRANSIT').map(o => {
+                  const client = clients?.find(c => c.id === o.clientId);
+                  return (
+                    <div key={o.id} style={{ background: '#0f172a', padding: '1.5rem', borderRadius: '16px', borderLeft: '6px solid #a855f7' }}>
+                      <h4 style={{ color: 'white', fontSize: '1.3rem', margin: '0 0 0.5rem 0' }}>{client?.name || 'Desconocido'}</h4>
+                      <p style={{ color: '#94a3b8', margin: 0 }}>En camino hacia el cliente</p>
+                    </div>
+                  );
+                })}
+                {(!orders || orders.filter(o => o.status === 'IN_TRANSIT').length === 0) && <p style={{ textAlign: 'center', color: '#64748b' }}>Ningún conductor en ruta</p>}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
     </div>
   );
 }
