@@ -26,13 +26,9 @@ export default function Crops() {
   const [newTarget, setNewTarget] = useState({ targetDayOfWeek: 1, productId: '', tuppersCount: 10 });
   const [newHarvest, setNewHarvest] = useState({ productId: '', tuppersCount: 1 });
 
-  // Computed properties for seed batch selection
+  // Computed properties for seed availability
   const selectedCropType = cropTypes?.find(c => c.id === newCrop.cropTypeId);
-  const availableSeedBatches = stockEntries?.filter(e => e.articleId === selectedCropType?.seedId && Number(e.remainingQuantity) > 0).sort((a,b) => new Date(a.purchaseDate) - new Date(b.purchaseDate)) || [];
-  
-  if (availableSeedBatches.length > 0 && !newCrop.selectedSeedBatchId) {
-    setNewCrop(prev => ({...prev, selectedSeedBatchId: availableSeedBatches[0].id}));
-  }
+  const totalAvailableSeed = stockEntries?.filter(e => e.articleId === selectedCropType?.seedId).reduce((acc, curr) => acc + Number(curr.quantity || 0), 0) || 0;
 
   const handleAddCrop = async (e) => { 
     e.preventDefault(); 
@@ -104,17 +100,9 @@ export default function Crops() {
                 
                 {selectedCropType && (
                   <div style={{ background: '#fffbeb', padding: '1rem', borderRadius: '8px', border: '1px solid #fde68a' }}>
-                    <label className="text-sm font-semibold mb-1 block text-amber-900">Lote Físico de Semilla a utilizar</label>
-                    <select className="premium-input w-full" style={{ padding: '0.75rem', borderRadius: '8px', border: '1px solid #fcd34d' }} value={newCrop.selectedSeedBatchId} onChange={e=>setNewCrop({...newCrop, selectedSeedBatchId: e.target.value})}>
-                      {availableSeedBatches.length === 0 && <option value="">No hay stock de esta semilla</option>}
-                      {availableSeedBatches.map((b, idx) => (
-                        <option key={b.id} value={b.id}>
-                          {idx === 0 ? '🟢 Lote Más Antiguo (Recomendado) - ' : '⚪ '}
-                          {new Date(b.purchaseDate).toLocaleDateString()} | Lote: {b.batchNumber || 'N/A'} | Quedan: {b.remainingQuantity}g
-                        </option>
-                      ))}
-                    </select>
-                    <p className="text-xs text-amber-700 mt-1">Si este lote no tiene suficientes gramos, se completará con el siguiente más antiguo.</p>
+                    <label className="text-sm font-semibold mb-1 block text-amber-900">Stock de Semilla Disponible</label>
+                    <p className="text-lg font-bold text-amber-800 m-0">{totalAvailableSeed.toFixed(2)} g disponibles</p>
+                    <p className="text-xs text-amber-700 mt-1">El sistema descontará {selectedCropType.seedGrams}g por cada bandeja automáticamente usando el método FIFO (primeras entradas, primeras salidas).</p>
                   </div>
                 )}
 
@@ -127,8 +115,8 @@ export default function Crops() {
 
                 <div className="flex justify-end gap-2 mt-4">
                   <button type="button" onClick={() => setIsSowModalOpen(false)} className="btn btn-secondary" style={{ padding: '0.75rem 1.5rem', borderRadius: '8px', border: '1px solid #cbd5e1', background: 'white' }}>Cancelar</button>
-                  <button type="submit" className="btn btn-primary" style={{ padding: '0.75rem 1.5rem', borderRadius: '8px', background: 'var(--crop-primary)', color: 'white', border: 'none', fontWeight: 'bold' }} disabled={selectedCropType && availableSeedBatches.length === 0}>
-                    {selectedCropType && availableSeedBatches.length === 0 ? 'Sin Stock de Semilla' : 'Plantar Cultivo'}
+                  <button type="submit" className="btn btn-primary" style={{ padding: '0.75rem 1.5rem', borderRadius: '8px', background: 'var(--crop-primary)', color: 'white', border: 'none', fontWeight: 'bold' }} disabled={selectedCropType && totalAvailableSeed <= 0}>
+                    {selectedCropType && totalAvailableSeed <= 0 ? 'Sin Stock de Semilla' : 'Plantar Cultivo'}
                   </button>
                 </div>
               </form>
