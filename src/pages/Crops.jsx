@@ -17,6 +17,10 @@ export default function Crops() {
   } = useData();
 
   const [activeTab, setActiveTab] = useState('menu');
+  const [sowTab, setSowTab] = useState('activos');
+  const [historySearch, setHistorySearch] = useState('');
+  const [historyPage, setHistoryPage] = useState(1);
+  const ITEMS_PER_PAGE = 10;
 
   // Modals state
   const [isSowModalOpen, setIsSowModalOpen] = useState(false);
@@ -132,155 +136,283 @@ export default function Crops() {
     return statusMap[normalized] || status;
   };
 
+  const renderHistorial = () => {
+    const historicalCrops = crops?.filter(c => c.status === 'HARVESTED' || c.status === 'DISCARDED') || [];
+    
+    const filteredHistory = historicalCrops.filter(crop => {
+      const cType = cropTypes?.find(c => c.id === crop.seedId || c.id === crop.cropTypeId);
+      const search = historySearch.toLowerCase();
+      const matchBatch = (crop.batchNumber || '').toLowerCase().includes(search);
+      const matchName = (cType?.name || '').toLowerCase().includes(search);
+      return matchBatch || matchName;
+    }).sort((a, b) => new Date(b.datePlanted || b.plantedAt) - new Date(a.datePlanted || a.plantedAt));
+
+    const totalPages = Math.ceil(filteredHistory.length / ITEMS_PER_PAGE);
+    const paginatedHistory = filteredHistory.slice((historyPage - 1) * ITEMS_PER_PAGE, historyPage * ITEMS_PER_PAGE);
+
+    return (
+      <div style={{ animation: 'fadeIn 0.3s ease' }}>
+        <div className="flex justify-between items-center mb-6 flex-wrap gap-4">
+          <div className="relative flex-1 min-w-[250px] max-w-md">
+            <span className="absolute inset-y-0 left-0 pl-3 flex items-center text-slate-400">
+              🔍
+            </span>
+            <input 
+              type="text" 
+              placeholder="Buscar por lote o cultivo..." 
+              className="premium-input w-full pl-10" 
+              style={{ padding: '0.75rem 1rem 0.75rem 2.5rem', borderRadius: '12px', border: '1px solid #cbd5e1' }}
+              value={historySearch}
+              onChange={(e) => { setHistorySearch(e.target.value); setHistoryPage(1); }}
+            />
+          </div>
+        </div>
+
+        <div className="premium-card" style={{ padding: 0, overflow: 'hidden' }}>
+          <div style={{ overflowX: 'auto' }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: '800px' }}>
+              <thead>
+                <tr style={{ backgroundColor: '#f8fafc', borderBottom: '2px solid #e2e8f0', color: '#475569', textAlign: 'left', fontSize: '0.85rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                  <th style={{ padding: '1.25rem 1.5rem', fontWeight: '700' }}>Lote / Siembra</th>
+                  <th style={{ padding: '1.25rem 1.5rem', fontWeight: '700' }}>Ficha de Cultivo</th>
+                  <th style={{ padding: '1.25rem 1.5rem', fontWeight: '700' }}>Fecha Siembra</th>
+                  <th style={{ padding: '1.25rem 1.5rem', fontWeight: '700', textAlign: 'center' }}>Bandejas</th>
+                  <th style={{ padding: '1.25rem 1.5rem', fontWeight: '700', textAlign: 'right' }}>Estado Final</th>
+                </tr>
+              </thead>
+              <tbody>
+                {paginatedHistory.map(crop => {
+                  const cType = cropTypes?.find(c => c.id === crop.seedId || c.id === crop.cropTypeId);
+                  const plantedDate = new Date(crop.datePlanted || crop.plantedAt).toLocaleDateString('es-ES', { year: 'numeric', month: 'short', day: 'numeric' });
+                  
+                  return (
+                    <tr key={crop.id} style={{ borderBottom: '1px solid #f1f5f9', transition: 'background 0.2s' }} className="hover:bg-slate-50">
+                      <td style={{ padding: '1.25rem 1.5rem', fontWeight: '600', color: '#0f172a' }}>{crop.batchNumber || 'N/A'}</td>
+                      <td style={{ padding: '1.25rem 1.5rem' }}>
+                        <div className="flex items-center gap-3">
+                          <div className="w-8 h-8 rounded-full bg-emerald-100 flex items-center justify-center text-emerald-600 font-bold text-xs">
+                            {(cType?.name || '?').charAt(0).toUpperCase()}
+                          </div>
+                          <span className="font-semibold text-slate-700">{cType?.name || 'Desconocido'}</span>
+                        </div>
+                      </td>
+                      <td style={{ padding: '1.25rem 1.5rem', color: '#64748b' }}>{plantedDate}</td>
+                      <td style={{ padding: '1.25rem 1.5rem', textAlign: 'center', fontWeight: 'bold', color: '#334155' }}>{crop.traysCount}</td>
+                      <td style={{ padding: '1.25rem 1.5rem', textAlign: 'right' }}>
+                        <span style={{ 
+                          padding: '6px 12px', borderRadius: '999px', fontSize: '0.8rem', fontWeight: 'bold', display: 'inline-flex', alignItems: 'center', gap: '4px',
+                          backgroundColor: crop.status === 'HARVESTED' ? '#dcfce7' : '#fee2e2',
+                          color: crop.status === 'HARVESTED' ? '#166534' : '#991b1b'
+                        }}>
+                          {crop.status === 'HARVESTED' ? '✅' : '🗑️'} {translateStatus(crop.status)}
+                        </span>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+            {paginatedHistory.length === 0 && (
+              <div style={{ textAlign: 'center', padding: '4rem 2rem', color: '#64748b' }}>
+                <div style={{ fontSize: '3rem', marginBottom: '1rem', opacity: 0.5 }}>📭</div>
+                <h3 className="text-xl font-bold mb-2">No hay resultados</h3>
+                <p>No se encontraron cultivos en el historial que coincidan con tu búsqueda.</p>
+              </div>
+            )}
+          </div>
+          
+          {totalPages > 1 && (
+            <div className="flex items-center justify-between px-6 py-4 border-t border-slate-200 bg-slate-50">
+              <span className="text-sm text-slate-500">Mostrando {(historyPage - 1) * ITEMS_PER_PAGE + 1} a {Math.min(historyPage * ITEMS_PER_PAGE, filteredHistory.length)} de {filteredHistory.length} resultados</span>
+              <div className="flex gap-2">
+                <button 
+                  onClick={() => setHistoryPage(p => Math.max(1, p - 1))} 
+                  disabled={historyPage === 1}
+                  className="px-3 py-1 rounded border border-slate-300 bg-white text-slate-600 disabled:opacity-50 hover:bg-slate-100 font-medium"
+                >Anterior</button>
+                <div className="flex gap-1">
+                  {Array.from({ length: totalPages }, (_, i) => i + 1).map(page => (
+                    <button 
+                      key={page} 
+                      onClick={() => setHistoryPage(page)}
+                      className={`w-8 h-8 rounded flex items-center justify-center font-medium ${historyPage === page ? 'bg-emerald-600 text-white' : 'border border-slate-300 bg-white text-slate-600 hover:bg-slate-100'}`}
+                    >
+                      {page}
+                    </button>
+                  ))}
+                </div>
+                <button 
+                  onClick={() => setHistoryPage(p => Math.min(totalPages, p + 1))} 
+                  disabled={historyPage === totalPages}
+                  className="px-3 py-1 rounded border border-slate-300 bg-white text-slate-600 disabled:opacity-50 hover:bg-slate-100 font-medium"
+                >Siguiente</button>
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+    );
+  };
+
   const renderLotes = () => {
     const activeCropsList = crops?.filter(c => c.status !== 'HARVESTED' && c.status !== 'DISCARDED') || [];
 
-    
     return (
       <div style={{ animation: 'fadeIn 0.3s ease' }}>
         <div className="flex justify-between items-center mb-6">
           <div>
-            <h2 className="text-2xl font-bold text-gray-800">🪴 Invernadero Activo</h2>
-            <p className="text-gray-500">Gestión de bandejas en curso.</p>
+            <h2 className="text-3xl font-black text-slate-800 tracking-tight">Gestión de Siembra</h2>
+            <p className="text-slate-500 text-lg mt-1">Supervisa y planta nuevas bandejas</p>
           </div>
-          <button onClick={() => setIsSowModalOpen(true)} className="btn btn-primary" style={{ background: 'var(--crop-primary)', color: 'white', border: 'none', padding: '0.75rem 1.5rem', borderRadius: '8px', fontWeight: 'bold', cursor: 'pointer' }}>
-            + Nueva Siembra
+          <button onClick={() => setIsSowModalOpen(true)} className="btn hover:-translate-y-1 transition-transform shadow-lg shadow-emerald-600/30" style={{ background: 'linear-gradient(135deg, #10b981, #059669)', color: 'white', border: 'none', padding: '0.875rem 1.5rem', borderRadius: '12px', fontWeight: 'bold', cursor: 'pointer', fontSize: '1rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+            <span style={{ fontSize: '1.2rem' }}>⊕</span> Registrar Siembra
+          </button>
+        </div>
+
+        {/* Tab Navigation */}
+        <div className="flex gap-2 mb-8 bg-slate-100 p-1 rounded-xl w-fit">
+          <button 
+            onClick={() => setSowTab('activos')}
+            className={`px-6 py-2.5 rounded-lg font-bold text-sm transition-all ${sowTab === 'activos' ? 'bg-white text-emerald-700 shadow-sm' : 'text-slate-500 hover:text-slate-700 hover:bg-slate-200/50'}`}
+          >
+            🪴 Bandejas Activas ({activeCropsList.length})
+          </button>
+          <button 
+            onClick={() => setSowTab('historico')}
+            className={`px-6 py-2.5 rounded-lg font-bold text-sm transition-all ${sowTab === 'historico' ? 'bg-white text-slate-800 shadow-sm' : 'text-slate-500 hover:text-slate-700 hover:bg-slate-200/50'}`}
+          >
+            📖 Histórico de Siembras
           </button>
         </div>
 
         {isSowModalOpen && (
           <div style={modalOverlayStyle}>
-            <div style={modalCardStyle}>
-              <div className="flex justify-between items-center mb-4">
-                <h3 className="font-bold text-xl">🪴 Sembrar / Remojar</h3>
-                <button onClick={() => setIsSowModalOpen(false)} style={{ background: 'none', border: 'none', fontSize: '1.5rem', cursor: 'pointer' }}>&times;</button>
+            <div style={{ ...modalCardStyle, maxWidth: '500px', padding: 0, overflow: 'hidden' }}>
+              <div style={{ background: 'linear-gradient(135deg, #10b981, #059669)', padding: '1.5rem', color: 'white' }} className="flex justify-between items-center">
+                <div className="flex items-center gap-3">
+                  <div className="bg-white/20 p-2 rounded-lg text-2xl">🌱</div>
+                  <div>
+                    <h3 className="font-bold text-xl m-0">Registrar Siembra</h3>
+                    <p className="text-emerald-100 text-sm m-0">Añade nuevas bandejas al invernadero</p>
+                  </div>
+                </div>
+                <button onClick={() => setIsSowModalOpen(false)} style={{ background: 'none', border: 'none', color: 'white', fontSize: '1.5rem', cursor: 'pointer', opacity: 0.8 }} className="hover:opacity-100 transition-opacity">&times;</button>
               </div>
-              <form onSubmit={handleAddCrop} className="flex flex-col gap-4">
-                <div>
-                  <label className="text-sm font-semibold mb-1 block">Tipo de Cultivo (Ficha)</label>
-                  <select className="premium-input w-full" style={{ padding: '0.75rem', borderRadius: '8px', border: '1px solid #cbd5e1' }} required value={newCrop.cropTypeId} onChange={e=>setNewCrop({...newCrop, cropTypeId: e.target.value, selectedSeedBatchId: ''})}>
-                    <option value="">Selecciona...</option>
-                    {cropTypes?.map(c => (
-                      <option key={c.id} value={c.id}>{c.name}</option>
-                    ))}
-                  </select>
-                </div>
-                
-                {selectedCropType && (
-                  <div style={{ background: '#fffbeb', padding: '1rem', borderRadius: '8px', border: '1px solid #fde68a' }}>
-                    <label className="text-sm font-semibold mb-1 block text-amber-900">Stock de Semilla Disponible</label>
-                    <p className="text-lg font-bold text-amber-800 m-0">
-                      {totalAvailableSeed.toFixed(2)} g disponibles 
-                      {selectedCropType.seedGrams > 0 && ` (Máx. ${Math.floor(totalAvailableSeed / selectedCropType.seedGrams)} bandejas)`}
-                    </p>
-                    <p className="text-xs text-amber-700 mt-1">El sistema descontará {selectedCropType.seedGrams}g por cada bandeja automáticamente usando el método FIFO (primeras entradas, primeras salidas).</p>
+              <div style={{ padding: '2rem' }}>
+                <form onSubmit={handleAddCrop} className="flex flex-col gap-5">
+                  <div>
+                    <label className="text-sm font-bold mb-2 block text-slate-700">1. ¿Qué vas a plantar?</label>
+                    <select className="premium-input w-full" style={{ padding: '1rem', borderRadius: '12px', border: '2px solid #e2e8f0', background: '#f8fafc', fontSize: '1rem', fontWeight: '500' }} required value={newCrop.cropTypeId} onChange={e=>setNewCrop({...newCrop, cropTypeId: e.target.value, selectedSeedBatchId: ''})}>
+                      <option value="">Selecciona una variedad...</option>
+                      {cropTypes?.map(c => (
+                        <option key={c.id} value={c.id}>{c.name}</option>
+                      ))}
+                    </select>
                   </div>
-                )}
+                  
+                  {selectedCropType && (
+                    <div style={{ background: '#f0fdf4', padding: '1.25rem', borderRadius: '12px', border: '1px solid #bbf7d0', display: 'flex', gap: '1rem', alignItems: 'flex-start' }}>
+                      <div className="text-2xl mt-1">📦</div>
+                      <div>
+                        <label className="text-xs font-bold uppercase tracking-wider text-green-800 block mb-1">Inventario Disponible</label>
+                        <p className="text-xl font-black text-green-900 m-0">
+                          {totalAvailableSeed.toFixed(2)} g 
+                          {selectedCropType.seedGrams > 0 && <span className="text-sm font-semibold text-green-700 ml-2">(Max. {Math.floor(totalAvailableSeed / selectedCropType.seedGrams)} bandejas)</span>}
+                        </p>
+                        <p className="text-xs text-green-700 mt-1 leading-relaxed">El sistema descontará automáticamente {selectedCropType.seedGrams}g por cada bandeja empleando el método FIFO.</p>
+                      </div>
+                    </div>
+                  )}
 
-                <div className="flex gap-4">
-                  <div className="flex-1">
-                    <label className="text-sm font-semibold mb-1 block">Número de Bandejas</label>
-                    <input type="number" required min="1" className="premium-input w-full" style={{ padding: '0.75rem', borderRadius: '8px', border: '1px solid #cbd5e1' }} value={newCrop.traysCount} onChange={e=>setNewCrop({...newCrop, traysCount: Number(e.target.value)})}/>
+                  <div>
+                    <label className="text-sm font-bold mb-2 block text-slate-700">2. ¿Cuántas bandejas son?</label>
+                    <input type="number" required min="1" className="premium-input w-full text-center" style={{ padding: '1rem', borderRadius: '12px', border: '2px solid #e2e8f0', fontSize: '1.5rem', fontWeight: '900', color: '#0f172a' }} value={newCrop.traysCount} onChange={e=>setNewCrop({...newCrop, traysCount: Number(e.target.value)})}/>
                   </div>
-                </div>
 
-                <div className="flex justify-end gap-2 mt-4">
-                  <button type="button" onClick={() => setIsSowModalOpen(false)} className="btn btn-secondary" style={{ padding: '0.75rem 1.5rem', borderRadius: '8px', border: '1px solid #cbd5e1', background: 'white' }}>Cancelar</button>
-                  <button type="submit" className="btn btn-primary" style={{ padding: '0.75rem 1.5rem', borderRadius: '8px', background: 'var(--crop-primary)', color: 'white', border: 'none', fontWeight: 'bold' }} disabled={selectedCropType && totalAvailableSeed <= 0}>
-                    {selectedCropType && totalAvailableSeed <= 0 ? 'Sin Stock de Semilla' : 'Plantar Cultivo'}
-                  </button>
-                </div>
-              </form>
+                  <div className="flex gap-3 mt-4">
+                    <button type="button" onClick={() => setIsSowModalOpen(false)} className="flex-1 py-3 px-4 rounded-xl border-2 border-slate-200 text-slate-600 font-bold hover:bg-slate-50 transition-colors">Cancelar</button>
+                    <button type="submit" className="flex-1 py-3 px-4 rounded-xl text-white font-bold transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-lg" style={{ background: 'linear-gradient(135deg, #10b981, #059669)', border: 'none' }} disabled={selectedCropType && totalAvailableSeed <= 0}>
+                      {selectedCropType && totalAvailableSeed <= 0 ? 'Sin Semilla' : 'Confirmar Siembra'}
+                    </button>
+                  </div>
+                </form>
+              </div>
             </div>
           </div>
         )}
 
-        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4 mt-6">
-          {activeCropsList.map(crop => {
-            const cType = cropTypes?.find(c => c.id === crop.seedId || c.id === crop.cropTypeId);
-            const daysAlive = Math.floor((new Date() - new Date(crop.datePlanted || crop.plantedAt)) / (1000 * 60 * 60 * 24));
-            
-            return (
-              <div key={crop.id} className={`status-card \${crop.status}`}>
-                <div className="status-header">
-                  <div>
-                    <h4 className="status-title">{cType?.name || 'Desconocido'}</h4>
-                    <span className="status-batch">{crop.traysCount} Bandejas</span>
+        {sowTab === 'activos' && (
+          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
+            {activeCropsList.map(crop => {
+              const cType = cropTypes?.find(c => c.id === crop.seedId || c.id === crop.cropTypeId);
+              const daysAlive = Math.floor((new Date() - new Date(crop.datePlanted || crop.plantedAt)) / (1000 * 60 * 60 * 24));
+              const expectedDays = cType?.daysToHarvest || 14;
+              const progressPercentage = Math.min(100, Math.max(0, (daysAlive / expectedDays) * 100));
+              
+              return (
+                <div key={crop.id} className={`bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-sm hover:shadow-md transition-shadow flex flex-col`}>
+                  <div className="p-5 border-b border-slate-100 flex justify-between items-start">
+                    <div className="flex gap-4 items-center">
+                      <div className="w-12 h-12 rounded-xl bg-emerald-50 text-emerald-500 flex items-center justify-center font-black text-xl border border-emerald-100">
+                        {cType?.name ? cType.name.charAt(0).toUpperCase() : '🌱'}
+                      </div>
+                      <div>
+                        <h4 className="font-bold text-slate-800 text-lg m-0">{cType?.name || 'Desconocido'}</h4>
+                        <span className="text-xs font-bold bg-slate-100 text-slate-600 px-2 py-0.5 rounded-full mt-1 inline-block border border-slate-200">{crop.batchNumber || 'N/A'}</span>
+                      </div>
+                    </div>
+                    <div className="text-right">
+                      <span className="text-2xl font-black text-emerald-600 block leading-none">{crop.traysCount}</span>
+                      <span className="text-xs font-bold text-slate-400 uppercase tracking-wide">Bandejas</span>
+                    </div>
                   </div>
-                  <button onClick={() => discardCrop(crop)} style={{ background: '#fee2e2', color: '#ef4444', border: 'none', padding: '4px 8px', borderRadius: '4px', cursor: 'pointer', fontSize: '0.75rem', fontWeight: 'bold' }}>Descartar</button>
-                </div>
-                
-                <div className="status-footer">
-                  <div>
-                    <p style={{ margin: '0 0 2px 0', fontSize: '0.65rem', fontWeight: 'bold', color: '#94a3b8', textTransform: 'uppercase' }}>Estado Actual</p>
-                    <p className="status-current">{translateStatus(crop.status)}</p>
-                    <p className="status-days">Día {daysAlive >= 0 ? daysAlive : 0}</p>
+                  
+                  <div className="p-5 flex-1 flex flex-col justify-between gap-4">
+                    <div>
+                      <div className="flex justify-between items-end mb-2">
+                        <div>
+                          <p className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">Estado</p>
+                          <p className="font-bold text-slate-700 m-0">{translateStatus(crop.status)}</p>
+                        </div>
+                        <div className="text-right">
+                          <p className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">Progreso</p>
+                          <p className="font-black text-emerald-600 m-0 text-xl">{daysAlive >= 0 ? daysAlive : 0} <span className="text-sm text-slate-400 font-bold">/ {expectedDays} d</span></p>
+                        </div>
+                      </div>
+                      
+                      {/* Progress bar */}
+                      <div className="w-full bg-slate-100 rounded-full h-2.5 overflow-hidden">
+                        <div className="bg-emerald-500 h-2.5 rounded-full" style={{ width: `${progressPercentage}%` }}></div>
+                      </div>
+                    </div>
+
+                    <div className="flex gap-2 mt-2">
+                      <button onClick={() => discardCrop(crop)} className="flex-1 py-2 rounded-lg font-bold text-xs border border-red-200 text-red-600 hover:bg-red-50 transition-colors">
+                        Descartar
+                      </button>
+                      <button onClick={() => advanceCropStatus(crop)} className="flex-[2] py-2 rounded-lg font-bold text-sm bg-slate-800 text-white hover:bg-slate-700 transition-colors shadow-md">
+                        Avanzar Fase ⏭
+                      </button>
+                    </div>
                   </div>
-                  <button onClick={() => advanceCropStatus(crop)} style={{ background: '#f1f5f9', color: '#334155', border: '1px solid #e2e8f0', padding: '8px 12px', borderRadius: '8px', cursor: 'pointer', fontSize: '0.8rem', fontWeight: 'bold' }}>
-                    Avanzar ⏭
-                  </button>
                 </div>
+              );
+            })}
+            {activeCropsList.length === 0 && (
+              <div className="col-span-full flex flex-col items-center justify-center py-16 bg-white rounded-2xl border-2 border-dashed border-slate-200">
+                <div className="text-5xl mb-4 opacity-50">🪴</div>
+                <h3 className="text-xl font-bold text-slate-700 mb-2">Invernadero Vacío</h3>
+                <p className="text-slate-500 mb-6 text-center max-w-md">No tienes ninguna bandeja creciendo actualmente. Registra tu primera siembra para empezar.</p>
+                <button onClick={() => setIsSowModalOpen(true)} className="btn btn-primary shadow-lg shadow-emerald-600/20" style={{ background: '#10b981', color: 'white', border: 'none', padding: '0.75rem 1.5rem', borderRadius: '12px', fontWeight: 'bold' }}>
+                  Hacer una Siembra
+                </button>
               </div>
-            );
-          })}
-          {activeCropsList.length === 0 && (
-            <div className="col-span-full text-center py-12 bg-gray-50 rounded-xl border border-dashed border-gray-300">
-              <p className="text-gray-500">No hay cultivos activos. ¡Siembra tu primera bandeja!</p>
-            </div>
-          )}
-        </div>
-
-        <div className="mt-12">
-          <div className="flex justify-between items-center mb-6">
-            <div>
-              <h2 className="text-2xl font-bold text-slate-800">📖 Histórico de Siembras</h2>
-              <p className="text-slate-500">Consulta los cultivos que ya han finalizado su ciclo.</p>
-            </div>
+            )}
           </div>
+        )}
 
-          <div className="premium-card">
-            <div style={{ overflowX: 'auto' }}>
-              <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: '600px' }}>
-                <thead>
-                  <tr style={{ borderBottom: '2px solid var(--color-border)', color: '#64748b', textAlign: 'left' }}>
-                    <th style={{ padding: '1rem', fontWeight: '600' }}>Lote / Siembra</th>
-                    <th style={{ padding: '1rem', fontWeight: '600' }}>Ficha de Cultivo</th>
-                    <th style={{ padding: '1rem', fontWeight: '600' }}>Fecha Siembra</th>
-                    <th style={{ padding: '1rem', fontWeight: '600' }}>Bandejas</th>
-                    <th style={{ padding: '1rem', fontWeight: '600' }}>Estado Final</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {(crops?.filter(c => c.status === 'HARVESTED' || c.status === 'DISCARDED') || []).map(crop => {
-                    const cType = cropTypes?.find(c => c.id === crop.seedId || c.id === crop.cropTypeId);
-                    const plantedDate = new Date(crop.datePlanted || crop.plantedAt).toLocaleDateString();
-                    
-                    return (
-                      <tr key={crop.id} style={{ borderBottom: '1px solid var(--color-border)' }}>
-                        <td style={{ padding: '1rem', fontWeight: '500' }}>{crop.batchNumber || 'N/A'}</td>
-                        <td style={{ padding: '1rem' }}>{cType?.name || 'Desconocido'}</td>
-                        <td style={{ padding: '1rem' }}>{plantedDate}</td>
-                        <td style={{ padding: '1rem' }}>{crop.traysCount}</td>
-                        <td style={{ padding: '1rem' }}>
-                          <span style={{ 
-                            padding: '4px 8px', borderRadius: '4px', fontSize: '0.85rem', fontWeight: 'bold',
-                            backgroundColor: crop.status === 'HARVESTED' ? '#dcfce7' : '#fee2e2',
-                            color: crop.status === 'HARVESTED' ? '#166534' : '#991b1b'
-                          }}>
-                            {translateStatus(crop.status)}
-                          </span>
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-              {(crops?.filter(c => c.status === 'HARVESTED' || c.status === 'DISCARDED') || []).length === 0 && (
-                <p style={{ textAlign: 'center', padding: '2rem', color: '#94a3b8' }}>No hay registros en el historial.</p>
-              )}
-            </div>
-          </div>
-        </div>
+        {sowTab === 'historico' && renderHistorial()}
+
       </div>
     );
   };
@@ -506,43 +638,43 @@ export default function Crops() {
   );
 
   const renderCropsHub = () => (
-    <div className="hub-container" style={{ padding: '1rem', animation: 'fadeIn 0.3s ease' }}>
-      <div className="hub-header" style={{ marginBottom: '3rem', textAlign: 'center' }}>
-        <h1 style={{ fontSize: '2.5rem', marginBottom: '1rem', color: '#1e293b' }}>🌱 Central del Invernadero</h1>
-        <p style={{ color: '#64748b', fontSize: '1.2rem' }}>Selecciona tu zona de trabajo</p>
+    <div className="hub-container" style={{ padding: '2rem', animation: 'fadeIn 0.4s ease', maxWidth: '1000px', margin: '0 auto' }}>
+      <div className="hub-header" style={{ marginBottom: '4rem', textAlign: 'center', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+        <h1 style={{ fontSize: '3rem', margin: '0 0 0.5rem 0', color: '#0f172a', fontWeight: '900', letterSpacing: '-0.05em' }}>Control de Cultivo</h1>
+        <p style={{ color: '#64748b', fontSize: '1.25rem', margin: 0 }}>Selecciona tu zona de trabajo para gestionar el invernadero</p>
       </div>
       
-      <div className="hub-grid">
-        <button onClick={() => setActiveTab('tareas')} className="hub-card crops-card" style={{ border: 'none', width: '100%' }}>
-          <div className="hub-card-icon" style={{ fontSize: '3.5rem' }}>🎯</div>
-          <div className="hub-card-text">
-            <h2 style={{ fontSize: '1.5rem' }}>Tareas</h2>
-            <p style={{ fontSize: '1rem' }}>Día / Semana / Mes</p>
+      <div className="hub-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1.5rem' }}>
+        <button onClick={() => setActiveTab('tareas')} className="hub-card crops-card" style={{ border: 'none', width: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '2.5rem 1rem', background: 'white', borderRadius: '24px', boxShadow: '0 10px 25px -5px rgba(0,0,0,0.05), 0 8px 10px -6px rgba(0,0,0,0.01)', transition: 'all 0.3s ease' }}>
+          <div className="hub-card-text" style={{ textAlign: 'center', marginBottom: '1.5rem' }}>
+            <h2 style={{ fontSize: '1.75rem', fontWeight: '800', color: '#1e293b', margin: '0 0 0.5rem 0' }}>Tareas</h2>
+            <p style={{ fontSize: '1rem', color: '#64748b', margin: 0 }}>Día / Semana / Mes</p>
           </div>
+          <div className="hub-card-icon" style={{ fontSize: '4rem', background: '#fef2f2', width: '80px', height: '80px', display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: '50%' }}>🎯</div>
         </button>
 
-        <button onClick={() => setActiveTab('lotes')} className="hub-card tv-card" style={{ border: 'none', width: '100%' }}>
-          <div className="hub-card-icon" style={{ fontSize: '3.5rem' }}>🪴</div>
-          <div className="hub-card-text">
-            <h2 style={{ fontSize: '1.5rem' }}>Siembra</h2>
-            <p style={{ fontSize: '1rem' }}>Bandejas en curso</p>
+        <button onClick={() => setActiveTab('lotes')} className="hub-card tv-card" style={{ border: 'none', width: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '2.5rem 1rem', background: 'white', borderRadius: '24px', boxShadow: '0 10px 25px -5px rgba(0,0,0,0.05), 0 8px 10px -6px rgba(0,0,0,0.01)', transition: 'all 0.3s ease' }}>
+          <div className="hub-card-text" style={{ textAlign: 'center', marginBottom: '1.5rem' }}>
+            <h2 style={{ fontSize: '1.75rem', fontWeight: '800', color: '#1e293b', margin: '0 0 0.5rem 0' }}>Siembra</h2>
+            <p style={{ fontSize: '1rem', color: '#64748b', margin: 0 }}>Bandejas en curso</p>
           </div>
+          <div className="hub-card-icon" style={{ fontSize: '4rem', background: '#f0fdf4', width: '80px', height: '80px', display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: '50%' }}>🪴</div>
         </button>
 
-        <button onClick={() => setActiveTab('cosechas')} className="hub-card admin-card" style={{ border: 'none', width: '100%' }}>
-          <div className="hub-card-icon" style={{ fontSize: '3.5rem' }}>🔪</div>
-          <div className="hub-card-text">
-            <h2 style={{ fontSize: '1.5rem' }}>Cosecha</h2>
-            <p style={{ fontSize: '1rem' }}>Envasado y etiquetas</p>
+        <button onClick={() => setActiveTab('cosechas')} className="hub-card admin-card" style={{ border: 'none', width: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '2.5rem 1rem', background: 'white', borderRadius: '24px', boxShadow: '0 10px 25px -5px rgba(0,0,0,0.05), 0 8px 10px -6px rgba(0,0,0,0.01)', transition: 'all 0.3s ease' }}>
+          <div className="hub-card-text" style={{ textAlign: 'center', marginBottom: '1.5rem' }}>
+            <h2 style={{ fontSize: '1.75rem', fontWeight: '800', color: '#1e293b', margin: '0 0 0.5rem 0' }}>Cosecha</h2>
+            <p style={{ fontSize: '1rem', color: '#64748b', margin: 0 }}>Envasado y etiquetas</p>
           </div>
+          <div className="hub-card-icon" style={{ fontSize: '4rem', background: '#f8fafc', width: '80px', height: '80px', display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: '50%' }}>🔪</div>
         </button>
 
-        <button onClick={() => setActiveTab('planificador')} className="hub-card driver-card" style={{ border: 'none', width: '100%' }}>
-          <div className="hub-card-icon" style={{ fontSize: '3.5rem' }}>📅</div>
-          <div className="hub-card-text">
-            <h2 style={{ fontSize: '1.5rem' }}>Planificador</h2>
-            <p style={{ fontSize: '1rem' }}>Rutinas automáticas</p>
+        <button onClick={() => setActiveTab('planificador')} className="hub-card driver-card" style={{ border: 'none', width: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '2.5rem 1rem', background: 'white', borderRadius: '24px', boxShadow: '0 10px 25px -5px rgba(0,0,0,0.05), 0 8px 10px -6px rgba(0,0,0,0.01)', transition: 'all 0.3s ease' }}>
+          <div className="hub-card-text" style={{ textAlign: 'center', marginBottom: '1.5rem' }}>
+            <h2 style={{ fontSize: '1.75rem', fontWeight: '800', color: '#1e293b', margin: '0 0 0.5rem 0' }}>Planificador</h2>
+            <p style={{ fontSize: '1rem', color: '#64748b', margin: 0 }}>Rutinas automáticas</p>
           </div>
+          <div className="hub-card-icon" style={{ fontSize: '4rem', background: '#eff6ff', width: '80px', height: '80px', display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: '50%' }}>📅</div>
         </button>
       </div>
     </div>
