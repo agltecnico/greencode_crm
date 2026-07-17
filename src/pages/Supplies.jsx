@@ -5,7 +5,7 @@ import { usePagination } from '../hooks/usePagination';
 export default function Supplies() {
   const { 
     providers, 
-    articles, addArticle, deleteArticle,
+    articles, addArticle, updateArticle, deleteArticle,
     stockEntries, addStockEntry, deleteStockEntry,
     cropTypes, addCropType, deleteCropType
   } = useData();
@@ -20,6 +20,8 @@ export default function Supplies() {
 
   // Forms State
   const [newArticle, setNewArticle] = useState({ name: '', type: 'SEMILLA' });
+  const [editingArticleId, setEditingArticleId] = useState(null);
+  const [editedArticle, setEditedArticle] = useState(null);
   const [newStockEntry, setNewStockEntry] = useState({ purchaseDate: new Date().toISOString().split('T')[0], deliveryNote: '', batchNumber: '', articleId: '', providerId: '', quantity: 1, price: 0 });
   
   const [newType, setNewType] = useState({
@@ -171,11 +173,39 @@ export default function Supplies() {
               </thead>
               <tbody>
                 {paginatedArticles.map(a => (
-                  <tr key={a.id}>
-                    <td className="font-medium text-slate-500">{getTypeLabel(a.type)}</td>
-                    <td className="font-bold text-slate-800">{a.name}</td>
-                    <td><button className="btn btn-danger" style={{ padding: '0.3rem 0.6rem', fontSize: '0.8rem', background: 'transparent', color: '#ef4444', border: '1px solid #ef4444' }} onClick={() => deleteArticle(a.id)}>Borrar</button></td>
-                  </tr>
+                  editingArticleId === a.id ? (
+                    <tr key={a.id}>
+                      <td>
+                        <select className="form-control" value={editedArticle.type} onChange={e => setEditedArticle({...editedArticle, type: e.target.value})}>
+                          <option value="SEMILLA">🌱 Semilla (Stock y Gasto)</option>
+                          <option value="SUSTRATO">🪨 Sustrato (Stock y Gasto)</option>
+                          <option value="ENVASE">📦 Envase / Bandeja (Stock y Gasto)</option>
+                          <option value="OTRO">🏷️ Consumible (Stock y Gasto)</option>
+                          <option value="GASTO_FIJO">💸 Gasto General / Servicio (SOLO GASTO)</option>
+                        </select>
+                      </td>
+                      <td>
+                        <input type="text" className="form-control" value={editedArticle.name} onChange={e => setEditedArticle({...editedArticle, name: e.target.value})} />
+                      </td>
+                      <td>
+                        <div style={{ display: 'flex', gap: '0.5rem' }}>
+                          <button className="btn btn-primary" style={{ padding: '0.3rem 0.6rem', fontSize: '0.8rem' }} onClick={() => { updateArticle(a.id, editedArticle); setEditingArticleId(null); }}>Guardar</button>
+                          <button className="btn btn-secondary" style={{ padding: '0.3rem 0.6rem', fontSize: '0.8rem', background: 'transparent' }} onClick={() => setEditingArticleId(null)}>Cancelar</button>
+                        </div>
+                      </td>
+                    </tr>
+                  ) : (
+                    <tr key={a.id}>
+                      <td className="font-medium text-slate-500">{getTypeLabel(a.type)}</td>
+                      <td className="font-bold text-slate-800">{a.name}</td>
+                      <td>
+                        <div style={{ display: 'flex', gap: '0.5rem' }}>
+                          <button className="btn btn-secondary" style={{ padding: '0.3rem 0.6rem', fontSize: '0.8rem', background: 'transparent' }} onClick={() => { setEditingArticleId(a.id); setEditedArticle(a); }}>Editar</button>
+                          <button className="btn btn-danger" style={{ padding: '0.3rem 0.6rem', fontSize: '0.8rem', background: 'transparent', color: '#ef4444', border: '1px solid #ef4444' }} onClick={() => deleteArticle(a.id)}>Borrar</button>
+                        </div>
+                      </td>
+                    </tr>
+                  )
                 ))}
               </tbody>
             </table>
