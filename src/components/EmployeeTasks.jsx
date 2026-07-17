@@ -174,9 +174,9 @@ export default function EmployeeTasks() {
           {timeFilter === 1 ? (
             // TODAY VIEW (Detailed)
             allTasks.map((dayGroup, idx) => (
-              <React.Fragment key={idx}>
+              <div key={idx}>
                 {renderDetailedDay(dayGroup)}
-              </React.Fragment>
+              </div>
             ))
           ) : (
             // CALENDAR GRID VIEW (7 or 30 days)
