@@ -65,7 +65,7 @@ export default function TvDashboard() {
             transition: 'all 0.3s ease',
             boxShadow: tvTab === 'greenhouse' ? '0 10px 25px rgba(52, 211, 153, 0.3)' : 'none'
           }}>
-          🪴 INVERNADERO ACTIVO
+          🌱 CULTIVOS ACTIVOS
         </button>
 
         <button 
