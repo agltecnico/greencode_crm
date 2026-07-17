@@ -34,11 +34,11 @@ export default function EmployeeTasks() {
       planted.setHours(0,0,0,0);
       const daysSincePlanted = Math.floor((targetDate - planted) / (1000 * 60 * 60 * 24));
       
-      const soakOffset = seed.soakingHours > 0 ? 1 : 0;
+      const soakOffset = (cType?.soakingHours || 0) > 0 ? 1 : 0;
       const germDay = soakOffset;
-      const darkDay = soakOffset + Number(seed.germinationDays);
-      const lightDay = soakOffset + Number(seed.germinationDays) + Number(seed.darknessDays);
-      const harvestDay = soakOffset + Number(seed.germinationDays) + Number(seed.darknessDays) + Number(seed.lightDays);
+      const darkDay = soakOffset + Number((cType?.germinationDays || 0));
+      const lightDay = soakOffset + Number((cType?.germinationDays || 0)) + Number((cType?.darknessDays || 0));
+      const harvestDay = soakOffset + Number((cType?.germinationDays || 0)) + Number((cType?.darknessDays || 0)) + Number((cType?.lightDays || 0));
 
       let action = null;
       let phaseStr = '';
@@ -91,7 +91,7 @@ export default function EmployeeTasks() {
         });
       }
       
-      if(seed.soakingHours > 0) {
+      if((cType?.soakingHours || 0) > 0) {
         let soakingDay = routine.targetDayOfWeek - 1;
         if(soakingDay < 0) soakingDay += 7;
         
@@ -99,7 +99,7 @@ export default function EmployeeTasks() {
           tasksForDate.push({
             type: 'soak',
             title: `Poner a remojo ${seed.name}`,
-            desc: `${seed.soakingHours}h de remojo para las ${routine.tuppersCount} bandejas de mañana.`,
+            desc: `${(cType?.soakingHours || 0)}h de remojo para las ${routine.tuppersCount} bandejas de mañana.`,
             icon: '💧',
             className: 'soak'
           });
