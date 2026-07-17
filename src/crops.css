@@ -568,3 +568,7 @@
   color: #f8fafc;
   border-color: #475569;
 }
+
+@media (min-width: 1280px) {
+  .xl\:grid-cols-4 { grid-template-columns: repeat(4, 1fr); }
+}
