@@ -18,10 +18,12 @@ export default function Invoices() {
   const [sharePhone, setSharePhone] = useState('');
   const [shareEmail, setShareEmail] = useState('');
 
-  // Get unbilled notes for selected client
   const clientUnbilledNotes = deliveryNotes.filter(
     dn => dn.clientId === selectedClientId && dn.status === 'UNBILLED'
   );
+
+  const modalOverlayStyle = { position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 50 };
+  const modalCardStyle = { width: '100%', maxWidth: '900px', margin: '20px', maxHeight: '90vh', overflowY: 'auto', backgroundColor: '#fff', padding: '2rem', borderRadius: '8px', border: '1px solid var(--color-border)' };
 
   const handleSelectClient = (e) => {
     setSelectedClientId(e.target.value);
@@ -194,17 +196,24 @@ export default function Invoices() {
   });
 
   return (
-    <div>
-      <div className="flex justify-between items-center mb-6">
-        <h2 className="text-2xl font-bold">Facturación</h2>
-        <button className="btn btn-primary" onClick={() => setIsAdding(!isAdding)}>
-          {isAdding ? 'Cancelar' : '+ Nueva Factura'}
+    <div className="admin-container">
+      <div className="admin-header" style={{ marginBottom: '1.5rem' }}>
+        <div>
+          <h2 className="text-2xl font-bold">Facturación</h2>
+          <p className="text-muted" style={{ marginTop: '0.25rem' }}>Emisión de facturas y control de pagos.</p>
+        </div>
+        <button className="btn btn-primary shadow-sm" onClick={() => setIsAdding(true)}>
+          + Nueva Factura
         </button>
       </div>
 
       {isAdding && (
-        <div className="card mb-6">
-          <h3 className="font-bold mb-4">Agrupar Albaranes</h3>
+        <div style={modalOverlayStyle}>
+          <div style={modalCardStyle}>
+            <div className="flex justify-between items-center mb-4">
+              <h3 className="font-bold text-xl">Generar Factura / Albarán Resumen</h3>
+              <button className="btn btn-secondary" style={{ padding: '0.2rem 0.6rem' }} onClick={() => setIsAdding(false)}>Cerrar</button>
+            </div>
           
           <div className="flex gap-4 mb-4">
             <label className="flex items-center gap-2 cursor-pointer p-3 border rounded-md" style={{ borderColor: documentType === 'INVOICE' ? 'var(--color-primary)' : 'var(--color-border)', backgroundColor: documentType === 'INVOICE' ? 'rgba(99,102,241,0.05)' : 'transparent' }}>
@@ -327,7 +336,8 @@ export default function Invoices() {
                 </div>
               )}
 
-              <div className="flex justify-end">
+              <div className="flex justify-end gap-3">
+                <button className="btn btn-secondary" onClick={() => setIsAdding(false)}>Cancelar</button>
                 <button 
                   className="btn btn-primary" 
                   disabled={selectedNotes.length === 0}
@@ -339,9 +349,10 @@ export default function Invoices() {
             </div>
           )}
         </div>
+        </div>
       )}
 
-      <div className="card">
+      <div>
 
         <div className="flex gap-2 mb-4" style={{ borderBottom: '1px solid var(--color-border)', paddingBottom: '10px' }}>
           <button 

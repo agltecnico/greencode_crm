@@ -11,6 +11,9 @@ export default function Clients() {
     paymentMethod: 'Transferencia'
   });
 
+  const modalOverlayStyle = { position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 50 };
+  const modalCardStyle = { width: '100%', maxWidth: '700px', margin: '20px', maxHeight: '90vh', overflowY: 'auto', backgroundColor: '#fff', padding: '2rem', borderRadius: '8px', border: '1px solid var(--color-border)' };
+
   const handleSubmit = (e) => {
     e.preventDefault();
     if (formData.name) {
@@ -53,17 +56,21 @@ export default function Clients() {
   };
 
   return (
-    <div>
-      <div className="flex justify-between items-center mb-6">
-        <h2 className="text-2xl font-bold">Gestión de Clientes</h2>
-        <button className="btn btn-primary" onClick={isFormOpen ? cancelForm : () => setIsFormOpen(true)}>
-          {isFormOpen ? 'Cancelar' : '+ Nuevo Cliente'}
+    <div className="admin-container">
+      <div className="admin-header" style={{ marginBottom: '1.5rem' }}>
+        <div>
+          <h2 className="text-2xl font-bold">Gestión de Clientes</h2>
+          <p className="text-muted" style={{ marginTop: '0.25rem' }}>Directorio de clientes, descuentos y condiciones de pago.</p>
+        </div>
+        <button className="btn btn-primary shadow-sm" onClick={() => setIsFormOpen(true)}>
+          + Nuevo Cliente
         </button>
       </div>
 
       {isFormOpen && (
-        <div className="card mb-6">
-          <h3 className="font-bold mb-4">{editingId ? 'Editar Cliente' : 'Añadir Nuevo Cliente'}</h3>
+        <div style={modalOverlayStyle}>
+          <div style={modalCardStyle}>
+            <h3 className="font-bold mb-4 text-xl">{editingId ? 'Editar Cliente' : 'Añadir Nuevo Cliente'}</h3>
           <form onSubmit={handleSubmit} className="grid grid-cols-2 gap-4">
             <div className="form-group">
               <label className="form-label">Nombre del Cliente / Empresa</label>
@@ -113,16 +120,18 @@ export default function Clients() {
                 <option value="Contado">Contado</option>
               </select>
             </div>
-            <div style={{ gridColumn: 'span 2', display: 'flex', justifyContent: 'flex-end' }}>
+            <div style={{ gridColumn: 'span 2', display: 'flex', justifyContent: 'flex-end', gap: '0.75rem', marginTop: '1rem' }}>
+              <button type="button" className="btn btn-secondary" onClick={cancelForm}>Cancelar</button>
               <button type="submit" className="btn btn-primary">
                 {editingId ? 'Guardar Cambios' : 'Guardar Cliente'}
               </button>
             </div>
           </form>
         </div>
+        </div>
       )}
 
-      <div className="card">
+      <div className="table-container">
         {clients.length === 0 ? (
           <p className="text-muted text-center py-4">No hay clientes registrados.</p>
         ) : (
@@ -173,6 +182,5 @@ export default function Clients() {
           </div>
         )}
       </div>
-    </div>
   );
 }
