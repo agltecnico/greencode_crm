@@ -3,7 +3,7 @@ import { useData } from '../context/DataContext';
 import { usePagination } from '../hooks/usePagination';
 
 export default function CropTypes() {
-  const { articles, stockEntries, cropTypes, addCropType, deleteCropType } = useData();
+  const { articles, stockEntries, cropTypes, addCropType, deleteCropType, providers } = useData();
 
   const [activeTab, setActiveTab] = useState('LIST');
   const [searchTerm, setSearchTerm] = useState('');
@@ -15,7 +15,8 @@ export default function CropTypes() {
     substrateId: '',
     substrateLiters: 0,
     containerId: '',
-    expectedYieldGrams: 0
+    expectedYieldGrams: 0,
+    providerId: ''
   });
 
   const seeds = articles?.filter(a => a.type === 'SEMILLA') || [];
@@ -25,14 +26,18 @@ export default function CropTypes() {
   const handleAdd = e => {
     e.preventDefault();
     addCropType(newType);
-    setNewType({ name: '', seedId: '', seedGrams: 0, substrateId: '', substrateLiters: 0, containerId: '', expectedYieldGrams: 0 });
+    setNewType({ name: '', seedId: '', seedGrams: 0, substrateId: '', substrateLiters: 0, containerId: '', expectedYieldGrams: 0, providerId: '' });
     setActiveTab('LIST');
   };
 
   // Helper to compute average cost of an article
-  const getAverageUnitCost = (articleId) => {
+  const getAverageUnitCost = (articleId, providerId = null) => {
     if (!articleId) return 0;
-    const entries = stockEntries?.filter(e => e.articleId === articleId) || [];
+    let entries = stockEntries?.filter(e => e.articleId === articleId) || [];
+    if (providerId) {
+      const providerEntries = entries.filter(e => e.providerId === providerId);
+      if (providerEntries.length > 0) entries = providerEntries;
+    }
     if (entries.length === 0) return 0;
     
     const totalQty = entries.reduce((acc, curr) => acc + Number(curr.quantity), 0);
@@ -68,6 +73,14 @@ export default function CropTypes() {
               <div style={{ gridColumn: 'span 2' }}>
                 <label className="form-label">Nombre de la Ficha (Ej: Rábano en Bandeja 1020)</label>
                 <input required type="text" className="form-control" value={newType.name} onChange={e => setNewType({...newType, name: e.target.value})} />
+              </div>
+
+              <div style={{ gridColumn: 'span 2' }}>
+                <label className="form-label">Proveedor Predilecto (Opcional)</label>
+                <select className="form-control" value={newType.providerId} onChange={e => setNewType({...newType, providerId: e.target.value})}>
+                  <option value="">Indiferente / Cualquier Proveedor</option>
+                  {providers?.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+                </select>
               </div>
 
               {/* Seed Section */}
@@ -141,6 +154,7 @@ export default function CropTypes() {
               <thead>
                 <tr>
                   <th>Tipo de Cultivo</th>
+                  <th>Proveedor (Semilla)</th>
                   <th>Receta (Semilla + Sustrato + Envase)</th>
                   <th>Coste Directo (Bandeja)</th>
                   <th>Rendimiento</th>
@@ -150,9 +164,9 @@ export default function CropTypes() {
               </thead>
               <tbody>
                 {currentData.map(c => {
-                  const seedCost = getAverageUnitCost(c.seedId) * Number(c.seedGrams || 0);
-                  const subCost = getAverageUnitCost(c.substrateId) * Number(c.substrateLiters || 0);
-                  const contCost = getAverageUnitCost(c.containerId) * 1; // 1 container per tray
+                  const seedCost = getAverageUnitCost(c.seedId, c.providerId) * Number(c.seedGrams || 0);
+                  const subCost = getAverageUnitCost(c.substrateId, c.providerId) * Number(c.substrateLiters || 0);
+                  const contCost = getAverageUnitCost(c.containerId, c.providerId) * 1; // 1 container per tray
                   
                   const totalCost = seedCost + subCost + contCost;
                   const expectedKg = Number(c.expectedYieldGrams || 0) / 1000;
@@ -161,6 +175,7 @@ export default function CropTypes() {
                   return (
                     <tr key={c.id}>
                       <td className="font-bold text-slate-800">{c.name}</td>
+                      <td className="text-muted">{providers?.find(p => p.id === c.providerId)?.name || 'Cualquiera'}</td>
                       <td className="text-sm text-slate-500">
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem' }}>
                           <span>🌱 {c.seedGrams}g ({seedCost.toFixed(2)}€)</span>

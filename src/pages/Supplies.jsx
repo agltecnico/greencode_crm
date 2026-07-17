@@ -19,7 +19,7 @@ export default function Supplies() {
   const [newArticle, setNewArticle] = useState({ name: '', type: 'SEMILLA' });
   
   // Stock State
-  const [newStockEntry, setNewStockEntry] = useState({ purchaseDate: new Date().toISOString().split('T')[0], deliveryNote: '', batchNumber: '', articleId: '', quantity: 1, price: 0 });
+  const [newStockEntry, setNewStockEntry] = useState({ purchaseDate: new Date().toISOString().split('T')[0], deliveryNote: '', batchNumber: '', articleId: '', providerId: '', quantity: 1, price: 0 });
 
   // Handlers
   const handleAddProvider = e => { e.preventDefault(); addProvider(newProvider); setNewProvider({name:'', contactInfo:''}); };
@@ -28,7 +28,7 @@ export default function Supplies() {
   const handleAddStockEntry = e => { 
     e.preventDefault(); 
     addStockEntry(newStockEntry); 
-    setNewStockEntry({...newStockEntry, deliveryNote: '', batchNumber: '', quantity: 1, price: 0}); 
+    setNewStockEntry({...newStockEntry, deliveryNote: '', batchNumber: '', providerId: '', quantity: 1, price: 0}); 
   };
 
   // Filtration logic
@@ -213,6 +213,13 @@ export default function Supplies() {
             
             <form onSubmit={handleAddStockEntry} style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: '1rem', alignItems: 'flex-end' }}>
               <div>
+                <label className="form-label">Proveedor</label>
+                <select required className="form-control" value={newStockEntry.providerId} onChange={e => setNewStockEntry({...newStockEntry, providerId: e.target.value})}>
+                  <option value="">Selecciona...</option>
+                  {providers?.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+                </select>
+              </div>
+              <div>
                 <label className="form-label">Fecha</label>
                 <input required type="date" className="form-control" value={newStockEntry.purchaseDate} onChange={e => setNewStockEntry({...newStockEntry, purchaseDate: e.target.value})} />
               </div>
@@ -248,6 +255,7 @@ export default function Supplies() {
               <thead>
                 <tr>
                   <th>Fecha</th>
+                  <th>Proveedor</th>
                   <th>Artículo</th>
                   <th>Albarán</th>
                   <th>Lote</th>
@@ -262,6 +270,7 @@ export default function Supplies() {
                   return (
                     <tr key={entry.id}>
                       <td>{new Date(entry.purchaseDate).toLocaleDateString()}</td>
+                      <td className="text-muted">{providers?.find(p => p.id === entry.providerId)?.name || '-'}</td>
                       <td className="font-bold text-primary">{art ? getTypeLabel(art.type) + ' ' + art.name : 'Desconocido'}</td>
                       <td className="text-muted font-mono">{entry.deliveryNote || '-'}</td>
                       <td className="font-mono text-indigo-600">{entry.batchNumber || '-'}</td>
