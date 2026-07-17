@@ -1,6 +1,7 @@
 name: Deploy to Hostinger via FTP
 
 on:
+  workflow_dispatch: # Permite ejecutarlo manualmente desde GitHub
   push:
     branches:
       - main # Se ejecutará automáticamente cada vez que haya cambios en la rama principal
