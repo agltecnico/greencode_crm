@@ -7,7 +7,7 @@ import '../crops.css';
 export default function Crops() {
   const navigate = useNavigate();
   const { 
-    crops, sowCrop, advanceCropStatus, discardCrop,
+    crops, sowCrop, updateCrop, advanceCropStatus, discardCrop,
     stockEntries, articles,
     cropTypes,
     harvestTargets, addHarvestTarget, deleteHarvestTarget,
@@ -24,7 +24,7 @@ export default function Crops() {
 
   const [newCrop, setNewCrop] = useState({ cropTypeId: '', traysCount: 1, selectedSeedBatchId: '' });
   const [newTarget, setNewTarget] = useState({ targetDayOfWeek: 1, productId: '', tuppersCount: 10 });
-  const [newHarvest, setNewHarvest] = useState({ productId: '', tuppersCount: 1 });
+  const [newHarvest, setNewHarvest] = useState({ productId: '', tuppersCount: 1, selectedCropIds: [] });
 
   // Computed properties for seed availability
   const selectedCropType = cropTypes?.find(c => c.id === newCrop.cropTypeId);
@@ -44,13 +44,29 @@ export default function Crops() {
 
   const handleAddHarvestTarget = e => { e.preventDefault(); addHarvestTarget(newTarget); };
   
-  const handleRegisterHarvest = e => {
+  const handleRegisterHarvest = async (e) => {
     e.preventDefault();
+    if (newHarvest.selectedCropIds.length === 0) {
+      alert("Debes seleccionar al menos una bandeja para cosechar.");
+      return;
+    }
+
     const batchNum = `L-${Date.now().toString().slice(-6)}`;
+    
+    // 1. Mark selected crops as HARVESTED
+    for (const cropId of newHarvest.selectedCropIds) {
+      const cropToHarvest = crops.find(c => c.id === cropId);
+      if (cropToHarvest) {
+        await updateCrop(cropId, { status: 'HARVESTED' });
+      }
+    }
+
+    // 2. Register the harvest product
     addHarvest({...newHarvest, harvestDate: new Date().toISOString(), batchNumber: batchNum});
     const product = products?.find(p => p.id === newHarvest.productId);
     generateLabelPDF(product?.name || 'Desconocido', batchNum, product?.shelfLifeDays || 10, newHarvest.tuppersCount);
-    setNewHarvest({...newHarvest, tuppersCount: 1});
+    
+    setNewHarvest({ productId: '', tuppersCount: 1, selectedCropIds: [] });
     setIsHarvestModalOpen(false);
     alert(`Cosecha registrada con el lote Sanidad: ${batchNum}. Generando PDF...`);
   };
@@ -247,9 +263,42 @@ export default function Crops() {
               <h3 className="font-bold text-xl">🔪 Registrar Cosecha y Envasado</h3>
               <button onClick={() => setIsHarvestModalOpen(false)} style={{ background: 'none', border: 'none', fontSize: '1.5rem', cursor: 'pointer' }}>&times;</button>
             </div>
-            <form onSubmit={handleRegisterHarvest} className="flex flex-col gap-4">
-              <div>
-                <label className="text-sm font-semibold mb-1 block">¿Qué producto has envasado hoy?</label>
+              <form onSubmit={handleRegisterHarvest} className="flex flex-col gap-4">
+                <div>
+                  <label className="text-sm font-semibold mb-2 block">1. Selecciona las bandejas que vas a cortar (para mixes, selecciona varias):</label>
+                  <div className="max-h-48 overflow-y-auto border border-slate-300 rounded-lg p-2 bg-slate-50 flex flex-col gap-2">
+                    {(crops?.filter(c => c.status === 'GROWING') || []).map(crop => {
+                      const cType = cropTypes?.find(c => c.id === crop.seedId || c.id === crop.cropTypeId);
+                      const isChecked = newHarvest.selectedCropIds.includes(crop.id);
+                      return (
+                        <label key={crop.id} className="flex items-center gap-3 p-2 bg-white rounded border border-slate-200 cursor-pointer hover:bg-slate-50 transition-colors">
+                          <input 
+                            type="checkbox" 
+                            className="w-5 h-5 text-green-600 rounded focus:ring-green-500"
+                            checked={isChecked}
+                            onChange={(e) => {
+                              if (e.target.checked) {
+                                setNewHarvest(prev => ({ ...prev, selectedCropIds: [...prev.selectedCropIds, crop.id] }));
+                              } else {
+                                setNewHarvest(prev => ({ ...prev, selectedCropIds: prev.selectedCropIds.filter(id => id !== crop.id) }));
+                              }
+                            }}
+                          />
+                          <div className="flex-1 flex justify-between">
+                            <span className="font-semibold text-slate-700">{cType?.name || 'Desconocido'} <span className="font-normal text-slate-500 text-sm">({crop.traysCount} bandejas)</span></span>
+                            <span className="text-xs bg-slate-200 text-slate-600 px-2 py-1 rounded font-mono">{crop.batchNumber}</span>
+                          </div>
+                        </label>
+                      );
+                    })}
+                    {(crops?.filter(c => c.status === 'GROWING') || []).length === 0 && (
+                      <p className="text-slate-500 text-sm text-center py-2">No hay cultivos listos para cosechar.</p>
+                    )}
+                  </div>
+                </div>
+
+                <div>
+                  <label className="text-sm font-semibold mb-1 block">2. ¿Qué producto final has envasado?</label>
                 <select className="premium-input w-full" style={{ padding: '0.75rem', borderRadius: '8px', border: '1px solid #cbd5e1' }} required value={newHarvest.productId} onChange={e=>setNewHarvest({...newHarvest, productId: e.target.value})}>
                   <option value="">-- Seleccionar --</option>
                   {products?.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
@@ -289,8 +338,8 @@ export default function Crops() {
                 </div>
                 <button 
                   onClick={() => {
+                    setNewHarvest(prev => ({ ...prev, selectedCropIds: [crop.id] }));
                     setIsHarvestModalOpen(true);
-                    // Pre-fill modal with related product if possible, but for now just open modal
                   }}
                   className="mt-3 w-full bg-green-600 hover:bg-green-700 text-white font-bold py-2 rounded-lg transition-colors"
                 >
