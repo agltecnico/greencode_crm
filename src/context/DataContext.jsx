@@ -347,7 +347,32 @@ export const DataProvider = ({ children }) => {
     await supabase.from('crops').delete().eq('id', id);
   };
 
-    const reverseCropStatus = async (crop) => {
+    const setCropPhase = async (crop, nextStatus) => {
+    const cType = cropTypes.find(ct => ct.id === crop.cropTypeId || ct.id === crop.seedId);
+    let daysToSubtract = 0;
+    
+    if (cType) {
+      const soakDays = cType.soakingHours > 0 ? 1 : 0;
+      const germDay = soakDays;
+      const lightDay = germDay + (Number(cType.germinationDays) || 0) + (Number(cType.darknessDays) || 0);
+      const readyDay = lightDay + (Number(cType.lightDays) || 0);
+      
+      if (nextStatus === 'SOAKING') daysToSubtract = 0;
+      else if (nextStatus === 'GERMINATING') daysToSubtract = germDay;
+      else if (nextStatus === 'GROWING') daysToSubtract = lightDay;
+      else if (nextStatus === 'READY') daysToSubtract = readyDay;
+    }
+
+    const newDate = new Date();
+    newDate.setDate(newDate.getDate() - daysToSubtract);
+
+    await updateCrop(crop.id, { 
+      status: nextStatus,
+      datePlanted: newDate.toISOString() 
+    });
+  };
+
+  const reverseCropStatus = async (crop) => {
     const sequence = ['SOAKING', 'GERMINATING', 'GROWING', 'READY'];
     const currentIdx = sequence.indexOf(crop.status ? crop.status.toUpperCase() : 'SOWED');
     
@@ -791,7 +816,7 @@ export const DataProvider = ({ children }) => {
         cropTypes, addCropType, updateCropType, deleteCropType,
         seeds, addSeed, updateSeed, deleteSeed,
         seedInventory, addSeedInventory, updateSeedInventory, deleteSeedInventory,
-        crops, addCrop, sowCrop, updateCrop, deleteCrop, advanceCropStatus, reverseCropStatus, discardCrop,
+        crops, addCrop, sowCrop, updateCrop, deleteCrop, advanceCropStatus, setCropPhase, discardCrop,
         harvestTargets, addHarvestTarget, updateHarvestTarget, deleteHarvestTarget,
       harvests, addHarvest, updateHarvest, deleteHarvest,
       dailyLogs, addDailyLog, updateDailyLog, deleteDailyLog,
