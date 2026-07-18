@@ -49,6 +49,7 @@ export default function Crops() {
   const [isSowModalOpen, setIsSowModalOpen] = useState(false);
   const [isHarvestModalOpen, setIsHarvestModalOpen] = useState(false);
   const [showPhaseChangeModal, setShowPhaseChangeModal] = useState(null);
+  const [pendingPhase, setPendingPhase] = useState(null);
 
   const [newCrop, setNewCrop] = useState({ cropTypeId: '', traysCount: 1, selectedSeedBatchId: '' });
   const [newTarget, setNewTarget] = useState({ targetDayOfWeek: 1, productId: '', tuppersCount: 1 });
@@ -502,7 +503,7 @@ export default function Crops() {
                                 <button onClick={() => discardCrop(crop)} title="Descartar" style={{ padding: '0.25rem 0.5rem', borderRadius: '0.35rem', border: '1px solid #fecaca', color: '#dc2626', backgroundColor: 'white', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                                   <svg width="14" height="14" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
                                 </button>
-                                <button onClick={() => setShowPhaseChangeModal(crop)} title="Cambiar Fase" style={{ padding: '0.35rem 0.75rem', borderRadius: '0.5rem', border: '1px solid #cbd5e1', backgroundColor: '#f8fafc', color: '#334155', fontWeight: 'bold', fontSize: '0.75rem', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.35rem', boxShadow: '0 1px 2px rgba(0,0,0,0.05)' }}>Cambiar Fase</button>
+                                <button onClick={() => { setShowPhaseChangeModal(crop); setPendingPhase(crop.status || "SOWED"); }} title="Cambiar Fase" style={{ padding: '0.35rem 0.75rem', borderRadius: '0.5rem', border: '1px solid #cbd5e1', backgroundColor: '#f8fafc', color: '#334155', fontWeight: 'bold', fontSize: '0.75rem', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.35rem', boxShadow: '0 1px 2px rgba(0,0,0,0.05)' }}>Cambiar Fase</button>
                               </div>
                             </td>
                           </tr>
@@ -1041,48 +1042,78 @@ export default function Crops() {
           <div style={modalCardStyle}>
             <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '1.5rem', alignItems: 'center' }}>
               <h3 style={{ fontSize: '1.5rem', fontWeight: '900', color: '#0f172a', margin: 0 }}>Ajustar Fase de Cultivo</h3>
-              <button onClick={() => setShowPhaseChangeModal(null)} style={{ background: 'transparent', border: 'none', fontSize: '1.5rem', cursor: 'pointer', color: '#64748b' }}>&times;</button>
+              <button onClick={() => { setShowPhaseChangeModal(null); setPendingPhase(null); }} style={{ background: 'transparent', border: 'none', fontSize: '1.5rem', cursor: 'pointer', color: '#64748b' }}>&times;</button>
             </div>
             <p style={{ marginBottom: '1.5rem', color: '#475569', fontSize: '0.95rem' }}>
-              Selecciona la fase a la que deseas mover este lote. Los días de crecimiento se sincronizarán automáticamente con la ficha de cultivo.
+              Selecciona la fase a la que deseas mover este lote y pulsa Aplicar. Los días de crecimiento se sincronizarán automáticamente con la ficha de cultivo.
             </p>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-              {['SOAKING', 'GERMINATING', 'DARKNESS', 'LIGHT', 'READY'].map(phase => {
-                const isCurrent = (showPhaseChangeModal.status || 'SOWED') === phase;
-                let cTheme = { bg: 'white', border: '#cbd5e1', text: '#334155', tagBg: '#94a3b8' };
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', marginBottom: '1.5rem' }}>
+              {(() => {
+                const cType = cropTypes?.find(c => c.id === showPhaseChangeModal.seedId || c.id === showPhaseChangeModal.cropTypeId);
+                const availablePhases = [];
+                if (cType) {
+                  if (parseInt(cType.soakDays) > 0) availablePhases.push('SOAKING');
+                  if (parseInt(cType.germinationDays) > 0) availablePhases.push('GERMINATING');
+                  if (parseInt(cType.darknessDays) > 0) availablePhases.push('DARKNESS');
+                  if (parseInt(cType.lightDays) > 0) availablePhases.push('LIGHT');
+                } else {
+                  availablePhases.push('SOAKING', 'GERMINATING', 'DARKNESS', 'LIGHT');
+                }
+                availablePhases.push('READY');
                 
-                if (phase === 'SOAKING') cTheme = { bg: '#dbeafe', border: '#3b82f6', text: '#1e3a8a', tagBg: '#3b82f6' };
-                else if (phase === 'GERMINATING') cTheme = { bg: '#fef3c7', border: '#f59e0b', text: '#92400e', tagBg: '#f59e0b' };
-                else if (phase === 'DARKNESS') cTheme = { bg: '#e0e7ff', border: '#4f46e5', text: '#3730a3', tagBg: '#4f46e5' };
-                else if (phase === 'LIGHT') cTheme = { bg: '#ccfbf1', border: '#14b8a6', text: '#0f766e', tagBg: '#14b8a6' };
-                else if (phase === 'READY') cTheme = { bg: '#dcfce7', border: '#22c55e', text: '#166534', tagBg: '#22c55e' };
+                return availablePhases.map(phase => {
+                  const isCurrent = pendingPhase === phase;
+                  const isActual = (showPhaseChangeModal.status || 'SOWED') === phase;
+                  let cTheme = { bg: 'white', border: '#cbd5e1', text: '#334155', tagBg: '#94a3b8' };
+                  
+                  if (phase === 'SOAKING') cTheme = { bg: '#dbeafe', border: '#3b82f6', text: '#1e3a8a', tagBg: '#3b82f6' };
+                  else if (phase === 'GERMINATING') cTheme = { bg: '#fef3c7', border: '#f59e0b', text: '#92400e', tagBg: '#f59e0b' };
+                  else if (phase === 'DARKNESS') cTheme = { bg: '#e0e7ff', border: '#4f46e5', text: '#3730a3', tagBg: '#4f46e5' };
+                  else if (phase === 'LIGHT') cTheme = { bg: '#ccfbf1', border: '#14b8a6', text: '#0f766e', tagBg: '#14b8a6' };
+                  else if (phase === 'READY') cTheme = { bg: '#dcfce7', border: '#22c55e', text: '#166534', tagBg: '#22c55e' };
 
-                return (
-                  <button 
-                    key={phase} 
-                    onClick={() => {
-                      setCropPhase(showPhaseChangeModal, phase);
-                      setShowPhaseChangeModal(null);
-                    }}
-                    style={{ 
-                      padding: '1rem', 
-                      border: isCurrent ? `2px solid ${cTheme.border}` : '1px solid #cbd5e1', 
-                      borderRadius: '12px', 
-                      textAlign: 'left', 
-                      backgroundColor: isCurrent ? cTheme.bg : 'white', 
-                      fontWeight: isCurrent ? 'bold' : 'normal',
-                      cursor: 'pointer',
-                      transition: 'all 0.2s',
-                      display: 'flex',
-                      justifyContent: 'space-between',
-                      alignItems: 'center'
-                    }}
-                  >
-                    <span style={{ color: isCurrent ? cTheme.text : '#334155' }}>{translateStatus(phase)}</span>
-                    {isCurrent && <span style={{ fontSize: '0.75rem', backgroundColor: cTheme.tagBg, color: 'white', padding: '0.15rem 0.5rem', borderRadius: '999px' }}>Actual</span>}
-                  </button>
-                );
-              })}
+                  return (
+                    <button 
+                      key={phase} 
+                      onClick={() => setPendingPhase(phase)}
+                      style={{ 
+                        padding: '1rem', 
+                        border: isCurrent ? `2px solid ${cTheme.border}` : '1px solid #cbd5e1', 
+                        borderRadius: '12px', 
+                        textAlign: 'left', 
+                        backgroundColor: isCurrent ? cTheme.bg : 'white', 
+                        fontWeight: isCurrent ? 'bold' : 'normal',
+                        cursor: 'pointer',
+                        transition: 'all 0.2s',
+                        display: 'flex',
+                        justifyContent: 'space-between',
+                        alignItems: 'center',
+                        transform: isCurrent ? 'scale(1.02)' : 'scale(1)'
+                      }}
+                    >
+                      <span style={{ color: isCurrent ? cTheme.text : '#334155' }}>{translateStatus(phase)}</span>
+                      {isActual && <span style={{ fontSize: '0.75rem', backgroundColor: '#64748b', color: 'white', padding: '0.15rem 0.5rem', borderRadius: '999px' }}>Estado Actual</span>}
+                    </button>
+                  );
+                });
+              })()}
+            </div>
+            
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '1rem' }}>
+              <button onClick={() => { setShowPhaseChangeModal(null); setPendingPhase(null); }} style={{ padding: '0.75rem 1.5rem', borderRadius: '8px', border: '1px solid #cbd5e1', backgroundColor: 'white', color: '#475569', fontWeight: 'bold', cursor: 'pointer' }}>
+                Cancelar
+              </button>
+              <button 
+                onClick={() => {
+                  if (pendingPhase && pendingPhase !== (showPhaseChangeModal.status || 'SOWED')) {
+                    setCropPhase(showPhaseChangeModal, pendingPhase);
+                  }
+                  setShowPhaseChangeModal(null);
+                  setPendingPhase(null);
+                }} 
+                style={{ padding: '0.75rem 1.5rem', borderRadius: '8px', border: 'none', backgroundColor: '#0f172a', color: 'white', fontWeight: 'bold', cursor: 'pointer', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.1)' }}>
+                Aplicar Cambio
+              </button>
             </div>
           </div>
         </div>
