@@ -4,6 +4,27 @@ import { useData } from '../context/DataContext';
 import EmployeeTasks from '../components/EmployeeTasks';
 import Supplies from './Supplies';
 import '../crops.css';
+import React from 'react';
+
+class ErrorBoundary extends React.Component {
+  constructor(props) {
+    super(props);
+    this.state = { hasError: false, error: null };
+  }
+  static getDerivedStateFromError(error) {
+    return { hasError: true, error };
+  }
+  componentDidCatch(error, errorInfo) {
+    console.error("ErrorBoundary caught an error", error, errorInfo);
+  }
+  render() {
+    if (this.state.hasError) {
+      return <div style={{padding: '2rem', background: '#fee2e2', color: '#991b1b'}}><h2>¡Error en la Aplicación!</h2><p>Por favor, haz una captura de pantalla de este error y envíasela a la IA:</p><pre style={{background: 'white', padding: '1rem', marginTop: '1rem', overflowX: 'auto'}}>{this.state.error && this.state.error.toString()}</pre><pre style={{background: 'white', padding: '1rem', marginTop: '1rem', overflowX: 'auto'}}>{this.state.error && this.state.error.stack}</pre></div>;
+    }
+    return this.props.children;
+  }
+}
+
 
 export default function Crops() {
   const navigate = useNavigate();
@@ -976,7 +997,8 @@ export default function Crops() {
   };
 
   return (
-    <div className="crops-module" style={{ paddingBottom: '5rem', maxWidth: '1400px', margin: '0 auto', paddingTop: '1rem' }}>
+    <ErrorBoundary>
+      <div className="crops-module" style={{ paddingBottom: '5rem', maxWidth: '1400px', margin: '0 auto', paddingTop: '1rem' }}>
       {activeTab === 'menu' && (
         <button onClick={() => navigate('/')} style={{ background: 'transparent', border: '1px solid var(--crop-border)', color: 'var(--crop-text-main)', padding: '0.5rem 1rem', borderRadius: '8px', fontWeight: 'bold', cursor: 'pointer', marginBottom: '1rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
           <span>🏠</span> Volver al Hub Central
@@ -1013,5 +1035,6 @@ export default function Crops() {
       </div>
       
     </div>
-  );
+      </ErrorBoundary>
+    );
 }
