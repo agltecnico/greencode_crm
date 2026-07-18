@@ -19,6 +19,7 @@ export default function Crops() {
 
   const [activeTab, setActiveTab] = useState('menu');
   const [sowTab, setSowTab] = useState('activos');
+  const [weekFilter, setWeekFilter] = useState('ALL');
   const [historySearch, setHistorySearch] = useState('');
   const [historyPage, setHistoryPage] = useState(1);
   const ITEMS_PER_PAGE = 10;
@@ -343,74 +344,120 @@ export default function Crops() {
         )}
 
         {sowTab === 'activos' && (
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: '1rem' }}>
-            {activeCropsList.map(crop => {
-              const cType = cropTypes?.find(c => c.id === crop.seedId || c.id === crop.cropTypeId);
-              const daysAlive = Math.floor((new Date() - new Date(crop.datePlanted || crop.plantedAt)) / (1000 * 60 * 60 * 24));
-              const expectedDays = cType?.daysToHarvest || 14;
-              const progressPercentage = Math.min(100, Math.max(0, (daysAlive / expectedDays) * 100));
-              
-              return (
-                <div key={crop.id} style={{ backgroundColor: 'white', borderRadius: '1rem', border: '1px solid #e2e8f0', overflow: 'hidden', boxShadow: '0 1px 2px 0 rgba(0, 0, 0, 0.05)', display: 'flex', flexDirection: 'column' }}>
-                  <div style={{ padding: '1.25rem', borderBottom: '1px solid #f1f5f9', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                    <div style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
-                      <div style={{ width: '3rem', height: '3rem', borderRadius: '0.75rem', backgroundColor: '#ecfdf5', color: '#10b981', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: '900', fontSize: '1.25rem', border: '1px solid #d1fae5' }}>
-                        {cType?.name ? cType.name.charAt(0).toUpperCase() : '🌱'}
-                      </div>
-                      <div>
-                        <h4 style={{ fontWeight: 'bold', color: '#1e293b', fontSize: '1.125rem', margin: 0 }}>{cType?.name || 'Desconocido'}</h4>
-                        <span style={{ fontSize: '0.75rem', fontWeight: 'bold', backgroundColor: '#f1f5f9', color: '#475569', padding: '0.125rem 0.5rem', borderRadius: '9999px', marginTop: '0.25rem', display: 'inline-block', border: '1px solid #e2e8f0' }}>{crop.batchNumber || 'N/A'}</span>
-                      </div>
-                    </div>
-                    <div style={{ textAlign: 'right' }}>
-                      <span style={{ fontSize: '1.5rem', fontWeight: '900', color: '#059669', display: 'block', lineHeight: 1 }}>{crop.traysCount}</span>
-                      <span style={{ fontSize: '0.75rem', fontWeight: 'bold', color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Bandejas</span>
-                    </div>
-                  </div>
-                  
-                  <div style={{ padding: '1.25rem', flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'space-between', gap: '1rem' }}>
-                    <div>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', marginBottom: '0.5rem' }}>
-                        <div>
-                          <p style={{ fontSize: '0.75rem', fontWeight: 'bold', color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.05em', margin: '0 0 0.25rem 0' }}>Estado</p>
-                          <p style={{ fontWeight: 'bold', color: '#334155', margin: 0 }}>{translateStatus(crop.status)}</p>
-                        </div>
-                        <div style={{ textAlign: 'right' }}>
-                          <p style={{ fontSize: '0.75rem', fontWeight: 'bold', color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.05em', margin: '0 0 0.25rem 0' }}>Progreso</p>
-                          <p style={{ fontWeight: '900', color: '#059669', margin: 0, fontSize: '1.25rem' }}>{daysAlive >= 0 ? daysAlive : 0} <span style={{ fontSize: '0.875rem', color: '#94a3b8', fontWeight: 'bold' }}>/ {expectedDays} d</span></p>
-                        </div>
-                      </div>
-                      
-                      {/* Progress bar */}
-                      <div style={{ width: '100%', backgroundColor: '#f1f5f9', borderRadius: '9999px', height: '0.625rem', overflow: 'hidden' }}>
-                        <div style={{ backgroundColor: '#10b981', height: '100%', borderRadius: '9999px', width: `${progressPercentage}%` }}></div>
-                      </div>
-                    </div>
-
-                    <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.5rem' }}>
-                      <button onClick={() => discardCrop(crop)} style={{ flex: '1', padding: '0.5rem', borderRadius: '0.5rem', fontWeight: 'bold', fontSize: '0.75rem', border: '1px solid #fecaca', color: '#dc2626', backgroundColor: 'transparent', cursor: 'pointer', transition: 'background-color 0.2s' }} onMouseOver={e=>e.currentTarget.style.backgroundColor='#fef2f2'} onMouseOut={e=>e.currentTarget.style.backgroundColor='transparent'}>
-                        Descartar
-                      </button>
-                      <button onClick={() => advanceCropStatus(crop)} style={{ flex: '2', padding: '0.5rem', borderRadius: '0.5rem', fontWeight: 'bold', fontSize: '0.875rem', backgroundColor: '#1e293b', color: 'white', border: 'none', cursor: 'pointer', transition: 'background-color 0.2s', boxShadow: '0 1px 3px rgba(0,0,0,0.1)' }} onMouseOver={e=>e.currentTarget.style.backgroundColor='#334155'} onMouseOut={e=>e.currentTarget.style.backgroundColor='#1e293b'}>
-                        Avanzar Fase ⏭
-                      </button>
-                    </div>
-                  </div>
+            <div style={{ animation: 'fadeIn 0.3s ease' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem', flexWrap: 'wrap', gap: '1rem' }}>
+                <h3 style={{ margin: 0, fontSize: '1.25rem', fontWeight: 'bold', color: '#1e293b' }}>Lotes en Producción</h3>
+                
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', background: '#f8fafc', padding: '0.25rem', borderRadius: '0.75rem', border: '1px solid #e2e8f0' }}>
+                  <button onClick={() => setWeekFilter('ALL')} style={{ padding: '0.5rem 1rem', borderRadius: '0.5rem', fontWeight: 'bold', fontSize: '0.875rem', border: 'none', cursor: 'pointer', transition: 'all 0.2s', backgroundColor: weekFilter === 'ALL' ? 'white' : 'transparent', color: weekFilter === 'ALL' ? '#0f172a' : '#64748b', boxShadow: weekFilter === 'ALL' ? '0 1px 2px rgba(0,0,0,0.05)' : 'none' }}>Todos</button>
+                  <button onClick={() => setWeekFilter('THIS_WEEK')} style={{ padding: '0.5rem 1rem', borderRadius: '0.5rem', fontWeight: 'bold', fontSize: '0.875rem', border: 'none', cursor: 'pointer', transition: 'all 0.2s', backgroundColor: weekFilter === 'THIS_WEEK' ? 'white' : 'transparent', color: weekFilter === 'THIS_WEEK' ? '#0f172a' : '#64748b', boxShadow: weekFilter === 'THIS_WEEK' ? '0 1px 2px rgba(0,0,0,0.05)' : 'none' }}>Esta Semana</button>
+                  <button onClick={() => setWeekFilter('LAST_WEEK')} style={{ padding: '0.5rem 1rem', borderRadius: '0.5rem', fontWeight: 'bold', fontSize: '0.875rem', border: 'none', cursor: 'pointer', transition: 'all 0.2s', backgroundColor: weekFilter === 'LAST_WEEK' ? 'white' : 'transparent', color: weekFilter === 'LAST_WEEK' ? '#0f172a' : '#64748b', boxShadow: weekFilter === 'LAST_WEEK' ? '0 1px 2px rgba(0,0,0,0.05)' : 'none' }}>Semana Pasada</button>
+                  <button onClick={() => setWeekFilter('OLDER')} style={{ padding: '0.5rem 1rem', borderRadius: '0.5rem', fontWeight: 'bold', fontSize: '0.875rem', border: 'none', cursor: 'pointer', transition: 'all 0.2s', backgroundColor: weekFilter === 'OLDER' ? 'white' : 'transparent', color: weekFilter === 'OLDER' ? '#0f172a' : '#64748b', boxShadow: weekFilter === 'OLDER' ? '0 1px 2px rgba(0,0,0,0.05)' : 'none' }}>Anteriores</button>
                 </div>
-              );
-            })}
-            {activeCropsList.length === 0 && (
-              <div style={{ gridColumn: '1 / -1', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '4rem 2rem', backgroundColor: 'white', borderRadius: '1rem', border: '2px dashed #e2e8f0' }}>
-                <div style={{ fontSize: '3rem', marginBottom: '1rem', opacity: 0.5 }}>🪴</div>
-                <h3 style={{ fontSize: '1.25rem', fontWeight: 'bold', color: '#334155', margin: '0 0 0.5rem 0' }}>Invernadero Vacío</h3>
-                <p style={{ color: '#64748b', marginBottom: '1.5rem', textAlign: 'center', maxWidth: '400px' }}>No tienes ninguna bandeja creciendo actualmente. Registra tu primera siembra para empezar.</p>
-                <button onClick={() => setIsSowModalOpen(true)} className="btn btn-primary" style={{ background: '#10b981', color: 'white', border: 'none', padding: '0.75rem 1.5rem', borderRadius: '0.75rem', fontWeight: 'bold', boxShadow: '0 4px 6px -1px rgba(16, 185, 129, 0.2)', cursor: 'pointer' }}>
-                  Hacer una Siembra
-                </button>
               </div>
-            )}
-          </div>
-        )}
+
+              <div style={{ backgroundColor: 'white', borderRadius: '1rem', border: '1px solid #e2e8f0', overflow: 'hidden', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.05)' }}>
+                <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
+                  <thead style={{ backgroundColor: '#f8fafc', borderBottom: '2px solid #e2e8f0' }}>
+                    <tr>
+                      <th style={{ padding: '1rem 1.5rem', fontSize: '0.75rem', fontWeight: 'bold', color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Variedad y Lote</th>
+                      <th style={{ padding: '1rem 1.5rem', fontSize: '0.75rem', fontWeight: 'bold', color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em', textAlign: 'center' }}>Bandejas</th>
+                      <th style={{ padding: '1rem 1.5rem', fontSize: '0.75rem', fontWeight: 'bold', color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Fase Actual</th>
+                      <th style={{ padding: '1rem 1.5rem', fontSize: '0.75rem', fontWeight: 'bold', color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em', width: '25%' }}>Desarrollo</th>
+                      <th style={{ padding: '1rem 1.5rem', fontSize: '0.75rem', fontWeight: 'bold', color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em', textAlign: 'right' }}>Acciones</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {activeCropsList
+                      .filter(crop => {
+                        if (weekFilter === 'ALL') return true;
+                        const date = new Date(crop.datePlanted || crop.plantedAt);
+                        const daysAgo = Math.floor((new Date() - date) / (1000 * 60 * 60 * 24));
+                        if (weekFilter === 'THIS_WEEK') return daysAgo <= 7;
+                        if (weekFilter === 'LAST_WEEK') return daysAgo > 7 && daysAgo <= 14;
+                        if (weekFilter === 'OLDER') return daysAgo > 14;
+                        return true;
+                      })
+                      .sort((a, b) => {
+                        // Older crops (closest to harvest) first
+                        const dateA = new Date(a.datePlanted || a.plantedAt);
+                        const dateB = new Date(b.datePlanted || b.plantedAt);
+                        return dateA - dateB;
+                      })
+                      .map(crop => {
+                        const cType = cropTypes?.find(c => c.id === crop.seedId || c.id === crop.cropTypeId);
+                        const daysAlive = Math.floor((new Date() - new Date(crop.datePlanted || crop.plantedAt)) / (1000 * 60 * 60 * 24));
+                        const expectedDays = cType?.daysToHarvest || 14;
+                        const progressPercentage = Math.min(100, Math.max(0, (daysAlive / expectedDays) * 100));
+                        
+                        let statusColor = { bg: '#f1f5f9', text: '#475569', bar: '#94a3b8' };
+                        const statusStr = (crop.status || '').toUpperCase();
+                        if (statusStr === 'SOAKING') statusColor = { bg: '#dbeafe', text: '#1e3a8a', bar: '#3b82f6' };
+                        else if (statusStr === 'GERMINATING') statusColor = { bg: '#fef3c7', text: '#92400e', bar: '#f59e0b' };
+                        else if (statusStr === 'GROWING') statusColor = { bg: '#d1fae5', text: '#065f46', bar: '#10b981' };
+
+                        return (
+                          <tr key={crop.id} style={{ borderBottom: '1px solid #f1f5f9', transition: 'background-color 0.2s' }} onMouseOver={e=>e.currentTarget.style.backgroundColor='#f8fafc'} onMouseOut={e=>e.currentTarget.style.backgroundColor='transparent'}>
+                            <td style={{ padding: '1rem 1.5rem' }}>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+                                <div style={{ width: '2.5rem', height: '2.5rem', borderRadius: '0.5rem', backgroundColor: '#ecfdf5', color: '#10b981', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 'bold', fontSize: '1rem', border: '1px solid #d1fae5' }}>
+                                  {cType?.name ? cType.name.charAt(0).toUpperCase() : '🌱'}
+                                </div>
+                                <div>
+                                  <div style={{ fontWeight: 'bold', color: '#1e293b' }}>{cType?.name || 'Desconocido'}</div>
+                                  <div style={{ fontSize: '0.75rem', color: '#64748b', fontFamily: 'monospace' }}>{crop.batchNumber || 'N/A'}</div>
+                                </div>
+                              </div>
+                            </td>
+                            <td style={{ padding: '1rem 1.5rem', textAlign: 'center' }}>
+                              <span style={{ fontSize: '1.25rem', fontWeight: '900', color: '#0f172a' }}>{crop.traysCount}</span>
+                            </td>
+                            <td style={{ padding: '1rem 1.5rem' }}>
+                              <span style={{ backgroundColor: statusColor.bg, color: statusColor.text, padding: '0.25rem 0.75rem', borderRadius: '9999px', fontSize: '0.75rem', fontWeight: 'bold', border: `1px solid ${statusColor.text}20` }}>
+                                {translateStatus(crop.status)}
+                              </span>
+                            </td>
+                            <td style={{ padding: '1rem 1.5rem' }}>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                                <div style={{ flex: 1, backgroundColor: '#e2e8f0', borderRadius: '9999px', height: '0.5rem', overflow: 'hidden' }}>
+                                  <div style={{ backgroundColor: statusColor.bar, height: '100%', borderRadius: '9999px', width: `${progressPercentage}%` }}></div>
+                                </div>
+                                <span style={{ fontSize: '0.75rem', fontWeight: 'bold', color: '#64748b', minWidth: '4rem', textAlign: 'right' }}>
+                                  Día {daysAlive >= 0 ? daysAlive : 0} / {expectedDays}
+                                </span>
+                              </div>
+                            </td>
+                            <td style={{ padding: '1rem 1.5rem', textAlign: 'right' }}>
+                              <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'flex-end' }}>
+                                <button onClick={() => discardCrop(crop)} title="Descartar" style={{ padding: '0.5rem', borderRadius: '0.5rem', border: '1px solid #fecaca', color: '#dc2626', backgroundColor: 'white', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                  <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
+                                </button>
+                                <button onClick={() => advanceCropStatus(crop)} title="Avanzar Fase" style={{ padding: '0.5rem 1rem', borderRadius: '0.5rem', border: 'none', backgroundColor: '#1e293b', color: 'white', fontWeight: 'bold', fontSize: '0.75rem', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
+                                  <span>Siguiente</span>
+                                  <svg width="14" height="14" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5l7 7-7 7"></path></svg>
+                                </button>
+                              </div>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                      
+                      {activeCropsList.length === 0 && (
+                        <tr>
+                          <td colSpan="5">
+                            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '4rem 2rem', backgroundColor: 'transparent' }}>
+                              <div style={{ fontSize: '3rem', marginBottom: '1rem', opacity: 0.5 }}>🌱</div>
+                              <h3 style={{ fontSize: '1.25rem', fontWeight: 'bold', color: '#334155', margin: '0 0 0.5rem 0' }}>Invernadero Vacío</h3>
+                              <p style={{ color: '#64748b', margin: 0, textAlign: 'center' }}>No hay bandejas en producción actualmente.<br/>Usa el botón de arriba para registrar una nueva siembra.</p>
+                            </div>
+                          </td>
+                        </tr>
+                      )}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
 
         {sowTab === 'historico' && renderHistorial()}
 
