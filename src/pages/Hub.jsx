@@ -34,7 +34,7 @@ export default function Hub() {
             </div>
           </button>
 
-          <button className="hub-card tv-card" onClick={() => navigate('/tv')}>
+          <button className="hub-card tv-card" onClick={() => window.open('/tv', 'TVMode', 'width=1920,height=1080,menubar=no,toolbar=no,location=no,status=no,resizable=yes')}>
             <div className="hub-card-icon">🖥️</div>
             <div className="hub-card-text">
               <h2>Modo TV</h2>
