@@ -77,7 +77,10 @@ export const DataProvider = ({ children }) => {
           supabase.from('stock_entries').select('*'),
           supabase.from('crop_types').select('*'),
           supabase.from('crops').select('*').order('createdAt', { ascending: true }),
-          supabase.from('harvest_targets').select('*').order('createdAt', { ascending: true }),
+          supabase.from('harvest_targets').select('*').then(res => {
+              if (res.error) console.error("Error fetching harvest_targets:", res.error);
+              return res;
+            }),
           supabase.from('harvests').select('*').order('createdAt', { ascending: true }),
           supabase.from('daily_logs').select('*').order('date', { ascending: true }),
         ]);
