@@ -1038,7 +1038,51 @@ export default function Crops() {
         {activeTab === 'stock' && <Supplies />}
       </div>
       
+    
+      {showPhaseChangeModal && (
+        <div style={modalOverlayStyle}>
+          <div style={modalCardStyle}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '1.5rem', alignItems: 'center' }}>
+              <h3 style={{ fontSize: '1.5rem', fontWeight: '900', color: '#0f172a', margin: 0 }}>Ajustar Fase de Cultivo</h3>
+              <button onClick={() => setShowPhaseChangeModal(null)} style={{ background: 'transparent', border: 'none', fontSize: '1.5rem', cursor: 'pointer', color: '#64748b' }}>&times;</button>
+            </div>
+            <p style={{ marginBottom: '1.5rem', color: '#475569', fontSize: '0.95rem' }}>
+              Selecciona la fase a la que deseas mover este lote. Los días de crecimiento se sincronizarán automáticamente con la ficha de cultivo.
+            </p>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+              {['SOAKING', 'GERMINATING', 'DARKNESS', 'LIGHT', 'READY'].map(phase => {
+                const isCurrent = (showPhaseChangeModal.status || 'SOWED') === phase;
+                return (
+                  <button 
+                    key={phase} 
+                    onClick={() => {
+                      setCropPhase(showPhaseChangeModal, phase);
+                      setShowPhaseChangeModal(null);
+                    }}
+                    style={{ 
+                      padding: '1rem', 
+                      border: isCurrent ? '2px solid #3b82f6' : '1px solid #cbd5e1', 
+                      borderRadius: '12px', 
+                      textAlign: 'left', 
+                      backgroundColor: isCurrent ? '#eff6ff' : 'white', 
+                      fontWeight: isCurrent ? 'bold' : 'normal',
+                      cursor: 'pointer',
+                      transition: 'all 0.2s',
+                      display: 'flex',
+                      justifyContent: 'space-between',
+                      alignItems: 'center'
+                    }}
+                  >
+                    <span style={{ color: isCurrent ? '#1e3a8a' : '#334155' }}>{translateStatus(phase)}</span>
+                    {isCurrent && <span style={{ fontSize: '0.75rem', backgroundColor: '#3b82f6', color: 'white', padding: '0.15rem 0.5rem', borderRadius: '999px' }}>Actual</span>}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
-      </ErrorBoundary>
+  </ErrorBoundary>
     );
 }
