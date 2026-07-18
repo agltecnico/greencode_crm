@@ -129,7 +129,7 @@ export default function EmployeeTasks() {
         tasksForDate.push({ type: 'move', title: `Luz (Rutina)`, desc: `Mover ${routine.tuppersCount}b de ${cType.name}`, icon: '🪴', className: 'move' });
       }
       if(harvestWd === targetDayOfWeek && (cType.lightDays || 0) > 0 && !checkPlanted(harvestOffset)) {
-        tasksForDate.push({ type: 'harvest', title: `Cosecha (Rutina)`, desc: `Cosechar ${routine.tuppersCount}b de ${cType.name}`, icon: '📦', className: 'harvest' });
+        tasksForDate.push({ type: 'harvest', title: `Cosecha (Rutina)`, desc: `Cosechar ${routine.tuppersCount}b de ${cType.name}`, icon: '✂️', className: 'harvest', cropTypeId: cType.id });
       }
     });
 
@@ -153,12 +153,12 @@ export default function EmployeeTasks() {
         <div className="task-grid">
           {dayGroup.items.map((task, i) => (
             <div key={i} className={`task-card ${task.className}`} onClick={() => {
-              if (task.type === 'plant') {
-                navigate('/crops?action=sow&cropTypeId=' + task.cropTypeId + '&trays=' + task.trays);
-              } else if (task.type === 'harvest') {
-                navigate('/crops?action=harvest&cropTypeId=' + task.cropTypeId);
-              }
-            }} style={{ cursor: (task.type === 'plant' || task.type === 'harvest') ? 'pointer' : 'default' }}>
+                if (task.type === 'plant') {
+                  navigate('/crops?action=sow&cropTypeId=' + task.cropTypeId + '&trays=' + task.trays);
+                } else if (task.type === 'harvest') {
+                  navigate('/crops?action=harvest&cropTypeId=' + task.cropTypeId);
+                }
+              }} style={{ cursor: (task.type === 'plant' || task.type === 'harvest') ? 'pointer' : 'default' }}>
               <div className="task-icon">{task.icon}</div>
               <div className="task-content">
                 <h4>{task.title}</h4>
