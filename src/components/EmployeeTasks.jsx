@@ -50,19 +50,42 @@ export default function EmployeeTasks() {
       
       const st = crop.status || 'SOWED';
 
-      if (isToday) {
-        if (daysSincePlanted >= germDay && (st === 'SOAKING' || st === 'SOWED')) { action = 'move'; phaseStr = 'GERMINACIÓN'; }
-        else if (daysSincePlanted >= darkDay && st === 'GERMINATING') { action = 'move'; phaseStr = 'OSCURIDAD'; }
-        else if (daysSincePlanted >= lightDay && st === 'DARKNESS') { action = 'move'; phaseStr = 'LUZ'; }
-        else if (daysSincePlanted >= harvestDay && st === 'LIGHT') { action = 'harvest'; }
-      } else {
-        if (daysSincePlanted === germDay) { action = 'move'; phaseStr = 'GERMINACIÓN'; }
-        else if (daysSincePlanted === darkDay) { action = 'move'; phaseStr = 'OSCURIDAD'; }
-        else if (daysSincePlanted === lightDay) { action = 'move'; phaseStr = 'LUZ'; }
-        else if (daysSincePlanted === harvestDay) { action = 'harvest'; }
-      }
+        const hasDarkness = Number(cType?.darknessDays || 0) > 0;
 
-      if (action === 'move') {
+        if (isToday) {
+          if (daysSincePlanted >= germDay && (st === 'SOAKING' || st === 'SOWED')) { 
+            action = 'move'; phaseStr = 'GERMINACIÓN'; 
+          }
+          else if (st === 'GERMINATING') {
+            if (hasDarkness && daysSincePlanted >= darkDay) {
+              action = 'move'; phaseStr = 'OSCURIDAD';
+            } else if (!hasDarkness && daysSincePlanted >= lightDay) {
+              action = 'move'; phaseStr = 'LUZ';
+            }
+          }
+          else if (daysSincePlanted >= lightDay && st === 'DARKNESS') { 
+            action = 'move'; phaseStr = 'LUZ'; 
+          }
+          else if (daysSincePlanted >= harvestDay && st === 'LIGHT') { 
+            action = 'harvest'; 
+          }
+        } else {
+          // Future days: we just look at exactly the day match, regardless of current status
+          if (daysSincePlanted === germDay) { 
+            action = 'move'; phaseStr = 'GERMINACIÓN'; 
+          }
+          else if (hasDarkness && daysSincePlanted === darkDay) { 
+            action = 'move'; phaseStr = 'OSCURIDAD'; 
+          }
+          else if (daysSincePlanted === lightDay) { 
+            action = 'move'; phaseStr = 'LUZ'; 
+          }
+          else if (daysSincePlanted === harvestDay) { 
+            action = 'harvest'; 
+          }
+        }
+
+        if (action === 'move') {
         tasksForDate.push({
           type: 'move',
           title: `Mover a ${phaseStr}`,
