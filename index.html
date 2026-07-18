@@ -15,8 +15,18 @@
     <meta name="theme-color" content="#3db846" />
     <script>
       if ('serviceWorker' in navigator) {
+        navigator.serviceWorker.getRegistrations().then(function(registrations) {
+          for(let registration of registrations) {
+            registration.unregister().then(function(boolean) {
+              if (boolean) {
+                console.log('Service worker unregistered.');
+                window.location.reload();
+              }
+            });
+          }
+        });
         window.addEventListener('load', () => {
-          navigator.serviceWorker.register('/sw.js');
+          navigator.serviceWorker.register('/sw.js?v=' + new Date().getTime());
         });
       }
     </script>
