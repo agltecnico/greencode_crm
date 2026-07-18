@@ -190,7 +190,8 @@ export default function Supplies() {
       <div className="admin-tabs" style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem' }}>
         <button className={`admin-tab ${activeTab === 'INVENTORY' ? 'active' : ''}`} onClick={() => setActiveTab('INVENTORY')}>Inventario (Stock)</button>
         <button className={`admin-tab ${activeTab === 'CATALOG' ? 'active' : ''}`} onClick={() => setActiveTab('CATALOG')}>Catálogo de Artículos</button>
-        <button className={`admin-tab ${activeTab === 'STOCK' ? 'active' : ''}`} onClick={() => setActiveTab('STOCK')}>Entradas y Salidas</button>
+        <button className={`admin-tab ${activeTab === 'STOCK' ? 'active' : ''}`} onClick={() => setActiveTab('STOCK')}>Albaranes de Entrada</button>
+          <button className={`admin-tab ${activeTab === 'STOCK_OUT' ? 'active' : ''}`} onClick={() => setActiveTab('STOCK_OUT')}>Salidas / Consumos</button>
         <button className={`admin-tab ${activeTab === 'EXPENSES' ? 'active' : ''}`} onClick={() => setActiveTab('EXPENSES')}>Historial de Gastos</button>
         <button className={`admin-tab ${activeTab === 'CROP_TYPES_LIST' ? 'active' : ''}`} onClick={() => setActiveTab('CROP_TYPES_LIST')}>Fichas de Cultivo</button>
       </div>
@@ -391,7 +392,15 @@ export default function Supplies() {
               </div>
             )}
 
-            <div className="flex justify-between items-center mb-4 mt-8 pt-6 border-t border-slate-200">
+            
+          </div>
+        )}
+  
+        
+
+        {activeTab === 'STOCK_OUT' && (
+          <div style={{ animation: 'fadeIn 0.3s ease' }}>
+<div className="flex justify-between items-center mb-4">
                <h3 className="font-bold text-lg text-orange-700">Historial de Salidas / Consumos</h3>
             </div>
             <div className="table-container border-orange-200">
@@ -441,7 +450,7 @@ export default function Supplies() {
             )}
           </div>
         )}
-  
+
         {activeTab === 'EXPENSES' && (
         <div style={{ animation: 'fadeIn 0.3s ease' }}>
           <div className="card" style={{ marginBottom: '1.5rem', background: '#f8fafc', display: 'flex', gap: '1rem', flexWrap: 'wrap', alignItems: 'center' }}>
