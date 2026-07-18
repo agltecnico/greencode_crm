@@ -987,8 +987,7 @@ export default function Crops() {
           addHarvestTarget({
             productId: cType.id,
             targetDayOfWeek: dayIndex,
-            tuppersCount: Number(result.value),
-            yieldPerTray: 0
+            tuppersCount: Number(result.value)
           });
         }
       });
