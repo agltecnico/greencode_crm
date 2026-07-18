@@ -1,3 +1,11 @@
+import React, { useState, useEffect } from 'react';
+import EmployeeTasks from '../components/EmployeeTasks';
+import { useData } from '../context/DataContext';
+import '../crops.css';
+
+export default function TvDashboard() {
+  const [tvTab, setTvTab] = useState('tasks');
+  const { crops, seeds, advanceCropStatus, refreshData, orders, clients } = useData();
 
   const translateStatus = (status) => {
     const statusMap = {
@@ -12,14 +20,7 @@
     return statusMap[normalized] || status;
   };
 
-  const activeCropsList = crops?.filter(c => c.status !== 'HARVESTED' && c.status !== 'DISCARDED') || [];import React, { useState, useEffect } from 'react';
-import EmployeeTasks from '../components/EmployeeTasks';
-import { useData } from '../context/DataContext';
-import '../crops.css';
-
-export default function TvDashboard() {
-  const [tvTab, setTvTab] = useState('tasks');
-  const { crops, seeds, advanceCropStatus, refreshData, orders, clients } = useData();
+  const activeCropsList = crops?.filter(c => c.status !== 'HARVESTED' && c.status !== 'DISCARDED') || [];
 
   useEffect(() => {
     // Auto-refresh data every 30 seconds for TV Mode
@@ -41,8 +42,6 @@ export default function TvDashboard() {
     }, 15000); // Rotate every 15 seconds
     return () => clearInterval(rotateInterval);
   }, []);
-
-  const activeCropsList = crops?.filter(c => c.status !== 'HARVESTED' && c.status !== 'DISCARDED') || [];
 
   return (
     <div className="tv-mode" style={{ minHeight: "100vh" }}>
