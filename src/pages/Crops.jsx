@@ -48,6 +48,7 @@ export default function Crops() {
   // Modals state
   const [isSowModalOpen, setIsSowModalOpen] = useState(false);
   const [isHarvestModalOpen, setIsHarvestModalOpen] = useState(false);
+  const [showPhaseChangeModal, setShowPhaseChangeModal] = useState(null);
 
   const [newCrop, setNewCrop] = useState({ cropTypeId: '', traysCount: 1, selectedSeedBatchId: '' });
   const [newTarget, setNewTarget] = useState({ targetDayOfWeek: 1, productId: '', tuppersCount: 1 });
