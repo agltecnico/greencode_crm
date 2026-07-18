@@ -20,7 +20,7 @@ createRoot(document.getElementById('root')).render(
   <StrictMode>
     <BrowserRouter>
       <DataProvider>
-        <App />
+        <GlobalErrorBoundary><App /></GlobalErrorBoundary>
       </DataProvider>
     </BrowserRouter>
   </StrictMode>,
