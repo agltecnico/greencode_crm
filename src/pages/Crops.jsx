@@ -436,12 +436,6 @@ export default function Crops() {
                   <tbody>
                     {activeCropsList
                       .filter(crop => {
-                        if (weekFilter === 'ALL') return true;
-                        const date = new Date(crop.datePlanted || crop.plantedAt);
-                        const daysAgo = Math.floor((new Date() - date) / (1000 * 60 * 60 * 24));
-                        if (weekFilter === 'THIS_WEEK') return daysAgo <= 7;
-                        if (weekFilter === 'LAST_WEEK') return daysAgo > 7 && daysAgo <= 14;
-                        if (weekFilter === 'OLDER') return daysAgo > 14;
                         return true;
                       })
                       .sort((a, b) => {
