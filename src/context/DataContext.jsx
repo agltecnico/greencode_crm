@@ -348,18 +348,20 @@ export const DataProvider = ({ children }) => {
   };
 
     const setCropPhase = async (crop, nextStatus) => {
-    const cType = cropTypes.find(ct => ct.id === crop.cropTypeId || ct.id === crop.seedId);
+        const cType = cropTypes.find(ct => ct.id === crop.cropTypeId || ct.id === crop.seedId);
     let daysToSubtract = 0;
     
     if (cType) {
       const soakDays = cType.soakingHours > 0 ? 1 : 0;
       const germDay = soakDays;
-      const lightDay = germDay + (Number(cType.germinationDays) || 0) + (Number(cType.darknessDays) || 0);
+      const darkDay = germDay + (Number(cType.germinationDays) || 0);
+      const lightDay = darkDay + (Number(cType.darknessDays) || 0);
       const readyDay = lightDay + (Number(cType.lightDays) || 0);
       
       if (nextStatus === 'SOAKING') daysToSubtract = 0;
       else if (nextStatus === 'GERMINATING') daysToSubtract = germDay;
-      else if (nextStatus === 'GROWING') daysToSubtract = lightDay;
+      else if (nextStatus === 'DARKNESS') daysToSubtract = darkDay;
+      else if (nextStatus === 'LIGHT') daysToSubtract = lightDay;
       else if (nextStatus === 'READY') daysToSubtract = readyDay;
     }
 

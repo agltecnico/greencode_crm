@@ -149,7 +149,7 @@ export default function Crops() {
       allowedSeedIds.forEach(seedId => {
         // Find all growing crops matching this seedId or cropTypeId (since cropType matches seedId 1-to-1 usually)
         // Wait, crop.seedId might be null if it's relying on cropTypeId. We need to check both.
-        const matchingCrops = crops.filter(c => c.status === 'GROWING' && (c.seedId === seedId || c.cropTypeId === seedId || cropTypes?.find(ct => ct.id === c.cropTypeId)?.seedId === seedId));
+        const matchingCrops = crops.filter(c => ['SOAKING', 'GERMINATING', 'DARKNESS', 'LIGHT', 'READY'].includes(c.status) && (c.seedId === seedId || c.cropTypeId === seedId || cropTypes?.find(ct => ct.id === c.cropTypeId)?.seedId === seedId));
         
         matchingCrops.sort((a, b) => new Date(a.datePlanted || a.plantedAt) - new Date(b.datePlanted || b.plantedAt));
         if (matchingCrops.length > 0) {
@@ -176,7 +176,8 @@ export default function Crops() {
       'SOAKING': 'En Remojo',
       'SOWED': 'Sembrado',
       'GERMINATING': 'Germinando',
-      'GROWING': 'Creciendo',
+      'DARKNESS': 'Oscuridad',
+        'LIGHT': 'Luz',
         'READY': 'Listo',
       'HARVESTED': 'Cosechado',
       'DISCARDED': 'Descartado'
@@ -418,9 +419,10 @@ export default function Crops() {
                 <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', background: '#f8fafc', padding: '0.25rem', borderRadius: '0.75rem', border: '1px solid #e2e8f0' }}>
                   <button onClick={() => setStatusFilter('ALL')} style={{ padding: '0.5rem 1rem', borderRadius: '0.5rem', fontWeight: 'bold', fontSize: '0.875rem', border: 'none', cursor: 'pointer', transition: 'all 0.2s', backgroundColor: statusFilter === 'ALL' ? 'white' : 'transparent', color: statusFilter === 'ALL' ? '#0f172a' : '#64748b', boxShadow: statusFilter === 'ALL' ? '0 1px 2px rgba(0,0,0,0.05)' : 'none' }}>Todos</button>
                   <button onClick={() => setStatusFilter('SOAKING')} style={{ padding: '0.5rem 1rem', borderRadius: '0.5rem', fontWeight: 'bold', fontSize: '0.875rem', border: 'none', cursor: 'pointer', transition: 'all 0.2s', backgroundColor: statusFilter === 'SOAKING' ? '#dbeafe' : 'transparent', color: statusFilter === 'SOAKING' ? '#1e3a8a' : '#64748b', boxShadow: statusFilter === 'SOAKING' ? '0 1px 2px rgba(0,0,0,0.05)' : 'none' }}>En Remojo</button>
-                  <button onClick={() => setStatusFilter('GERMINATING')} style={{ padding: '0.5rem 1rem', borderRadius: '0.5rem', fontWeight: 'bold', fontSize: '0.875rem', border: 'none', cursor: 'pointer', transition: 'all 0.2s', backgroundColor: statusFilter === 'GERMINATING' ? '#fef3c7' : 'transparent', color: statusFilter === 'GERMINATING' ? '#92400e' : '#64748b', boxShadow: statusFilter === 'GERMINATING' ? '0 1px 2px rgba(0,0,0,0.05)' : 'none' }}>Germinando</button>
-                  <button onClick={() => setStatusFilter('GROWING')} style={{ padding: '0.5rem 1rem', borderRadius: '0.5rem', fontWeight: 'bold', fontSize: '0.875rem', border: 'none', cursor: 'pointer', transition: 'all 0.2s', backgroundColor: statusFilter === 'GROWING' ? '#d1fae5' : 'transparent', color: statusFilter === 'GROWING' ? '#065f46' : '#64748b', boxShadow: statusFilter === 'GROWING' ? '0 1px 2px rgba(0,0,0,0.05)' : 'none' }}>Creciendo</button>
-                  <button onClick={() => setStatusFilter('READY')} style={{ padding: '0.5rem 1rem', borderRadius: '0.5rem', fontWeight: 'bold', fontSize: '0.875rem', border: 'none', cursor: 'pointer', transition: 'all 0.2s', backgroundColor: statusFilter === 'READY' ? '#fce7f3' : 'transparent', color: statusFilter === 'READY' ? '#be185d' : '#64748b', boxShadow: statusFilter === 'READY' ? '0 1px 2px rgba(0,0,0,0.05)' : 'none' }}>Listos</button>
+                  <button onClick={() => setStatusFilter('GERMINATING')} style={{ padding: '0.5rem 1rem', borderRadius: '0.5rem', fontWeight: 'bold', fontSize: '0.875rem', border: 'none', cursor: 'pointer', transition: 'all 0.2s', backgroundColor: statusFilter === 'GERMINATING' ? '#fef3c7' : 'transparent', color: statusFilter === 'GERMINATING' ? '#92400e' : '#64748b', boxShadow: statusFilter === 'GERMINATING' ? '0 1px 2px rgba(0,0,0,0.05)' : 'none' }}>Germinación</button>
+                  <button onClick={() => setStatusFilter('DARKNESS')} style={{ padding: '0.5rem 1rem', borderRadius: '0.5rem', fontWeight: 'bold', fontSize: '0.875rem', border: 'none', cursor: 'pointer', transition: 'all 0.2s', backgroundColor: statusFilter === 'DARKNESS' ? '#e0e7ff' : 'transparent', color: statusFilter === 'DARKNESS' ? '#3730a3' : '#64748b', boxShadow: statusFilter === 'DARKNESS' ? '0 1px 2px rgba(0,0,0,0.05)' : 'none' }}>Oscuridad</button>
+                  <button onClick={() => setStatusFilter('LIGHT')} style={{ padding: '0.5rem 1rem', borderRadius: '0.5rem', fontWeight: 'bold', fontSize: '0.875rem', border: 'none', cursor: 'pointer', transition: 'all 0.2s', backgroundColor: statusFilter === 'LIGHT' ? '#ccfbf1' : 'transparent', color: statusFilter === 'LIGHT' ? '#0f766e' : '#64748b', boxShadow: statusFilter === 'LIGHT' ? '0 1px 2px rgba(0,0,0,0.05)' : 'none' }}>Luz</button>
+                  <button onClick={() => setStatusFilter('READY')} style={{ padding: '0.5rem 1rem', borderRadius: '0.5rem', fontWeight: 'bold', fontSize: '0.875rem', border: 'none', cursor: 'pointer', transition: 'all 0.2s', backgroundColor: statusFilter === 'READY' ? '#dcfce7' : 'transparent', color: statusFilter === 'READY' ? '#166534' : '#64748b', boxShadow: statusFilter === 'READY' ? '0 1px 2px rgba(0,0,0,0.05)' : 'none' }}>Listos</button>
                 </div>
               </div>
 
@@ -456,7 +458,8 @@ export default function Crops() {
                         const statusStr = (crop.status || '').toUpperCase();
                         if (statusStr === 'SOAKING') statusColor = { bg: '#dbeafe', text: '#1e3a8a', bar: '#3b82f6' };
                         else if (statusStr === 'GERMINATING') statusColor = { bg: '#fef3c7', text: '#92400e', bar: '#f59e0b' };
-                        else if (statusStr === 'GROWING') statusColor = { bg: '#d1fae5', text: '#065f46', bar: '#10b981' };
+                        else if (statusStr === 'DARKNESS') statusColor = { bg: '#e0e7ff', text: '#3730a3', bar: '#4f46e5' };
+                          else if (statusStr === 'LIGHT') statusColor = { bg: '#ccfbf1', text: '#0f766e', bar: '#14b8a6' };
                           else if (statusStr === 'READY') statusColor = { bg: '#dcfce7', text: '#166534', bar: '#22c55e' };
 
                         return (
@@ -564,7 +567,7 @@ export default function Crops() {
                     <span>2. Selecciona las bandejas que vas a cortar:</span>
                   </label>
                   <div className="max-h-48 overflow-y-auto border border-slate-300 rounded-lg p-2 bg-slate-50 flex flex-col gap-2">
-                    {(crops?.filter(c => c.status === 'GROWING' || c.status === 'READY') || []).map(crop => {
+                    {(crops?.filter(c => c.status === 'LIGHT' || c.status === 'READY') || []).map(crop => {
                       const cType = cropTypes?.find(c => c.id === crop.seedId || c.id === crop.cropTypeId);
                       const isChecked = newHarvest.selectedCropIds.includes(crop.id);
                       
@@ -601,7 +604,7 @@ export default function Crops() {
                         </label>
                       );
                     })}
-                    {(crops?.filter(c => c.status === 'GROWING' || c.status === 'READY') || []).length === 0 && (
+                    {(crops?.filter(c => c.status === 'LIGHT' || c.status === 'READY') || []).length === 0 && (
                       <p className="text-slate-500 text-sm text-center py-2">No hay cultivos listos para cosechar.</p>
                     )}
                   </div>
@@ -624,7 +627,7 @@ export default function Crops() {
       <div className="premium-card mt-6">
         <h3 className="premium-card-title mb-4">🌱 Cultivos Listos para Cosechar</h3>
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {(crops?.filter(c => c.status === 'GROWING' || c.status === 'READY') || []).map(crop => {
+          {(crops?.filter(c => c.status === 'LIGHT' || c.status === 'READY') || []).map(crop => {
             const cType = cropTypes?.find(c => c.id === crop.seedId || c.id === crop.cropTypeId);
             const daysAlive = Math.floor((new Date() - new Date(crop.datePlanted || crop.plantedAt)) / (1000 * 60 * 60 * 24));
             
@@ -650,7 +653,7 @@ export default function Crops() {
               </div>
             );
           })}
-          {(crops?.filter(c => c.status === 'GROWING' || c.status === 'READY') || []).length === 0 && (
+          {(crops?.filter(c => c.status === 'LIGHT' || c.status === 'READY') || []).length === 0 && (
             <div className="col-span-full text-center py-6 bg-gray-50 rounded-xl border border-dashed border-gray-300">
               <p className="text-gray-500">No hay cultivos en fase de crecimiento actualmente.</p>
             </div>
