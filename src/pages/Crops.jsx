@@ -805,25 +805,25 @@ export default function Crops() {
     const days = ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb'];
     let currentDayOffset = 0;
     
-    // Germination
-    const hasSoak = cType.soakingTime > 0;
-    if (hasSoak) currentDayOffset += 1;
+    // Soaking/Germination
+    const hasSoak = Number(cType.soakDays) > 0;
+    if (hasSoak) currentDayOffset += Number(cType.soakDays);
     const germDay = (sowDayOfWeek + currentDayOffset) % 7;
     const germWeek = Math.floor((sowDayOfWeek + currentDayOffset) / 7);
     
     // Darkness
-    currentDayOffset += Number(cType.germinationTime) || 0;
-    const hasDarkness = cType.darknessTime > 0;
+    currentDayOffset += Number(cType.germinationDays) || 0;
+    const hasDarkness = Number(cType.darknessDays) > 0;
     const darkDay = hasDarkness ? (sowDayOfWeek + currentDayOffset) % 7 : null;
     const darkWeek = hasDarkness ? Math.floor((sowDayOfWeek + currentDayOffset) / 7) : 0;
     
     // Light
-    currentDayOffset += Number(cType.darknessTime) || 0;
+    currentDayOffset += Number(cType.darknessDays) || 0;
     const lightDay = (sowDayOfWeek + currentDayOffset) % 7;
     const lightWeek = Math.floor((sowDayOfWeek + currentDayOffset) / 7);
     
     // Harvest
-    currentDayOffset += Number(cType.lightTime) || 0;
+    currentDayOffset += Number(cType.lightDays) || 0;
     const harvestDay = (sowDayOfWeek + currentDayOffset) % 7;
     const harvestWeek = Math.floor((sowDayOfWeek + currentDayOffset) / 7);
     
