@@ -106,7 +106,8 @@ export default function EmployeeTasks() {
         tDate.setDate(tDate.getDate() - offset);
         tDate.setHours(0,0,0,0);
         return crops.some(c => {
-          if (c.cropTypeId !== routine.productId && c.seedId !== routine.productId) return false;
+          if (c.status === 'DISCARDED') return false;
+            if (c.cropTypeId !== routine.productId && c.seedId !== routine.productId) return false;
           const cDate = new Date(c.datePlanted);
           cDate.setHours(0,0,0,0);
           return Math.abs((cDate - tDate) / 86400000) <= 1;
