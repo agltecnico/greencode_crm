@@ -441,8 +441,11 @@ export default function Crops() {
                   <tbody>
                     {activeCropsList
                       .filter(crop => {
-                        return true;
-                      })
+                          if (statusFilter === 'ALL') return true;
+                          const s = crop.status || 'SOWED';
+                          if (statusFilter === 'READY') return s === 'READY';
+                          return s === statusFilter;
+                        })
                       .sort((a, b) => {
                         // Older crops (closest to harvest) first
                         const dateA = new Date(a.datePlanted || a.plantedAt);
