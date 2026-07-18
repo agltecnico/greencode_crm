@@ -349,7 +349,7 @@ export default function Crops() {
           {/* SOWING SMART TASKS OUTSIDE MODAL */}
           {(() => {
             const today = new Date();
-            const targetDayOfWeek = today.getDay() || 7;
+            const targetDayOfWeek = today.getDay();
             const tasks = [];
             
             (harvestTargets || []).forEach(routine => {
