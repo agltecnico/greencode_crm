@@ -18,7 +18,7 @@ export default function TvDashboard() {
 
 
   useEffect(() => {
-    const tabs = ['tasks', 'greenhouse', 'orders'];
+    const tabs = ['tasks', 'greenhouse', 'climate', 'orders'];
     const rotateInterval = setInterval(() => {
       setTvTab(prev => {
         const nextIndex = (tabs.indexOf(prev) + 1) % tabs.length;
@@ -85,6 +85,25 @@ export default function TvDashboard() {
           }}>
           📦 ESTADO PEDIDOS
         </button>
+
+        <button 
+          onClick={() => setTvTab('climate')}
+          style={{
+            background: tvTab === 'climate' ? 'linear-gradient(135deg, #34d399, #0ea5e9)' : '#1e293b',
+            color: tvTab === 'climate' ? 'white' : '#94a3b8',
+            border: '2px solid',
+            borderColor: tvTab === 'climate' ? 'transparent' : '#334155',
+            padding: '1rem 3rem',
+            fontSize: '1.5rem',
+            fontWeight: '900',
+            borderRadius: '16px',
+            cursor: 'pointer',
+            transition: 'all 0.3s ease',
+            boxShadow: tvTab === 'climate' ? '0 10px 25px rgba(52, 211, 153, 0.3)' : 'none'
+          }}>
+          🌡️ CLIMA ACTUAL
+        </button>
+
       </div>
   
         {tvTab === 'tasks' && (

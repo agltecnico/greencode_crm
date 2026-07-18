@@ -167,7 +167,7 @@ export default function EmployeeTasks() {
         </div>
       </div>
 
-      <div className="dashboard-layout">
+      
         
         
         <div className="tasks-list-area">
@@ -234,51 +234,7 @@ export default function EmployeeTasks() {
           )}
         </div>
 
-
-        <div className="climate-sidebar">
-          <div className="climate-widget">
-            <div className="climate-widget-header">
-              <span style={{ fontSize: '2rem' }}>🌡️</span>
-              <h3>Clima Invernadero</h3>
-            </div>
-            
-            <p className="climate-desc">
-              Introduce las métricas actuales. Se requiere un registro diario obligatorio por normativas de Sanidad.
-            </p>
-            
-            <div className="climate-form">
-              <div className="climate-input-group">
-                <label className="climate-label">Temperatura (°C)</label>
-                <input type="number" id="temp-input" step="0.1" className="climate-input" placeholder="Ej: 24.5" />
-              </div>
-              
-              <div className="climate-input-group">
-                <label className="climate-label">Humedad (%)</label>
-                <input type="number" id="hum-input" className="climate-input" placeholder="Ej: 55" />
-              </div>
-
-              <button 
-                className="climate-btn"
-                onClick={() => {
-                   const t = document.getElementById('temp-input').value;
-                   const h = document.getElementById('hum-input').value;
-                   if(t && h) {
-                     if(addDailyLog) addDailyLog({ temperature: t, humidity: h, date: new Date().toISOString() });
-                     alert("✅ Registro climático guardado con éxito.");
-                     document.getElementById('temp-input').value = '';
-                     document.getElementById('hum-input').value = '';
-                   }
-                }}
-              >
-                REGISTRAR LECTURA
-              </button>
-            </div>
-          </div>
-        </div>
-
-      </div>
-
-      {selectedDayTasks && (
+{selectedDayTasks && (
         <div style={{
           position: 'fixed', top: 0, left: 0, width: '100vw', height: '100vh',
           background: 'rgba(15, 23, 42, 0.7)', backdropFilter: 'blur(4px)',
