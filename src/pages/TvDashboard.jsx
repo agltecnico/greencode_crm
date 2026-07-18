@@ -127,41 +127,31 @@ export default function TvDashboard() {
         
         {tvTab === 'greenhouse' && (
           <div style={{ animation: 'fadeIn 0.4s ease' }}>
-            <div className="tasks-header" style={{ marginBottom: '3rem' }}>
-            <h2>Visión General del Invernadero</h2>
-            <p style={{ color: '#94a3b8', fontSize: '1.25rem' }}>Estado en tiempo real de todas las bandejas cultivadas.</p>
-          </div>
-          
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-            {activeCropsList.map(crop => {
-              const cType = cropTypes?.find(c => c.id === crop.cropTypeId) || seeds?.find(s => s.id === crop.seedId);
-              const daysAlive = Math.floor((new Date() - new Date(crop.datePlanted)) / (1000 * 60 * 60 * 24));
-              
-              return (
-                <div key={crop.id} className={`status-card ${crop.status}`} style={{ background: '#1e293b', borderColor: '#334155', padding: '2rem' }}>
-                  <div className="status-header" style={{ marginBottom: '1.5rem' }}>
-                    <div>
-                      <h4 className="status-title" style={{ color: '#f8fafc', fontSize: '1.5rem', minHeight: '36px' }}>{cType?.name || 'Variedad Desconocida'}</h4>
-                      <span className="status-batch" style={{ background: '#0f172a', color: '#94a3b8', fontSize: '1rem', padding: '4px 12px' }}>LOTE: {crop.batchNumber}</span>
+            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 xl:grid-cols-6 2xl:grid-cols-8 gap-4" style={{ marginTop: '2rem' }}>
+              {activeCropsList.map(crop => {
+                const cType = cropTypes?.find(c => c.id === crop.cropTypeId) || seeds?.find(s => s.id === crop.seedId);
+                const daysAlive = Math.floor((new Date() - new Date(crop.datePlanted)) / (1000 * 60 * 60 * 24));
+                
+                return (
+                  <div key={crop.id} className={`status-card ${crop.status}`} style={{ background: '#1e293b', borderColor: '#334155', padding: '1rem' }}>
+                    <div className="status-header" style={{ marginBottom: '0.75rem' }}>
+                      <div>
+                        <h4 className="status-title" style={{ color: '#f8fafc', fontSize: '1rem', minHeight: '24px', margin: 0 }}>{cType?.name || 'Variedad Desconocida'}</h4>
+                        <span className="status-batch" style={{ background: '#0f172a', color: '#94a3b8', fontSize: '0.75rem', padding: '2px 8px', display: 'inline-block', marginTop: '4px' }}>LOTE: {crop.batchNumber}</span>
+                      </div>
+                    </div>
+                    
+                    <div className="status-footer" style={{ borderTopColor: '#334155', marginTop: '0.75rem', paddingTop: '0.75rem', borderTop: '1px solid #334155' }}>
+                      <div>
+                        <p style={{ margin: '0 0 2px 0', fontSize: '0.65rem', fontWeight: 'bold', color: '#64748b', textTransform: 'uppercase' }}>Estado</p>
+                        <p className="status-current" style={{ fontSize: '1.2rem', margin: 0 }}>{translateStatus(crop.status)}</p>
+                        <p className="status-days" style={{ fontSize: '0.8rem', color: '#cbd5e1', marginTop: '2px', marginBottom: 0 }}>Día {daysAlive}</p>
+                      </div>
                     </div>
                   </div>
-                  
-                  <div className="status-footer" style={{ borderTopColor: '#334155', marginTop: '1.5rem', paddingTop: '1.5rem' }}>
-                    <div>
-                      <p style={{ margin: '0 0 4px 0', fontSize: '0.8rem', fontWeight: 'bold', color: '#64748b', textTransform: 'uppercase' }}>Estado Actual</p>
-                      <p className="status-current" style={{ fontSize: '1.8rem' }}>{translateStatus(crop.status)}</p>
-                      <p className="status-days" style={{ fontSize: '1rem', color: '#cbd5e1', marginTop: '4px' }}>Día {daysAlive}</p>
-                    </div>
-                    <button 
-                      onClick={() => advanceCropStatus(crop)} 
-                      style={{ background: '#0f172a', color: '#38bdf8', border: '1px solid #38bdf8', padding: '12px 20px', borderRadius: '12px', cursor: 'pointer', fontSize: '1.1rem', fontWeight: '900', boxShadow: '0 4px 10px rgba(56, 189, 248, 0.1)' }}>
-                      Avanzar ⏭
-                    </button>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
+                );
+              })}
+            </div>
           
           {activeCropsList.length === 0 && (
             <div style={{ textAlign: 'center', padding: '5rem', color: '#64748b', fontSize: '1.5rem' }}>
