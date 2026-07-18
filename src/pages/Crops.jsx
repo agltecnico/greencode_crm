@@ -916,26 +916,36 @@ export default function Crops() {
     const hasSoak = cType.soakingTime > 0;
     if (hasSoak) currentDayOffset += 1;
     const germDay = (sowDayOfWeek + currentDayOffset) % 7;
+    const germWeek = Math.floor((sowDayOfWeek + currentDayOffset) / 7);
     
     // Darkness
     currentDayOffset += Number(cType.germinationTime) || 0;
     const hasDarkness = cType.darknessTime > 0;
     const darkDay = hasDarkness ? (sowDayOfWeek + currentDayOffset) % 7 : null;
+    const darkWeek = hasDarkness ? Math.floor((sowDayOfWeek + currentDayOffset) / 7) : 0;
     
     // Light
     currentDayOffset += Number(cType.darknessTime) || 0;
     const lightDay = (sowDayOfWeek + currentDayOffset) % 7;
+    const lightWeek = Math.floor((sowDayOfWeek + currentDayOffset) / 7);
     
     // Harvest
     currentDayOffset += Number(cType.lightTime) || 0;
     const harvestDay = (sowDayOfWeek + currentDayOffset) % 7;
+    const harvestWeek = Math.floor((sowDayOfWeek + currentDayOffset) / 7);
     
+    const formatDay = (dayStr, weekOffset) => {
+      if (weekOffset === 0) return dayStr;
+      if (weekOffset === 1) return dayStr + ' (+1s)';
+      return dayStr + ` (+${weekOffset}s)`;
+    };
+
     return {
       soak: hasSoak ? days[sowDayOfWeek] : null,
-      germ: days[germDay],
-      dark: hasDarkness ? days[darkDay] : null,
-      light: days[lightDay],
-      harvest: days[harvestDay]
+      germ: formatDay(days[germDay], germWeek),
+      dark: hasDarkness ? formatDay(days[darkDay], darkWeek) : null,
+      light: formatDay(days[lightDay], lightWeek),
+      harvest: formatDay(days[harvestDay], harvestWeek)
     };
   };
 
