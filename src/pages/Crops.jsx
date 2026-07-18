@@ -36,6 +36,31 @@ export default function Crops() {
   const selectedCropType = cropTypes?.find(c => c.id === newCrop.cropTypeId);
   const totalAvailableSeed = stockEntries?.filter(e => e.articleId === selectedCropType?.seedId).reduce((acc, curr) => acc + Number(curr.quantity || 0), 0) || 0;
 
+  const availableBatches = React.useMemo(() => {
+    if (!selectedCropType?.seedId) return [];
+    const entries = stockEntries?.filter(e => e.articleId === selectedCropType.seedId) || [];
+    const batches = {};
+    entries.forEach(e => {
+      const batch = e.batchNumber || 'SIN_LOTE';
+      if (!batches[batch]) batches[batch] = { batchNumber: batch, quantity: 0, date: e.purchaseDate || e.createdAt || '' };
+      batches[batch].quantity += Number(e.quantity || 0);
+      const eDate = e.purchaseDate || e.createdAt || '';
+      if (eDate && eDate < batches[batch].date) batches[batch].date = eDate;
+    });
+    
+    return Object.values(batches)
+      .filter(b => b.quantity > 0)
+      .sort((a, b) => String(a.date || '').localeCompare(String(b.date || ''))); // Oldest first
+  }, [selectedCropType, stockEntries]);
+
+  const oldestBatch = availableBatches.length > 0 ? availableBatches[0].batchNumber : '';
+
+  React.useEffect(() => {
+    if (oldestBatch && newCrop.cropTypeId && !newCrop.selectedSeedBatchId) {
+      setNewCrop(prev => ({ ...prev, selectedSeedBatchId: oldestBatch }));
+    }
+  }, [oldestBatch, newCrop.cropTypeId]);
+
   const handleAddCrop = async (e) => { 
     e.preventDefault(); 
     try {
