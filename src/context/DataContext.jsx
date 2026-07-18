@@ -301,14 +301,14 @@ export const DataProvider = ({ children }) => {
     
     // 2. Create the Crop Record using existing DB columns: seedId, datePlanted, batchNumber
     const cropRecord = {
-      cropTypeId: cType.id,
-      traysCount: trays,
-      gramsPerTray: cType.seedGrams || 0,
-      substrateCostPerTray: 0,
-      status: cType.soakingHours > 0 ? 'SOAKING' : 'SOWED',
-      datePlanted: new Date().toISOString(),
-      batchNumber: batchNum
-    };
+        cropTypeId: cType.id,
+        traysCount: trays,
+        gramsPerTray: cType.seedGrams || 0,
+        substrateCostPerTray: 0,
+        status: cType.soakingHours > 0 ? 'SOAKING' : 'SOWED',
+        datePlanted: new Date().toISOString(),
+        batchNumber: newCrop.selectedSeedBatchId || 'SIN_LOTE'
+      };
     
     await addCrop(cropRecord);
 
