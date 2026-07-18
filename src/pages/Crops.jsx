@@ -356,7 +356,7 @@ export default function Crops() {
               const cType = (cropTypes || []).find(ct => ct.id === routine.productId);
               if(!cType) return;
               
-              const plantWd = routine.targetDayOfWeek;
+              const plantWd = Number(routine.targetDayOfWeek);
               
               const isPlanted = (crops || []).some(c => {
                 if(c.cropTypeId !== cType.id) return false;
