@@ -28,28 +28,31 @@ export default function EmployeeTasks() {
     const tasksForDate = [];
 
     activeCrops.forEach(crop => {
-      const seed = seeds?.find(s => s.id === crop.seedId);
-      if(!seed) return;
-      const cType = cropTypes?.find(ct => ct.id === crop.cropTypeId);
+      const cType = cropTypes?.find(c => c.id === crop.cropTypeId || c.id === crop.seedId);
+      const seed = seeds?.find(s => s.id === cType?.seedId || s.id === crop.seedId);
+      if (!cType || !seed) return;
 
-      const planted = new Date(crop.datePlanted);
+      const planted = new Date(crop.datePlanted || crop.plantedAt);
       planted.setHours(0,0,0,0);
       const daysSincePlanted = Math.floor((targetDate - planted) / (1000 * 60 * 60 * 24));
-      
+      if (daysSincePlanted < 0) return;
+
       const soakOffset = (cType?.soakingHours || 0) > 0 ? 1 : 0;
       const germDay = soakOffset;
       const darkDay = soakOffset + Number((cType?.germinationDays || 0));
-      const lightDay = soakOffset + Number((cType?.germinationDays || 0)) + Number((cType?.darknessDays || 0));
-      const harvestDay = soakOffset + Number((cType?.germinationDays || 0)) + Number((cType?.darknessDays || 0)) + Number((cType?.lightDays || 0));
+      const lightDay = darkDay + Number((cType?.darknessDays || 0));
+      const harvestDay = lightDay + Number((cType?.lightDays || 0));
 
       let action = null;
       let phaseStr = '';
       
+      const st = crop.status || 'SOWED';
+
       if (isToday) {
-        if (daysSincePlanted >= germDay && crop.status === 'SOAKING') { action = 'move'; phaseStr = 'GERMINACIÓN'; }
-        else if (daysSincePlanted >= darkDay && crop.status === 'GERMINATION') { action = 'move'; phaseStr = 'OSCURIDAD'; }
-        else if (daysSincePlanted >= lightDay && crop.status === 'DARKNESS') { action = 'move'; phaseStr = 'LUZ'; }
-        else if (daysSincePlanted >= harvestDay && crop.status === 'LIGHT') { action = 'harvest'; }
+        if (daysSincePlanted >= germDay && (st === 'SOAKING' || st === 'SOWED')) { action = 'move'; phaseStr = 'GERMINACIÓN'; }
+        else if (daysSincePlanted >= darkDay && st === 'GERMINATING') { action = 'move'; phaseStr = 'OSCURIDAD'; }
+        else if (daysSincePlanted >= lightDay && st === 'DARKNESS') { action = 'move'; phaseStr = 'LUZ'; }
+        else if (daysSincePlanted >= harvestDay && st === 'LIGHT') { action = 'harvest'; }
       } else {
         if (daysSincePlanted === germDay) { action = 'move'; phaseStr = 'GERMINACIÓN'; }
         else if (daysSincePlanted === darkDay) { action = 'move'; phaseStr = 'OSCURIDAD'; }
@@ -62,7 +65,7 @@ export default function EmployeeTasks() {
           type: 'move',
           title: `Mover a ${phaseStr}`,
           desc: `${crop.traysCount} bandejas de ${seed.name} (Lote: ${crop.batchNumber})`,
-          icon: '🌱',
+          icon: '🪴',
           className: 'move'
         });
       } else if (action === 'harvest') {
@@ -70,42 +73,61 @@ export default function EmployeeTasks() {
           type: 'harvest',
           title: `¡COSECHAR!`,
           desc: `${crop.traysCount} bandejas de ${seed.name} (Lote: ${crop.batchNumber})`,
-          icon: '🔪',
+          icon: '📦',
           className: 'harvest'
         });
       }
     });
 
     harvestTargets?.forEach(routine => {
-      // En el planificador directo, productId guarda el cropTypeId
       const cType = cropTypes?.find(ct => ct.id === routine.productId);
       if(!cType) return;
       const seed = seeds?.find(s => s.id === cType.seedId);
       if(!seed) return;
 
-      if(routine.targetDayOfWeek === targetDayOfWeek) {
-        tasksForDate.push({
-          type: 'plant',
-          title: `Plantar ${cType.name}`,
-          desc: `Rutina semanal: ${routine.tuppersCount} bandejas`,
-          icon: '🪴',
-          className: 'plant'
+      const plantWd = routine.targetDayOfWeek;
+      const soakHrs = cType.soakingHours || 0;
+      const soakOffset = soakHrs > 0 ? 1 : 0;
+      const germOffset = soakOffset;
+      const darkOffset = soakOffset + Number(cType.germinationDays || 0);
+      const lightOffset = darkOffset + Number(cType.darknessDays || 0);
+      const harvestOffset = lightOffset + Number(cType.lightDays || 0);
+
+      const soakWd = (plantWd - 1 + 7) % 7;
+      const germWd = (plantWd + germOffset) % 7;
+      const darkWd = (plantWd + darkOffset) % 7;
+      const lightWd = (plantWd + lightOffset) % 7;
+      const harvestWd = (plantWd + harvestOffset) % 7;
+
+      const checkPlanted = (offset) => {
+        const tDate = new Date(targetDate);
+        tDate.setDate(tDate.getDate() - offset);
+        tDate.setHours(0,0,0,0);
+        return crops.some(c => {
+          if (c.cropTypeId !== routine.productId && c.seedId !== routine.productId) return false;
+          const cDate = new Date(c.datePlanted);
+          cDate.setHours(0,0,0,0);
+          return Math.abs((cDate - tDate) / 86400000) <= 1;
         });
+      };
+
+      if(plantWd === targetDayOfWeek && !checkPlanted(0)) {
+        tasksForDate.push({ type: 'plant', title: `Plantar ${cType.name}`, desc: `Rutina semanal: ${routine.tuppersCount} bandejas`, icon: '🌱', className: 'plant' });
       }
-      
-      if((cType?.soakingHours || 0) > 0) {
-        let soakingDay = routine.targetDayOfWeek - 1;
-        if(soakingDay < 0) soakingDay += 7;
-        
-        if(soakingDay === targetDayOfWeek) {
-          tasksForDate.push({
-            type: 'soak',
-            title: `Poner a remojo ${seed.name}`,
-            desc: `${(cType?.soakingHours || 0)}h de remojo para las ${routine.tuppersCount} bandejas de mañana.`,
-            icon: '💧',
-            className: 'soak'
-          });
-        }
+      if(soakHrs > 0 && soakWd === targetDayOfWeek && !checkPlanted(-1)) {
+        tasksForDate.push({ type: 'soak', title: `Remojo: ${seed.name}`, desc: `Rutina: ${soakHrs}h para ${routine.tuppersCount} bandejas.`, icon: '💧', className: 'soak' });
+      }
+      if(germWd === targetDayOfWeek && germOffset > 0 && !checkPlanted(germOffset)) {
+        tasksForDate.push({ type: 'move', title: `Germinación (Rutina)`, desc: `Mover ${routine.tuppersCount}b de ${cType.name}`, icon: '🪴', className: 'move' });
+      }
+      if(darkWd === targetDayOfWeek && (cType.germinationDays || 0) > 0 && !checkPlanted(darkOffset)) {
+        tasksForDate.push({ type: 'move', title: `Oscuridad (Rutina)`, desc: `Mover ${routine.tuppersCount}b de ${cType.name}`, icon: '🪴', className: 'move' });
+      }
+      if(lightWd === targetDayOfWeek && (cType.darknessDays || 0) > 0 && !checkPlanted(lightOffset)) {
+        tasksForDate.push({ type: 'move', title: `Luz (Rutina)`, desc: `Mover ${routine.tuppersCount}b de ${cType.name}`, icon: '🪴', className: 'move' });
+      }
+      if(harvestWd === targetDayOfWeek && (cType.lightDays || 0) > 0 && !checkPlanted(harvestOffset)) {
+        tasksForDate.push({ type: 'harvest', title: `Cosecha (Rutina)`, desc: `Cosechar ${routine.tuppersCount}b de ${cType.name}`, icon: '📦', className: 'harvest' });
       }
     });
 
