@@ -1,3 +1,4 @@
+/* eslint-disable no-unused-vars */
 import { useState, useMemo, useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useData } from '../context/DataContext';
@@ -33,7 +34,7 @@ export default function Crops() {
     crops, sowCrop, updateCrop, advanceCropStatus, setCropPhase, discardCrop, deleteCrop,
     stockEntries, articles,
     cropTypes,
-    harvestTargets, addHarvestTarget, deleteHarvestTarget,
+    harvestTargets, addHarvestTarget, updateHarvestTarget, deleteHarvestTarget,
     harvests, addHarvest,
     products,
     orders, clients, updateOrderList
@@ -907,73 +908,178 @@ export default function Crops() {
     );
   };
 
-  const renderPlanificador = () => (
-    <div>
-      <div style={{ background: 'linear-gradient(135deg, #f0fdf4, #ccfbf1)', border: '1px solid #99f6e4', padding: '2rem', borderRadius: '20px', marginBottom: '2rem' }}>
-        <h2 style={{ margin: '0 0 0.5rem 0', fontSize: '1.8rem', fontWeight: 900, color: '#065f46' }}>Planificador Semanal de Siembra</h2>
-        <p style={{ margin: 0, color: '#047857', fontSize: '1.1rem', fontWeight: 500, lineHeight: 1.5 }}>
-          Define qué variedades vas a sembrar cada día de la semana para mantener tu ritmo de producción. El sistema generará automáticamente las tareas de Siembra y te avisará un día antes si la semilla requiere remojo.
-        </p>
+  const calculateCycleDays = (sowDayOfWeek, cType) => {
+    const days = ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb'];
+    let currentDayOffset = 0;
+    
+    // Germination
+    const hasSoak = cType.soakingTime > 0;
+    if (hasSoak) currentDayOffset += 1;
+    const germDay = (sowDayOfWeek + currentDayOffset) % 7;
+    
+    // Darkness
+    currentDayOffset += Number(cType.germinationTime) || 0;
+    const hasDarkness = cType.darknessTime > 0;
+    const darkDay = hasDarkness ? (sowDayOfWeek + currentDayOffset) % 7 : null;
+    
+    // Light
+    currentDayOffset += Number(cType.darknessTime) || 0;
+    const lightDay = (sowDayOfWeek + currentDayOffset) % 7;
+    
+    // Harvest
+    currentDayOffset += Number(cType.lightTime) || 0;
+    const harvestDay = (sowDayOfWeek + currentDayOffset) % 7;
+    
+    return {
+      soak: hasSoak ? days[sowDayOfWeek] : null,
+      germ: days[germDay],
+      dark: hasDarkness ? days[darkDay] : null,
+      light: days[lightDay],
+      harvest: days[harvestDay]
+    };
+  };
+
+  const handleCellClick = (cType, dayIndex) => {
+    const existing = harvestTargets?.find(ht => ht.productId === cType.id && ht.targetDayOfWeek === dayIndex);
+    const dayNames = ['Domingo','Lunes','Martes','Miércoles','Jueves','Viernes','Sábado'];
+    if (existing) {
+      Swal.fire({
+        title: 'Modificar Rutina',
+        html: `¿Cuántas bandejas quieres sembrar de <b>${cType.name}</b> los <b>${dayNames[dayIndex]}</b>?`,
+        input: 'number',
+        inputValue: existing.tuppersCount,
+        showCancelButton: true,
+        showDenyButton: true,
+        confirmButtonColor: '#059669',
+        denyButtonColor: '#ef4444',
+        confirmButtonText: 'Actualizar',
+        denyButtonText: 'Eliminar Siembra',
+        cancelButtonText: 'Cancelar'
+      }).then((result) => {
+        if (result.isConfirmed && result.value > 0) {
+          updateHarvestTarget(existing.id, { tuppersCount: Number(result.value) });
+        } else if (result.isDenied || (result.isConfirmed && result.value <= 0)) {
+          deleteHarvestTarget(existing.id);
+        }
+      });
+    } else {
+      Swal.fire({
+        title: 'Nueva Siembra Semanal',
+        html: `¿Cuántas bandejas quieres sembrar de <b>${cType.name}</b> los <b>${dayNames[dayIndex]}</b>?`,
+        input: 'number',
+        inputValue: 1,
+        showCancelButton: true,
+        confirmButtonColor: '#059669',
+        confirmButtonText: 'Añadir Rutina',
+        cancelButtonText: 'Cancelar'
+      }).then((result) => {
+        if (result.isConfirmed && result.value > 0) {
+          addHarvestTarget({
+            productId: cType.id,
+            targetDayOfWeek: dayIndex,
+            tuppersCount: Number(result.value),
+            yieldPerTray: 0
+          });
+        }
+      });
+    }
+  };
+
+  const renderPlanificador = () => {
+    const tableDays = [
+      { idx: 1, name: 'Lunes' },
+      { idx: 2, name: 'Martes' },
+      { idx: 3, name: 'Miércoles' },
+      { idx: 4, name: 'Jueves' },
+      { idx: 5, name: 'Viernes' },
+      { idx: 6, name: 'Sábado' },
+      { idx: 0, name: 'Domingo' }
+    ];
+
+    return (
+      <div>
+        <div style={{ background: 'linear-gradient(135deg, #f0fdf4, #ccfbf1)', border: '1px solid #99f6e4', padding: '2rem', borderRadius: '20px', marginBottom: '2rem' }}>
+          <h2 style={{ margin: '0 0 0.5rem 0', fontSize: '1.8rem', fontWeight: 900, color: '#065f46' }}>Planificador Semanal de Siembra</h2>
+          <p style={{ margin: 0, color: '#047857', fontSize: '1.1rem', fontWeight: 500, lineHeight: 1.5 }}>
+            Haz clic en cualquier celda para añadir o modificar la cantidad de bandejas a sembrar.
+          </p>
+        </div>
+
+        {renderSowingAnalytics()}
+
+        <div style={{ overflowX: 'auto', background: 'white', borderRadius: '16px', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.05)', padding: '1.5rem', marginBottom: '2rem' }}>
+          <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: '800px' }}>
+            <thead>
+              <tr>
+                <th style={{ padding: '1rem', textAlign: 'left', borderBottom: '2px solid #e2e8f0', color: '#475569', width: '200px' }}>Variedad</th>
+                {tableDays.map(d => (
+                  <th key={d.idx} style={{ padding: '1rem', textAlign: 'center', borderBottom: '2px solid #e2e8f0', color: '#475569', fontWeight: 800 }}>{d.name}</th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {cropTypes?.map(cType => (
+                <tr key={cType.id} style={{ borderBottom: '1px solid #f1f5f9' }}>
+                  <td style={{ padding: '1rem', fontWeight: 700, color: '#1e293b' }}>{cType.name}</td>
+                  {tableDays.map(d => {
+                    const ht = harvestTargets?.find(t => t.productId === cType.id && t.targetDayOfWeek === d.idx);
+                    const cycle = ht ? calculateCycleDays(d.idx, cType) : null;
+                    
+                    return (
+                      <td key={d.idx} style={{ padding: '0.5rem', verticalAlign: 'top' }}>
+                        <div 
+                          onClick={() => handleCellClick(cType, d.idx)}
+                          style={{
+                            height: '100%',
+                            minHeight: '80px',
+                            borderRadius: '12px',
+                            cursor: 'pointer',
+                            display: 'flex',
+                            flexDirection: 'column',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            padding: '0.5rem',
+                            transition: 'all 0.2s ease',
+                            border: ht ? '2px solid #10b981' : '2px dashed #cbd5e1',
+                            background: ht ? '#ecfdf5' : 'transparent',
+                          }}
+                          onMouseEnter={e => {
+                            if (!ht) e.currentTarget.style.background = '#f8fafc';
+                            e.currentTarget.style.transform = 'scale(1.02)';
+                          }}
+                          onMouseLeave={e => {
+                            if (!ht) e.currentTarget.style.background = 'transparent';
+                            e.currentTarget.style.transform = 'scale(1)';
+                          }}
+                        >
+                          {ht ? (
+                            <>
+                              <div style={{ fontSize: '1.5rem', fontWeight: 900, color: '#059669', lineHeight: 1, marginBottom: '0.5rem' }}>{ht.tuppersCount}</div>
+                              <div style={{ fontSize: '0.7rem', display: 'flex', flexDirection: 'column', gap: '2px', width: '100%' }}>
+                                {cycle.soak && <div style={{ display: 'flex', justifyContent: 'space-between', color: '#3b82f6' }}><span>💧</span><span>{cycle.soak}</span></div>}
+                                <div style={{ display: 'flex', justifyContent: 'space-between', color: '#8b5cf6' }}><span>🌱</span><span>{cycle.germ}</span></div>
+                                {cycle.dark && <div style={{ display: 'flex', justifyContent: 'space-between', color: '#475569' }}><span>🌑</span><span>{cycle.dark}</span></div>}
+                                <div style={{ display: 'flex', justifyContent: 'space-between', color: '#eab308' }}><span>☀️</span><span>{cycle.light}</span></div>
+                                <div style={{ display: 'flex', justifyContent: 'space-between', color: '#10b981', fontWeight: 'bold' }}><span>✂️</span><span>{cycle.harvest}</span></div>
+                              </div>
+                            </>
+                          ) : (
+                            <div style={{ color: '#cbd5e1', fontSize: '1.5rem', fontWeight: 900 }}>+</div>
+                          )}
+                        </div>
+                      </td>
+                    );
+                  })}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
       </div>
+    );
+  };
 
-      {renderSowingAnalytics()}
-
-      <div className="premium-card" style={{ marginBottom: '2rem' }}>
-        <form onSubmit={handleAddHarvestTarget} style={{ display: 'flex', gap: '1rem', alignItems: 'flex-end', flexWrap: 'wrap' }}>
-          <div style={{ flex: '1', minWidth: '200px' }}>
-            <label className="premium-label">Día de Siembra</label>
-            <select className="premium-input" value={newTarget.targetDayOfWeek} onChange={e=>setNewTarget({...newTarget, targetDayOfWeek: Number(e.target.value)})}>
-              <option value="1">Lunes</option>
-              <option value="2">Martes</option>
-              <option value="3">Miércoles</option>
-              <option value="4">Jueves</option>
-              <option value="5">Viernes</option>
-              <option value="6">Sábado</option>
-              <option value="0">Domingo</option>
-            </select>
-          </div>
-          <div style={{ flex: '2', minWidth: '250px' }}>
-            <label className="premium-label">Variedad a Cultivar</label>
-            <select className="premium-input" required value={newTarget.productId} onChange={e=>setNewTarget({...newTarget, productId: e.target.value})}>
-              <option value="">-- Seleccionar Variedad --</option>
-              {cropTypes?.map(ct => <option key={ct.id} value={ct.id}>{ct.name}</option>)}
-            </select>
-          </div>
-          <div style={{ flex: '1', minWidth: '150px' }}>
-            <label className="premium-label">Cantidad de Bandejas</label>
-            <input type="number" className="premium-input" required min="1" value={newTarget.tuppersCount} onChange={e=>setNewTarget({...newTarget, tuppersCount: Number(e.target.value)})}/>
-          </div>
-          <button type="submit" className="climate-btn" style={{ margin: 0, width: 'auto', minWidth: '150px' }}>Añadir a Rutina</button>
-        </form>
-      </div>
-
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', gap: '1rem' }}>
-        {harvestTargets?.map(ht => {
-          const cType = cropTypes?.find(c => c.id === ht.productId);
-          const days = ['Domingo','Lunes','Martes','Miércoles','Jueves','Viernes','Sábado'];
-          return (
-            <div key={ht.id} style={{ background: 'white', border: '1px solid #e2e8f0', borderRadius: '16px', padding: '1.5rem', position: 'relative', overflow: 'hidden', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.05)' }}>
-              <div style={{ position: 'absolute', top: 0, left: 0, width: '4px', height: '100%', background: 'var(--crop-primary)' }}></div>
-              <button onClick={() => deleteHarvestTarget(ht.id)} style={{ position: 'absolute', top: '1rem', right: '1rem', background: 'none', border: 'none', color: '#94a3b8', cursor: 'pointer', fontSize: '1rem' }}>✖</button>
-              <h4 style={{ margin: '0 0 1rem 0', fontSize: '1.1rem', fontWeight: 900, color: '#1e293b', paddingRight: '1rem' }}>{cType?.name || 'Variedad Eliminada'}</h4>
-              <div style={{ display: 'flex', alignItems: 'baseline', gap: '0.5rem', marginBottom: '1rem' }}>
-                <span style={{ fontSize: '2.5rem', fontWeight: 900, color: 'var(--crop-primary)', lineHeight: 1 }}>{ht.tuppersCount}</span>
-                <span style={{ fontSize: '0.85rem', fontWeight: 'bold', color: '#64748b' }}>bandejas</span>
-              </div>
-              <div style={{ display: 'inline-block', padding: '4px 12px', background: '#ecfdf5', color: '#059669', borderRadius: '8px', fontSize: '0.8rem', fontWeight: 'bold' }}>
-                Sembramos en: {days[ht.targetDayOfWeek]}
-              </div>
-            </div>
-          )
-        })}
-        {(!harvestTargets || harvestTargets.length === 0) && (
-          <p style={{ gridColumn: '1 / -1', textAlign: 'center', color: '#64748b', padding: '2rem' }}>No has configurado ninguna rutina de siembra semanal.</p>
-        )}
-      </div>
-    </div>
-  );
-
-    const renderCropsHub = () => (
+  const renderCropsHub = () => (
     <div className="hub-container" style={{ padding: '2rem', animation: 'fadeIn 0.4s ease' }}>
       <div className="hub-content" style={{ maxWidth: '1400px', margin: '0 auto', width: '100%' }}>
         <div className="hub-header" style={{ marginBottom: '4rem', textAlign: 'center', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
