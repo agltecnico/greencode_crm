@@ -76,7 +76,7 @@ export default function EmployeeTasks() {
           title: `¡COSECHAR!`,
           desc: `${crop.traysCount} bandejas de ${seed.name} (Lote: ${crop.batchNumber})`,
           icon: '📦',
-          className: 'harvest'
+          className: 'harvest', cropTypeId: cType.id
         });
       }
     });
@@ -116,21 +116,6 @@ export default function EmployeeTasks() {
       if(plantWd === targetDayOfWeek && !checkPlanted(0)) {
         tasksForDate.push({ type: 'plant', title: `Plantar ${cType.name}`, desc: `Rutina semanal: ${routine.tuppersCount} bandejas`, icon: '🌱', className: 'plant', cropTypeId: cType.id, trays: routine.tuppersCount });
       }
-      if(soakHrs > 0 && soakWd === targetDayOfWeek && !checkPlanted(-1)) {
-        tasksForDate.push({ type: 'soak', title: `Remojo: ${seed.name}`, desc: `Rutina: ${soakHrs}h para ${routine.tuppersCount} bandejas.`, icon: '💧', className: 'soak' });
-      }
-      if(germWd === targetDayOfWeek && germOffset > 0 && !checkPlanted(germOffset)) {
-        tasksForDate.push({ type: 'move', title: `Germinación (Rutina)`, desc: `Mover ${routine.tuppersCount}b de ${cType.name}`, icon: '🪴', className: 'move' });
-      }
-      if(darkWd === targetDayOfWeek && (cType.germinationDays || 0) > 0 && !checkPlanted(darkOffset)) {
-        tasksForDate.push({ type: 'move', title: `Oscuridad (Rutina)`, desc: `Mover ${routine.tuppersCount}b de ${cType.name}`, icon: '🪴', className: 'move' });
-      }
-      if(lightWd === targetDayOfWeek && (cType.darknessDays || 0) > 0 && !checkPlanted(lightOffset)) {
-        tasksForDate.push({ type: 'move', title: `Luz (Rutina)`, desc: `Mover ${routine.tuppersCount}b de ${cType.name}`, icon: '🪴', className: 'move' });
-      }
-      if(harvestWd === targetDayOfWeek && (cType.lightDays || 0) > 0 && !checkPlanted(harvestOffset)) {
-        tasksForDate.push({ type: 'harvest', title: `Cosecha (Rutina)`, desc: `Cosechar ${routine.tuppersCount}b de ${cType.name}`, icon: '✂️', className: 'harvest', cropTypeId: cType.id });
-      }
     });
 
     // Always push the date so the user sees empty days as requested
@@ -154,9 +139,9 @@ export default function EmployeeTasks() {
           {dayGroup.items.map((task, i) => (
             <div key={i} className={`task-card ${task.className}`} onClick={() => {
                 if (task.type === 'plant') {
-                  navigate('/crops?action=sow&cropTypeId=' + task.cropTypeId + '&trays=' + task.trays);
+                  window.location.href = '/crops?action=sow&cropTypeId=' + task.cropTypeId + '&trays=' + task.trays;
                 } else if (task.type === 'harvest') {
-                  navigate('/crops?action=harvest&cropTypeId=' + task.cropTypeId);
+                  window.location.href = '/crops?action=harvest&cropTypeId=' + task.cropTypeId;
                 }
               }} style={{ cursor: (task.type === 'plant' || task.type === 'harvest') ? 'pointer' : 'default' }}>
               <div className="task-icon">{task.icon}</div>
