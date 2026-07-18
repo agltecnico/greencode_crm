@@ -380,7 +380,7 @@ export default function Crops() {
               
               const isPlanted = (crops || []).some(c => {
                 if(c.cropTypeId !== cType.id) return false;
-                if(!c.datePlanted || c.status === 'DISCARDED') return false;
+                if(!c.datePlanted || c.status === 'DISCARDED' || c.status === 'HARVESTED') return false;
                 const cDate = new Date(c.datePlanted);
                 const tDate = new Date();
                 return cDate.getFullYear() === tDate.getFullYear() && 
