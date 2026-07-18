@@ -447,7 +447,7 @@ export default function Crops() {
                       .map(crop => {
                         const cType = cropTypes?.find(c => c.id === crop.seedId || c.id === crop.cropTypeId);
                         const daysAlive = Math.floor((new Date() - new Date(crop.datePlanted || crop.plantedAt)) / (1000 * 60 * 60 * 24));
-                        const expectedDays = cType?.daysToHarvest || 14;
+                        const expectedDays = cType ? ((Number(cType.germinationDays || 0) + Number(cType.darknessDays || 0) + Number(cType.lightDays || 0)) || 14) : 14;
                         const progressPercentage = Math.min(100, Math.max(0, (daysAlive / expectedDays) * 100));
                         
                         let statusColor = { bg: '#f1f5f9', text: '#475569', bar: '#94a3b8' };
