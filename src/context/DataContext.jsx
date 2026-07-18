@@ -347,6 +347,40 @@ export const DataProvider = ({ children }) => {
     await supabase.from('crops').delete().eq('id', id);
   };
 
+    const reverseCropStatus = async (crop) => {
+    const sequence = ['SOAKING', 'GERMINATING', 'GROWING', 'READY'];
+    const currentIdx = sequence.indexOf(crop.status ? crop.status.toUpperCase() : 'SOWED');
+    
+    let prevStatus = 'SOAKING';
+    if (currentIdx > 0) {
+      prevStatus = sequence[currentIdx - 1];
+    } else {
+      return; // Already at first phase
+    }
+
+    const cType = cropTypes.find(ct => ct.id === crop.cropTypeId || ct.id === crop.seedId);
+    let daysToSubtract = 0;
+    
+    if (cType) {
+      const soakDays = cType.soakingHours > 0 ? 1 : 0;
+      const germDay = soakDays;
+      const lightDay = germDay + (Number(cType.germinationDays) || 0) + (Number(cType.darknessDays) || 0);
+      const readyDay = lightDay + (Number(cType.lightDays) || 0);
+      
+      if (prevStatus === 'SOAKING') daysToSubtract = 0;
+      else if (prevStatus === 'GERMINATING') daysToSubtract = germDay;
+      else if (prevStatus === 'GROWING') daysToSubtract = lightDay;
+    }
+
+    const newDate = new Date();
+    newDate.setDate(newDate.getDate() - daysToSubtract);
+
+    await updateCrop(crop.id, { 
+      status: prevStatus,
+      datePlanted: newDate.toISOString() 
+    });
+  };
+
   const advanceCropStatus = async (crop) => {
     const sequence = ['SOAKING', 'GERMINATING', 'GROWING', 'READY'];
     const currentIdx = sequence.indexOf(crop.status ? crop.status.toUpperCase() : 'SOWED');
@@ -757,7 +791,7 @@ export const DataProvider = ({ children }) => {
         cropTypes, addCropType, updateCropType, deleteCropType,
         seeds, addSeed, updateSeed, deleteSeed,
         seedInventory, addSeedInventory, updateSeedInventory, deleteSeedInventory,
-        crops, addCrop, sowCrop, updateCrop, deleteCrop, advanceCropStatus, discardCrop,
+        crops, addCrop, sowCrop, updateCrop, deleteCrop, advanceCropStatus, reverseCropStatus, discardCrop,
         harvestTargets, addHarvestTarget, updateHarvestTarget, deleteHarvestTarget,
       harvests, addHarvest, updateHarvest, deleteHarvest,
       dailyLogs, addDailyLog, updateDailyLog, deleteDailyLog,
