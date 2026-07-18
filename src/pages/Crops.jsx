@@ -19,7 +19,7 @@ export default function Crops() {
 
   const [activeTab, setActiveTab] = useState('menu');
   const [sowTab, setSowTab] = useState('activos');
-  const [weekFilter, setWeekFilter] = useState('ALL');
+  const [statusFilter, setStatusFilter] = useState('ALL');
   const [historySearch, setHistorySearch] = useState('');
   const [historyPage, setHistoryPage] = useState(1);
   const ITEMS_PER_PAGE = 10;
@@ -349,10 +349,10 @@ export default function Crops() {
                 <h3 style={{ margin: 0, fontSize: '1.25rem', fontWeight: 'bold', color: '#1e293b' }}>Lotes en Producción</h3>
                 
                 <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', background: '#f8fafc', padding: '0.25rem', borderRadius: '0.75rem', border: '1px solid #e2e8f0' }}>
-                  <button onClick={() => setWeekFilter('ALL')} style={{ padding: '0.5rem 1rem', borderRadius: '0.5rem', fontWeight: 'bold', fontSize: '0.875rem', border: 'none', cursor: 'pointer', transition: 'all 0.2s', backgroundColor: weekFilter === 'ALL' ? 'white' : 'transparent', color: weekFilter === 'ALL' ? '#0f172a' : '#64748b', boxShadow: weekFilter === 'ALL' ? '0 1px 2px rgba(0,0,0,0.05)' : 'none' }}>Todos</button>
-                  <button onClick={() => setWeekFilter('THIS_WEEK')} style={{ padding: '0.5rem 1rem', borderRadius: '0.5rem', fontWeight: 'bold', fontSize: '0.875rem', border: 'none', cursor: 'pointer', transition: 'all 0.2s', backgroundColor: weekFilter === 'THIS_WEEK' ? 'white' : 'transparent', color: weekFilter === 'THIS_WEEK' ? '#0f172a' : '#64748b', boxShadow: weekFilter === 'THIS_WEEK' ? '0 1px 2px rgba(0,0,0,0.05)' : 'none' }}>Esta Semana</button>
-                  <button onClick={() => setWeekFilter('LAST_WEEK')} style={{ padding: '0.5rem 1rem', borderRadius: '0.5rem', fontWeight: 'bold', fontSize: '0.875rem', border: 'none', cursor: 'pointer', transition: 'all 0.2s', backgroundColor: weekFilter === 'LAST_WEEK' ? 'white' : 'transparent', color: weekFilter === 'LAST_WEEK' ? '#0f172a' : '#64748b', boxShadow: weekFilter === 'LAST_WEEK' ? '0 1px 2px rgba(0,0,0,0.05)' : 'none' }}>Semana Pasada</button>
-                  <button onClick={() => setWeekFilter('OLDER')} style={{ padding: '0.5rem 1rem', borderRadius: '0.5rem', fontWeight: 'bold', fontSize: '0.875rem', border: 'none', cursor: 'pointer', transition: 'all 0.2s', backgroundColor: weekFilter === 'OLDER' ? 'white' : 'transparent', color: weekFilter === 'OLDER' ? '#0f172a' : '#64748b', boxShadow: weekFilter === 'OLDER' ? '0 1px 2px rgba(0,0,0,0.05)' : 'none' }}>Anteriores</button>
+                  <button onClick={() => setStatusFilter('ALL')} style={{ padding: '0.5rem 1rem', borderRadius: '0.5rem', fontWeight: 'bold', fontSize: '0.875rem', border: 'none', cursor: 'pointer', transition: 'all 0.2s', backgroundColor: statusFilter === 'ALL' ? 'white' : 'transparent', color: statusFilter === 'ALL' ? '#0f172a' : '#64748b', boxShadow: statusFilter === 'ALL' ? '0 1px 2px rgba(0,0,0,0.05)' : 'none' }}>Todos</button>
+                  <button onClick={() => setStatusFilter('SOAKING')} style={{ padding: '0.5rem 1rem', borderRadius: '0.5rem', fontWeight: 'bold', fontSize: '0.875rem', border: 'none', cursor: 'pointer', transition: 'all 0.2s', backgroundColor: statusFilter === 'SOAKING' ? '#dbeafe' : 'transparent', color: statusFilter === 'SOAKING' ? '#1e3a8a' : '#64748b', boxShadow: statusFilter === 'SOAKING' ? '0 1px 2px rgba(0,0,0,0.05)' : 'none' }}>En Remojo</button>
+                  <button onClick={() => setStatusFilter('GERMINATING')} style={{ padding: '0.5rem 1rem', borderRadius: '0.5rem', fontWeight: 'bold', fontSize: '0.875rem', border: 'none', cursor: 'pointer', transition: 'all 0.2s', backgroundColor: statusFilter === 'GERMINATING' ? '#fef3c7' : 'transparent', color: statusFilter === 'GERMINATING' ? '#92400e' : '#64748b', boxShadow: statusFilter === 'GERMINATING' ? '0 1px 2px rgba(0,0,0,0.05)' : 'none' }}>Germinando</button>
+                  <button onClick={() => setStatusFilter('GROWING')} style={{ padding: '0.5rem 1rem', borderRadius: '0.5rem', fontWeight: 'bold', fontSize: '0.875rem', border: 'none', cursor: 'pointer', transition: 'all 0.2s', backgroundColor: statusFilter === 'GROWING' ? '#d1fae5' : 'transparent', color: statusFilter === 'GROWING' ? '#065f46' : '#64748b', boxShadow: statusFilter === 'GROWING' ? '0 1px 2px rgba(0,0,0,0.05)' : 'none' }}>Creciendo</button>
                 </div>
               </div>
 
