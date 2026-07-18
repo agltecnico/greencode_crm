@@ -224,13 +224,13 @@ export default function Crops() {
           </div>
           
           {totalPages > 1 && (
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '1rem 1.5rem', borderTop: '1px solid #e2e8f0', backgroundColor: '#f8fafc' }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0.5rem 1rem', borderTop: '1px solid #e2e8f0', backgroundColor: '#f8fafc' }}>
               <span style={{ fontSize: '0.875rem', color: '#64748b' }}>Mostrando {(historyPage - 1) * ITEMS_PER_PAGE + 1} a {Math.min(historyPage * ITEMS_PER_PAGE, filteredHistory.length)} de {filteredHistory.length} resultados</span>
               <div style={{ display: 'flex', gap: '0.5rem' }}>
                 <button 
                   onClick={() => setHistoryPage(p => Math.max(1, p - 1))} 
                   disabled={historyPage === 1}
-                  style={{ padding: '0.25rem 0.75rem', borderRadius: '0.25rem', border: '1px solid #cbd5e1', backgroundColor: 'white', color: '#475569', fontWeight: '500', cursor: historyPage === 1 ? 'not-allowed' : 'pointer', opacity: historyPage === 1 ? 0.5 : 1 }}
+                  style={{ padding: '0.15rem 0.5rem', borderRadius: '0.25rem', border: '1px solid #cbd5e1', backgroundColor: 'white', color: '#475569', fontWeight: '500', cursor: historyPage === 1 ? 'not-allowed' : 'pointer', opacity: historyPage === 1 ? 0.5 : 1 }}
                 >Anterior</button>
                 <div style={{ display: 'flex', gap: '0.25rem' }}>
                   {Array.from({ length: totalPages }, (_, i) => i + 1).map(page => (
@@ -246,7 +246,7 @@ export default function Crops() {
                 <button 
                   onClick={() => setHistoryPage(p => Math.min(totalPages, p + 1))} 
                   disabled={historyPage === totalPages}
-                  style={{ padding: '0.25rem 0.75rem', borderRadius: '0.25rem', border: '1px solid #cbd5e1', backgroundColor: 'white', color: '#475569', fontWeight: '500', cursor: historyPage === totalPages ? 'not-allowed' : 'pointer', opacity: historyPage === totalPages ? 0.5 : 1 }}
+                  style={{ padding: '0.15rem 0.5rem', borderRadius: '0.25rem', border: '1px solid #cbd5e1', backgroundColor: 'white', color: '#475569', fontWeight: '500', cursor: historyPage === totalPages ? 'not-allowed' : 'pointer', opacity: historyPage === totalPages ? 0.5 : 1 }}
                 >Siguiente</button>
               </div>
             </div>
@@ -360,11 +360,11 @@ export default function Crops() {
                 <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
                   <thead style={{ backgroundColor: '#f8fafc', borderBottom: '2px solid #e2e8f0' }}>
                     <tr>
-                      <th style={{ padding: '1rem 1.5rem', fontSize: '0.75rem', fontWeight: 'bold', color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Variedad y Lote</th>
-                      <th style={{ padding: '1rem 1.5rem', fontSize: '0.75rem', fontWeight: 'bold', color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em', textAlign: 'center' }}>Bandejas</th>
-                      <th style={{ padding: '1rem 1.5rem', fontSize: '0.75rem', fontWeight: 'bold', color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Fase Actual</th>
-                      <th style={{ padding: '1rem 1.5rem', fontSize: '0.75rem', fontWeight: 'bold', color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em', width: '25%' }}>Desarrollo</th>
-                      <th style={{ padding: '1rem 1.5rem', fontSize: '0.75rem', fontWeight: 'bold', color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em', textAlign: 'right' }}>Acciones</th>
+                      <th style={{ padding: '0.5rem 1rem', fontSize: '0.75rem', fontWeight: 'bold', color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Variedad y Lote</th>
+                      <th style={{ padding: '0.5rem 1rem', fontSize: '0.75rem', fontWeight: 'bold', color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em', textAlign: 'center' }}>Bandejas</th>
+                      <th style={{ padding: '0.5rem 1rem', fontSize: '0.75rem', fontWeight: 'bold', color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Fase Actual</th>
+                      <th style={{ padding: '0.5rem 1rem', fontSize: '0.75rem', fontWeight: 'bold', color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em', width: '25%' }}>Desarrollo</th>
+                      <th style={{ padding: '0.5rem 1rem', fontSize: '0.75rem', fontWeight: 'bold', color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em', textAlign: 'right' }}>Acciones</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -398,28 +398,28 @@ export default function Crops() {
 
                         return (
                           <tr key={crop.id} style={{ borderBottom: '1px solid #f1f5f9', transition: 'background-color 0.2s' }} onMouseOver={e=>e.currentTarget.style.backgroundColor='#f8fafc'} onMouseOut={e=>e.currentTarget.style.backgroundColor='transparent'}>
-                            <td style={{ padding: '1rem 1.5rem' }}>
+                            <td style={{ padding: '0.5rem 1rem' }}>
                               <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
-                                <div style={{ width: '2.5rem', height: '2.5rem', borderRadius: '0.5rem', backgroundColor: '#ecfdf5', color: '#10b981', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 'bold', fontSize: '1rem', border: '1px solid #d1fae5' }}>
+                                <div style={{ width: '1.75rem', height: '1.75rem', borderRadius: '0.5rem', backgroundColor: '#ecfdf5', color: '#10b981', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 'bold', fontSize: '1rem', border: '1px solid #d1fae5' }}>
                                   {cType?.name ? cType.name.charAt(0).toUpperCase() : '🌱'}
                                 </div>
                                 <div>
-                                  <div style={{ fontWeight: 'bold', color: '#1e293b' }}>{cType?.name || 'Desconocido'}</div>
-                                  <div style={{ fontSize: '0.75rem', color: '#64748b', fontFamily: 'monospace' }}>{crop.batchNumber || 'N/A'}</div>
+                                  <div style={{ fontWeight: 'bold', color: '#1e293b', fontSize: '0.85rem' }}>{cType?.name || 'Desconocido'}</div>
+                                  <div style={{ fontSize: '0.7rem', color: '#64748b', fontFamily: 'monospace', marginTop: '-2px' }}>{crop.batchNumber || 'N/A'}</div>
                                 </div>
                               </div>
                             </td>
-                            <td style={{ padding: '1rem 1.5rem', textAlign: 'center' }}>
-                              <span style={{ fontSize: '1.25rem', fontWeight: '900', color: '#0f172a' }}>{crop.traysCount}</span>
+                            <td style={{ padding: '0.5rem 1rem', textAlign: 'center' }}>
+                              <span style={{ fontSize: '1rem', fontWeight: '900', color: '#0f172a' }}>{crop.traysCount}</span>
                             </td>
-                            <td style={{ padding: '1rem 1.5rem' }}>
-                              <span style={{ backgroundColor: statusColor.bg, color: statusColor.text, padding: '0.25rem 0.75rem', borderRadius: '9999px', fontSize: '0.75rem', fontWeight: 'bold', border: `1px solid ${statusColor.text}20` }}>
+                            <td style={{ padding: '0.5rem 1rem' }}>
+                              <span style={{ backgroundColor: statusColor.bg, color: statusColor.text, padding: '0.15rem 0.5rem', borderRadius: '9999px', fontSize: '0.7rem', fontWeight: 'bold', border: `1px solid ${statusColor.text}20` }}>
                                 {translateStatus(crop.status)}
                               </span>
                             </td>
-                            <td style={{ padding: '1rem 1.5rem' }}>
+                            <td style={{ padding: '0.5rem 1rem' }}>
                               <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-                                <div style={{ flex: 1, backgroundColor: '#e2e8f0', borderRadius: '9999px', height: '0.5rem', overflow: 'hidden' }}>
+                                <div style={{ flex: 1, backgroundColor: '#e2e8f0', borderRadius: '9999px', height: '0.35rem', overflow: 'hidden' }}>
                                   <div style={{ backgroundColor: statusColor.bar, height: '100%', borderRadius: '9999px', width: `${progressPercentage}%` }}></div>
                                 </div>
                                 <span style={{ fontSize: '0.75rem', fontWeight: 'bold', color: '#64748b', minWidth: '4rem', textAlign: 'right' }}>
@@ -427,14 +427,14 @@ export default function Crops() {
                                 </span>
                               </div>
                             </td>
-                            <td style={{ padding: '1rem 1.5rem', textAlign: 'right' }}>
+                            <td style={{ padding: '0.5rem 1rem', textAlign: 'right' }}>
                               <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'flex-end' }}>
-                                <button onClick={() => discardCrop(crop)} title="Descartar" style={{ padding: '0.5rem', borderRadius: '0.5rem', border: '1px solid #fecaca', color: '#dc2626', backgroundColor: 'white', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                                  <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
+                                <button onClick={() => discardCrop(crop)} title="Descartar" style={{ padding: '0.25rem 0.5rem', borderRadius: '0.35rem', border: '1px solid #fecaca', color: '#dc2626', backgroundColor: 'white', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                  <svg width="14" height="14" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
                                 </button>
-                                <button onClick={() => advanceCropStatus(crop)} title="Avanzar Fase" style={{ padding: '0.5rem 1rem', borderRadius: '0.5rem', border: 'none', backgroundColor: '#1e293b', color: 'white', fontWeight: 'bold', fontSize: '0.75rem', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
+                                <button onClick={() => advanceCropStatus(crop)} title="Avanzar Fase" style={{ padding: '0.25rem 0.5rem', borderRadius: '0.35rem', border: 'none', backgroundColor: '#1e293b', color: 'white', fontWeight: 'bold', fontSize: '0.75rem', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
                                   <span>Siguiente</span>
-                                  <svg width="14" height="14" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5l7 7-7 7"></path></svg>
+                                  <svg width="12" height="12" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5l7 7-7 7"></path></svg>
                                 </button>
                               </div>
                             </td>
