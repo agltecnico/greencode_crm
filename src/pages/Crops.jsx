@@ -313,18 +313,38 @@ export default function Crops() {
                   </div>
                   
                   {selectedCropType && (
-                    <div style={{ background: '#f0fdf4', padding: '1.25rem', borderRadius: '0.75rem', border: '1px solid #bbf7d0', display: 'flex', gap: '1rem', alignItems: 'flex-start' }}>
-                      <div style={{ fontSize: '1.5rem', marginTop: '0.25rem' }}>📦</div>
-                      <div>
-                        <label style={{ fontSize: '0.75rem', fontWeight: 'bold', textTransform: 'uppercase', letterSpacing: '0.05em', color: '#166534', display: 'block', marginBottom: '0.25rem' }}>Inventario Disponible</label>
-                        <p style={{ fontSize: '1.25rem', fontWeight: '900', color: '#14532d', margin: 0 }}>
-                          {totalAvailableSeed.toFixed(2)} g 
-                          {selectedCropType.seedGrams > 0 && <span style={{ fontSize: '0.875rem', fontWeight: '600', color: '#15803d', marginLeft: '0.5rem' }}>(Max. {Math.floor(totalAvailableSeed / selectedCropType.seedGrams)} bandejas)</span>}
-                        </p>
-                        <p style={{ fontSize: '0.75rem', color: '#15803d', marginTop: '0.25rem', lineHeight: 1.5 }}>El sistema descontará automáticamente {selectedCropType.seedGrams}g por cada bandeja empleando el método FIFO.</p>
+                      <div style={{ background: '#f0fdf4', padding: '1.25rem', borderRadius: '0.75rem', border: '1px solid #bbf7d0', display: 'flex', gap: '1rem', alignItems: 'flex-start', flexDirection: 'column' }}>
+                        <div style={{ display: 'flex', gap: '1rem', width: '100%' }}>
+                          <div style={{ fontSize: '1.5rem', marginTop: '0.25rem' }}>🌱</div>
+                          <div style={{ flex: 1 }}>
+                            <label style={{ fontSize: '0.75rem', fontWeight: 'bold', textTransform: 'uppercase', letterSpacing: '0.05em', color: '#166534', display: 'block', marginBottom: '0.25rem' }}>Inventario Disponible Total</label>
+                            <p style={{ fontSize: '1.25rem', fontWeight: '900', color: '#14532d', margin: 0 }}>
+                              {totalAvailableSeed.toFixed(2)} g 
+                              {selectedCropType.seedGrams > 0 && <span style={{ fontSize: '0.875rem', fontWeight: '600', color: '#15803d', marginLeft: '0.5rem' }}>(Max. {Math.floor(totalAvailableSeed / selectedCropType.seedGrams)} bandejas)</span>}
+                            </p>
+                          </div>
+                        </div>
+
+                        <div style={{ width: '100%', marginTop: '0.5rem', paddingTop: '0.5rem', borderTop: '1px dashed #bbf7d0' }}>
+                          <label style={{ fontSize: '0.75rem', fontWeight: 'bold', textTransform: 'uppercase', letterSpacing: '0.05em', color: '#166534', display: 'block', marginBottom: '0.5rem' }}>Selecciona el Lote de Semillas (Trazabilidad)</label>
+                          <select className="premium-input" style={{ width: '100%', padding: '0.75rem', borderRadius: '0.5rem', border: '1px solid #86efac', background: 'white', fontSize: '0.875rem', fontWeight: 'bold' }} required value={newCrop.selectedSeedBatchId || ''} onChange={e => setNewCrop({...newCrop, selectedSeedBatchId: e.target.value})}>
+                            <option value="">-- Sin stock de lotes --</option>
+                            {availableBatches.map(b => (
+                              <option key={b.batchNumber} value={b.batchNumber}>{b.batchNumber} ({b.quantity.toFixed(2)} g disponibles) {b.batchNumber === oldestBatch ? ' - [FIFO Recomendado]' : ''}</option>
+                            ))}
+                          </select>
+                          
+                          {newCrop.selectedSeedBatchId && newCrop.selectedSeedBatchId !== oldestBatch && (
+                            <div style={{ marginTop: '0.75rem', display: 'flex', alignItems: 'flex-start', gap: '0.5rem', backgroundColor: '#fffbeb', padding: '0.75rem', borderRadius: '0.5rem', border: '1px solid #fde68a' }}>
+                              <span style={{ fontSize: '1.25rem' }}>⚠️</span>
+                              <p style={{ margin: 0, fontSize: '0.75rem', color: '#92400e', fontWeight: 'bold', lineHeight: 1.4 }}>Aviso: Hay semillas de un lote más antiguo en stock ({oldestBatch}). Se recomienda encarecidamente usar el método FIFO para evitar caducidades y mermas.</p>
+                            </div>
+                          )}
+                          
+                          <p style={{ fontSize: '0.75rem', color: '#15803d', marginTop: '0.75rem', lineHeight: 1.5 }}>Al plantar, se descontará automáticamente el consumo asignándolo al lote seleccionado para garantizar la trazabilidad.</p>
+                        </div>
                       </div>
-                    </div>
-                  )}
+                    )}
 
                   <div>
                     <label style={{ fontSize: '0.875rem', fontWeight: 'bold', marginBottom: '0.5rem', display: 'block', color: '#334155' }}>2. ¿Cuántas bandejas son?</label>

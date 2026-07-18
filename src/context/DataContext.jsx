@@ -313,15 +313,17 @@ export const DataProvider = ({ children }) => {
     await addCrop(cropRecord);
 
     // 3. Deduct Stock (Seeds)
-    if (cType.seedId && cType.seedGrams > 0) {
-      await addStockEntry({
-        articleId: cType.seedId,
-        quantity: -(Number(cType.seedGrams) * trays),
-        batchNumber: 'USO_CULTIVO',
-        purchaseDate: new Date().toISOString(),
-        price: 0
-      });
-    }
+      if (cType.seedId && cType.seedGrams > 0) {
+        await addStockEntry({
+          articleId: cType.seedId,
+          quantity: -(Number(cType.seedGrams) * trays),
+          batchNumber: newCrop.selectedSeedBatchId || 'SIN_LOTE',
+          purchaseDate: new Date().toISOString().split('T')[0],
+          price: 0,
+          providerId: 'INTERNAL',
+          deliveryNote: `Consumo siembra lote ${batchNum}`
+        });
+      }
 
     // 4. Deduct Stock (Substrate)
     if (cType.substrateId && cType.substrateGrams > 0) {
