@@ -5,6 +5,7 @@ import EmployeeTasks from '../components/EmployeeTasks';
 import Supplies from './Supplies';
 import '../crops.css';
 import React from 'react';
+import Swal from 'sweetalert2';
 
 class ErrorBoundary extends React.Component {
   constructor(props) {
