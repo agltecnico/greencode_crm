@@ -29,7 +29,7 @@ class ErrorBoundary extends React.Component {
 export default function Crops() {
   const navigate = useNavigate();
   const { 
-    crops, sowCrop, updateCrop, advanceCropStatus, setCropPhase, discardCrop,
+    crops, sowCrop, updateCrop, advanceCropStatus, setCropPhase, discardCrop, deleteCrop,
     stockEntries, articles,
     cropTypes,
     harvestTargets, addHarvestTarget, deleteHarvestTarget,
@@ -37,6 +37,25 @@ export default function Crops() {
     products,
     orders, clients, updateOrderList
   } = useData();
+
+  
+  const handleDeleteCrop = (crop) => {
+    Swal.fire({
+      title: '¿Eliminar Siembra?',
+      text: "Esto borrará la siembra por completo de la base de datos (usar solo para errores de registro). ¿Estás seguro?",
+      icon: 'error',
+      showCancelButton: true,
+      confirmButtonColor: '#dc2626',
+      cancelButtonColor: '#94a3b8',
+      confirmButtonText: 'Sí, eliminar',
+      cancelButtonText: 'Cancelar'
+    }).then((result) => {
+      if (result.isConfirmed) {
+        deleteCrop(crop.id);
+        Swal.fire({ title: 'Eliminado', text: 'El registro ha sido eliminado.', icon: 'success', timer: 1500, showConfirmButton: false });
+      }
+    });
+  };
 
   const [activeTab, setActiveTab] = useState('menu');
   const [sowTab, setSowTab] = useState('activos');
@@ -360,7 +379,7 @@ export default function Crops() {
               
               const isPlanted = (crops || []).some(c => {
                 if(c.cropTypeId !== cType.id) return false;
-                if(!c.datePlanted) return false;
+                if(!c.datePlanted || c.status === 'DISCARDED') return false;
                 const cDate = new Date(c.datePlanted);
                 const tDate = new Date();
                 return cDate.getFullYear() === tDate.getFullYear() && 
@@ -593,6 +612,11 @@ export default function Crops() {
                                 <button onClick={() => discardCrop(crop)} title="Descartar" style={{ padding: '0.25rem 0.5rem', borderRadius: '0.35rem', border: '1px solid #fecaca', color: '#dc2626', backgroundColor: 'white', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                                   <svg width="14" height="14" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
                                 </button>
+  
+<button onClick={() => handleDeleteCrop(crop)} title="Eliminar Registro" style={{ padding: '0.25rem 0.5rem', borderRadius: '0.35rem', border: '1px solid #fecaca', color: '#dc2626', backgroundColor: '#fee2e2', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+  <svg width="14" height="14" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
+</button>
+
                                 <button onClick={() => { setShowPhaseChangeModal(crop); setPendingPhase(crop.status || "SOWED"); }} title="Cambiar Fase" style={{ padding: '0.35rem 0.75rem', borderRadius: '0.5rem', border: '1px solid #cbd5e1', backgroundColor: '#f8fafc', color: '#334155', fontWeight: 'bold', fontSize: '0.75rem', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.35rem', boxShadow: '0 1px 2px rgba(0,0,0,0.05)' }}>Cambiar Fase</button>
                               </div>
                             </td>
