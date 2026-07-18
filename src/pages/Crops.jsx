@@ -1052,6 +1052,14 @@ export default function Crops() {
             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
               {['SOAKING', 'GERMINATING', 'DARKNESS', 'LIGHT', 'READY'].map(phase => {
                 const isCurrent = (showPhaseChangeModal.status || 'SOWED') === phase;
+                let cTheme = { bg: 'white', border: '#cbd5e1', text: '#334155', tagBg: '#94a3b8' };
+                
+                if (phase === 'SOAKING') cTheme = { bg: '#dbeafe', border: '#3b82f6', text: '#1e3a8a', tagBg: '#3b82f6' };
+                else if (phase === 'GERMINATING') cTheme = { bg: '#fef3c7', border: '#f59e0b', text: '#92400e', tagBg: '#f59e0b' };
+                else if (phase === 'DARKNESS') cTheme = { bg: '#e0e7ff', border: '#4f46e5', text: '#3730a3', tagBg: '#4f46e5' };
+                else if (phase === 'LIGHT') cTheme = { bg: '#ccfbf1', border: '#14b8a6', text: '#0f766e', tagBg: '#14b8a6' };
+                else if (phase === 'READY') cTheme = { bg: '#dcfce7', border: '#22c55e', text: '#166534', tagBg: '#22c55e' };
+
                 return (
                   <button 
                     key={phase} 
@@ -1061,10 +1069,10 @@ export default function Crops() {
                     }}
                     style={{ 
                       padding: '1rem', 
-                      border: isCurrent ? '2px solid #3b82f6' : '1px solid #cbd5e1', 
+                      border: isCurrent ? `2px solid ${cTheme.border}` : '1px solid #cbd5e1', 
                       borderRadius: '12px', 
                       textAlign: 'left', 
-                      backgroundColor: isCurrent ? '#eff6ff' : 'white', 
+                      backgroundColor: isCurrent ? cTheme.bg : 'white', 
                       fontWeight: isCurrent ? 'bold' : 'normal',
                       cursor: 'pointer',
                       transition: 'all 0.2s',
@@ -1073,8 +1081,8 @@ export default function Crops() {
                       alignItems: 'center'
                     }}
                   >
-                    <span style={{ color: isCurrent ? '#1e3a8a' : '#334155' }}>{translateStatus(phase)}</span>
-                    {isCurrent && <span style={{ fontSize: '0.75rem', backgroundColor: '#3b82f6', color: 'white', padding: '0.15rem 0.5rem', borderRadius: '999px' }}>Actual</span>}
+                    <span style={{ color: isCurrent ? cTheme.text : '#334155' }}>{translateStatus(phase)}</span>
+                    {isCurrent && <span style={{ fontSize: '0.75rem', backgroundColor: cTheme.tagBg, color: 'white', padding: '0.15rem 0.5rem', borderRadius: '999px' }}>Actual</span>}
                   </button>
                 );
               })}
