@@ -479,8 +479,19 @@ export const DataProvider = ({ children }) => {
     const tempId = Date.now().toString();
     const newItem = { ...item, id: tempId };
     setHarvestTargets(prev => [...prev, newItem]);
-    const { data, error } = await supabase.from('harvest_targets').insert([newItem]).select();
-    if (!error && data) setHarvestTargets(prev => prev.map(i => i.id === tempId ? data[0] : i));
+    
+    // We remove the temporary 'id' before inserting so Supabase can generate its own UUID if needed
+    const dbItem = { ...item };
+    
+    const { data, error } = await supabase.from('harvest_targets').insert([dbItem]).select();
+    if (error) {
+      console.error("Error inserting harvest target:", error);
+      Swal.fire('Error', 'No se pudo guardar la rutina: ' + error.message, 'error');
+      // Rollback
+      setHarvestTargets(prev => prev.filter(i => i.id !== tempId));
+    } else if (data) {
+      setHarvestTargets(prev => prev.map(i => i.id === tempId ? data[0] : i));
+    }
     return tempId;
   };
   const updateHarvestTarget = async (id, updatedFields) => {
