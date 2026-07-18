@@ -1,11 +1,37 @@
 import Swal from 'sweetalert2';
 
 window.alert = (msg) => {
+  let icon = 'info';
+  let title = 'Información';
+  let color = '#0ea5e9'; // default blue
+  
+  const textLower = msg.toLowerCase();
+  
+  if (textLower.includes('error') || textLower.includes('crítico') || textLower.includes('incompletos')) {
+    icon = 'error';
+    title = '¡Error!';
+    color = '#ef4444'; // red
+  } else if (textLower.includes('atención') || textLower.includes('insuficiente') || textLower.includes('seguro') || textLower.includes('por favor')) {
+    icon = 'warning';
+    title = '¡Atención!';
+    color = '#f59e0b'; // amber
+  } else if (textLower.includes('éxito') || textLower.includes('completado') || textLower.includes('registrada') || textLower.includes('plantado')) {
+    icon = 'success';
+    title = '¡Genial!';
+    color = '#10b981'; // emerald
+  }
+
   Swal.fire({
+    title: title,
     text: msg,
-    icon: 'info',
-    confirmButtonColor: '#0ea5e9',
-    confirmButtonText: 'Entendido'
+    icon: icon,
+    confirmButtonColor: color,
+    confirmButtonText: 'Entendido',
+    customClass: {
+      popup: 'premium-swal-popup',
+      title: 'premium-swal-title',
+      confirmButton: 'premium-swal-button'
+    }
   });
 };
 

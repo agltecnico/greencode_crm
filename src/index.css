@@ -763,3 +763,26 @@ body {
 .status-badge.intransit { background: #f3e8ff; color: #7e22ce; }
 .status-badge.delivered { background: #d1fae5; color: #059669; }
 
+
+/* SweetAlert2 Premium Styles */
+.premium-swal-popup {
+  border-radius: 20px !important;
+  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25) !important;
+  padding: 2rem !important;
+}
+.premium-swal-title {
+  font-weight: 800 !important;
+  color: #1e293b !important;
+}
+.premium-swal-button {
+  border-radius: 12px !important;
+  padding: 0.75rem 2rem !important;
+  font-weight: 700 !important;
+  font-size: 1rem !important;
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1) !important;
+  transition: transform 0.2s, box-shadow 0.2s !important;
+}
+.premium-swal-button:hover {
+  transform: translateY(-2px) !important;
+  box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1) !important;
+}

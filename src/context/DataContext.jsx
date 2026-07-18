@@ -444,9 +444,28 @@ export const DataProvider = ({ children }) => {
   };
 
   const discardCrop = async (crop) => {
-    if (window.confirm("¿Seguro que quieres descartar esta bandeja por completo?")) {
-      await updateCrop(crop.id, { status: 'DISCARDED' });
-    }
+    Swal.fire({
+      title: '¿Descartar Bandeja?',
+      text: "Esta acción marcará la bandeja como descartada y no se podrá revertir. ¿Estás seguro?",
+      icon: 'warning',
+      showCancelButton: true,
+      confirmButtonColor: '#ef4444',
+      cancelButtonColor: '#94a3b8',
+      confirmButtonText: 'Sí, descartar 🗑️',
+      cancelButtonText: 'Cancelar'
+    }).then(async (result) => {
+      if (result.isConfirmed) {
+        await updateCrop(crop.id, { status: 'DISCARDED' });
+        Swal.fire({
+          title: '¡Descartada!',
+          text: 'La bandeja ha sido movida al historial de descartes.',
+          icon: 'success',
+          confirmButtonColor: '#10b981',
+          timer: 2000,
+          showConfirmButton: false
+        });
+      }
+    });
   };
 
   // HarvestTarget
