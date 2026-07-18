@@ -29,7 +29,7 @@ class ErrorBoundary extends React.Component {
 export default function Crops() {
   const navigate = useNavigate();
   const { 
-    crops, sowCrop, updateCrop, advanceCropStatus, discardCrop,
+    crops, sowCrop, updateCrop, advanceCropStatus, setCropPhase, discardCrop,
     stockEntries, articles,
     cropTypes,
     harvestTargets, addHarvestTarget, deleteHarvestTarget,
