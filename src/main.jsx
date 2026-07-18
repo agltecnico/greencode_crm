@@ -4,7 +4,8 @@ window.alert = (msg) => {
   Swal.fire({
     text: msg,
     icon: 'info',
-    confirmButtonColor: '#0ea5e9'
+    confirmButtonColor: '#0ea5e9',
+    confirmButtonText: 'Entendido'
   });
 };
 

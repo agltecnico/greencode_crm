@@ -1,4 +1,18 @@
-import React, { useState, useEffect } from 'react';
+
+  const translateStatus = (status) => {
+    const statusMap = {
+      'SOAKING': 'En Remojo',
+      'SOWED': 'Sembrado',
+      'GERMINATING': 'Germinando',
+      'GROWING': 'Creciendo',
+      'HARVESTED': 'Cosechado',
+      'DISCARDED': 'Descartado'
+    };
+    const normalized = (status || '').toUpperCase();
+    return statusMap[normalized] || status;
+  };
+
+  const activeCropsList = crops?.filter(c => c.status !== 'HARVESTED' && c.status !== 'DISCARDED') || [];import React, { useState, useEffect } from 'react';
 import EmployeeTasks from '../components/EmployeeTasks';
 import { useData } from '../context/DataContext';
 import '../crops.css';
@@ -134,7 +148,7 @@ export default function TvDashboard() {
                   <div className="status-footer" style={{ borderTopColor: '#334155', marginTop: '1.5rem', paddingTop: '1.5rem' }}>
                     <div>
                       <p style={{ margin: '0 0 4px 0', fontSize: '0.8rem', fontWeight: 'bold', color: '#64748b', textTransform: 'uppercase' }}>Estado Actual</p>
-                      <p className="status-current" style={{ fontSize: '1.8rem' }}>{crop.status}</p>
+                      <p className="status-current" style={{ fontSize: '1.8rem' }}>{translateStatus(crop.status)}</p>
                       <p className="status-days" style={{ fontSize: '1rem', color: '#cbd5e1', marginTop: '4px' }}>Día {daysAlive}</p>
                     </div>
                     <button 
