@@ -78,17 +78,7 @@ export const DataProvider = ({ children }) => {
           supabase.from('crop_types').select('*'),
           supabase.from('crops').select('*').order('createdAt', { ascending: true }),
           supabase.from('harvest_targets').select('*').then(res => {
-              if (res.error) {
-                console.error("Error fetching harvest_targets:", res.error);
-                Swal.fire('Error al cargar Rutinas', 'Detalle: ' + res.error.message, 'error');
-              } else {
-                console.log("FETCHED HARVEST TARGETS:", res.data);
-                if (!res.data || res.data.length === 0) {
-                   Swal.fire('Atención', 'Supabase devolvió 0 rutinas, pero no dio error.', 'info');
-                } else {
-                   Swal.fire('Éxito', 'Supabase devolvió ' + res.data.length + ' rutinas.', 'success');
-                }
-              }
+              if (res.error) console.error("Error fetching harvest_targets:", res.error);
               return res;
             }),
           supabase.from('harvests').select('*').order('createdAt', { ascending: true }),
