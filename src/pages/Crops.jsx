@@ -806,8 +806,8 @@ export default function Crops() {
     let currentDayOffset = 0;
     
     // Soaking/Germination
-    const hasSoak = Number(cType.soakDays) > 0;
-    if (hasSoak) currentDayOffset += Number(cType.soakDays);
+    const hasSoak = Number(cType.soakingHours) > 0;
+    if (hasSoak) currentDayOffset += 1;
     const germDay = (sowDayOfWeek + currentDayOffset) % 7;
     const germWeek = Math.floor((sowDayOfWeek + currentDayOffset) / 7);
     
