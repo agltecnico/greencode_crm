@@ -1,3 +1,4 @@
+import Swal from 'sweetalert2';
 import { useState, Fragment } from 'react';
 import { useData } from '../context/DataContext';
 import { generateDeliveryNotePDF, generateDeliveryNoteBlob } from '../utils/pdf';
@@ -308,9 +309,19 @@ export default function DeliveryNotes() {
                           className="btn btn-danger" 
                           style={{ padding: '0.3rem 0.6rem', fontSize: '0.8rem' }}
                           onClick={() => {
-                            if (window.confirm('¿Estás seguro de que quieres eliminar este albarán permanentemente?')) {
-                              deleteDeliveryNote(dn.id);
-                            }
+                            Swal.fire({
+                              text: '¿Estás seguro de que quieres eliminar este albarán permanentemente?',
+                              icon: 'warning',
+                              showCancelButton: true,
+                              confirmButtonColor: '#ef4444',
+                              cancelButtonColor: '#94a3b8',
+                              confirmButtonText: 'Sí, eliminar',
+                              cancelButtonText: 'Cancelar'
+                            }).then((result) => {
+                              if (result.isConfirmed) {
+                                deleteDeliveryNote(dn.id);
+                              }
+                            });
                           }}
                           title="Eliminar Albarán"
                         >

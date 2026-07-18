@@ -18,7 +18,8 @@
     "react-dom": "^19.2.4",
     "react-router-dom": "^7.13.2",
     "react-signature-canvas": "^1.1.0-alpha.2",
-    "recharts": "^3.9.0"
+    "recharts": "^3.9.0",
+    "sweetalert2": "^11.26.25"
   },
   "devDependencies": {
     "@eslint/js": "^9.39.4",

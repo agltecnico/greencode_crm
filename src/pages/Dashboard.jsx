@@ -1,3 +1,4 @@
+import Swal from 'sweetalert2';
 ﻿import { useState, useRef } from 'react';
 import { useData } from '../context/DataContext';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts';
@@ -272,9 +273,20 @@ export default function Dashboard() {
     reader.onload = (event) => {
       try {
         const parsedData = JSON.parse(event.target.result);
-        if (window.confirm("ATENCIÓN: Esto sobrescribirá todos los datos actuales con los de la copia de seguridad. ¿Estás seguro?")) {
-          importData(parsedData);
-        }
+        Swal.fire({
+          title: 'ATENCIÓN',
+          text: 'Esto sobrescribirá todos los datos actuales con los de la copia de seguridad. ¿Estás seguro?',
+          icon: 'warning',
+          showCancelButton: true,
+          confirmButtonColor: '#ef4444',
+          cancelButtonColor: '#94a3b8',
+          confirmButtonText: 'Sí, sobrescribir',
+          cancelButtonText: 'Cancelar'
+        }).then((result) => {
+          if (result.isConfirmed) {
+            importData(parsedData);
+          }
+        });
       } catch (err) {
         alert("Error al leer el archivo de copia de seguridad. Asegúrate de que es un archivo JSON válido.");
       }

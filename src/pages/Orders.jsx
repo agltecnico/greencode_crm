@@ -1,3 +1,4 @@
+import Swal from 'sweetalert2';
 import { useState, Fragment } from 'react';
 import { useData } from '../context/DataContext';
 import { usePagination } from '../hooks/usePagination';
@@ -466,7 +467,7 @@ export default function Orders() {
                       <button 
                         className="btn btn-danger" 
                         style={{ padding: '0.3rem 0.6rem', fontSize: '0.8rem', background: 'transparent', color: '#ef4444', border: '1px solid #ef4444' }}
-                        onClick={() => { if(window.confirm('¿Seguro que quieres eliminar este pedido?')) deleteOrder(order.id); }}
+                        onClick={() => { Swal.fire({text: '¿Seguro que quieres eliminar este pedido?', icon: 'warning', showCancelButton: true, confirmButtonColor: '#ef4444', cancelButtonColor: '#94a3b8', confirmButtonText: 'Sí, eliminar', cancelButtonText: 'Cancelar'}).then(r => { if(r.isConfirmed) deleteOrder(order.id); }) }}
                       >
                         X
                       </button>

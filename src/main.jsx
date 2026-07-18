@@ -1,3 +1,13 @@
+import Swal from 'sweetalert2';
+
+window.alert = (msg) => {
+  Swal.fire({
+    text: msg,
+    icon: 'info',
+    confirmButtonColor: '#0ea5e9'
+  });
+};
+
 import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
 import { BrowserRouter } from 'react-router-dom'

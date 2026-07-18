@@ -1,3 +1,4 @@
+import Swal from 'sweetalert2';
 import { useState } from 'react';
 import { useData } from '../context/DataContext';
 import { generateInvoicePDF, generateInvoiceBlob } from '../utils/pdf';
@@ -66,9 +67,19 @@ export default function Invoices() {
   };
 
   const handleDeleteInvoice = (id) => {
-    if (window.confirm('¿Estás seguro de que deseas eliminar esta factura? Los albaranes asociados pasarán a estar pendientes de nuevo.')) {
-      deleteInvoice(id);
-    }
+    Swal.fire({
+      text: '¿Estás seguro de que deseas eliminar esta factura? Los albaranes asociados pasarán a estar pendientes de nuevo.',
+      icon: 'warning',
+      showCancelButton: true,
+      confirmButtonColor: '#ef4444',
+      cancelButtonColor: '#94a3b8',
+      confirmButtonText: 'Sí, eliminar',
+      cancelButtonText: 'Cancelar'
+    }).then((result) => {
+      if (result.isConfirmed) {
+        deleteInvoice(id);
+      }
+    });
   };
 
   const handleGenerateInvoice = async () => {
