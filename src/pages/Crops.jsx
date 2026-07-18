@@ -177,6 +177,7 @@ export default function Crops() {
       'SOWED': 'Sembrado',
       'GERMINATING': 'Germinando',
       'GROWING': 'Creciendo',
+        'READY': 'Listo',
       'HARVESTED': 'Cosechado',
       'DISCARDED': 'Descartado'
     };
@@ -456,6 +457,7 @@ export default function Crops() {
                         if (statusStr === 'SOAKING') statusColor = { bg: '#dbeafe', text: '#1e3a8a', bar: '#3b82f6' };
                         else if (statusStr === 'GERMINATING') statusColor = { bg: '#fef3c7', text: '#92400e', bar: '#f59e0b' };
                         else if (statusStr === 'GROWING') statusColor = { bg: '#d1fae5', text: '#065f46', bar: '#10b981' };
+                          else if (statusStr === 'READY') statusColor = { bg: '#dcfce7', text: '#166534', bar: '#22c55e' };
 
                         return (
                           <tr key={crop.id} style={{ borderBottom: '1px solid #f1f5f9', transition: 'background-color 0.2s' }} onMouseOver={e=>e.currentTarget.style.backgroundColor='#f8fafc'} onMouseOut={e=>e.currentTarget.style.backgroundColor='transparent'}>
@@ -493,7 +495,11 @@ export default function Crops() {
                                 <button onClick={() => discardCrop(crop)} title="Descartar" style={{ padding: '0.25rem 0.5rem', borderRadius: '0.35rem', border: '1px solid #fecaca', color: '#dc2626', backgroundColor: 'white', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                                   <svg width="14" height="14" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
                                 </button>
-                                <button onClick={() => advanceCropStatus(crop)} title="Avanzar Fase" style={{ padding: '0.25rem 0.5rem', borderRadius: '0.35rem', border: 'none', backgroundColor: '#1e293b', color: 'white', fontWeight: 'bold', fontSize: '0.75rem', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
+                                <button onClick={() => {
+                                    if (window.confirm('¿Confirmas que deseas avanzar este lote a la siguiente fase manualmente?')) {
+                                      advanceCropStatus(crop);
+                                    }
+                                  }} title="Avanzar Fase" style={{ padding: '0.25rem 0.5rem', borderRadius: '0.35rem', border: 'none', backgroundColor: '#1e293b', color: 'white', fontWeight: 'bold', fontSize: '0.75rem', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
                                   <span>Siguiente</span>
                                   <svg width="12" height="12" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5l7 7-7 7"></path></svg>
                                 </button>

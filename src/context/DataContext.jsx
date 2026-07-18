@@ -350,12 +350,36 @@ export const DataProvider = ({ children }) => {
   const advanceCropStatus = async (crop) => {
     const sequence = ['SOAKING', 'GERMINATING', 'GROWING', 'READY'];
     const currentIdx = sequence.indexOf(crop.status ? crop.status.toUpperCase() : 'SOWED');
-    if (currentIdx === -1) {
-      // If it's SOWED, advance to GERMINATING
-      await updateCrop(crop.id, { status: 'GERMINATING' });
-    } else if (currentIdx < sequence.length - 1) {
-      await updateCrop(crop.id, { status: sequence[currentIdx + 1] });
+    
+    let nextStatus = 'GERMINATING';
+    if (currentIdx !== -1 && currentIdx < sequence.length - 1) {
+      nextStatus = sequence[currentIdx + 1];
+    } else if (currentIdx === sequence.length - 1) {
+      return; // Already READY
     }
+
+    // Calculate days to subtract to match the beginning of the next phase
+    const cType = cropTypes.find(ct => ct.id === crop.cropTypeId || ct.id === crop.seedId);
+    let daysToSubtract = 0;
+    
+    if (cType) {
+      const soakDays = cType.soakingHours > 0 ? 1 : 0;
+      const germDay = soakDays;
+      const lightDay = germDay + (Number(cType.germinationDays) || 0) + (Number(cType.darknessDays) || 0);
+      const readyDay = lightDay + (Number(cType.lightDays) || 0);
+      
+      if (nextStatus === 'GERMINATING') daysToSubtract = germDay;
+      else if (nextStatus === 'GROWING') daysToSubtract = lightDay;
+      else if (nextStatus === 'READY') daysToSubtract = readyDay;
+    }
+
+    const newDate = new Date();
+    newDate.setDate(newDate.getDate() - daysToSubtract);
+
+    await updateCrop(crop.id, { 
+      status: nextStatus,
+      datePlanted: newDate.toISOString() 
+    });
   };
 
   const discardCrop = async (crop) => {
