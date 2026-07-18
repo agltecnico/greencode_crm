@@ -5,13 +5,15 @@ import '../crops.css';
 
 export default function TvDashboard() {
   const [tvTab, setTvTab] = useState('tasks');
-  const { crops, seeds, advanceCropStatus, refreshData, orders, clients } = useData();
+  const { crops, cropTypes, seeds, advanceCropStatus, refreshData, orders, clients } = useData();
 
   const translateStatus = (status) => {
     const statusMap = {
       'SOAKING': 'En Remojo',
       'SOWED': 'Sembrado',
       'GERMINATING': 'Germinando',
+        'DARKNESS': 'Oscuridad',
+        'LIGHT': 'Luz',
       'GROWING': 'Creciendo',
       'HARVESTED': 'Cosechado',
       'DISCARDED': 'Descartado'
@@ -132,14 +134,14 @@ export default function TvDashboard() {
           
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
             {activeCropsList.map(crop => {
-              const seed = seeds?.find(s => s.id === crop.seedId);
+              const cType = cropTypes?.find(c => c.id === crop.cropTypeId) || seeds?.find(s => s.id === crop.seedId);
               const daysAlive = Math.floor((new Date() - new Date(crop.datePlanted)) / (1000 * 60 * 60 * 24));
               
               return (
                 <div key={crop.id} className={`status-card ${crop.status}`} style={{ background: '#1e293b', borderColor: '#334155', padding: '2rem' }}>
                   <div className="status-header" style={{ marginBottom: '1.5rem' }}>
                     <div>
-                      <h4 className="status-title" style={{ color: '#f8fafc', fontSize: '1.5rem' }}>{seed?.name}</h4>
+                      <h4 className="status-title" style={{ color: '#f8fafc', fontSize: '1.5rem', minHeight: '36px' }}>{cType?.name || 'Variedad Desconocida'}</h4>
                       <span className="status-batch" style={{ background: '#0f172a', color: '#94a3b8', fontSize: '1rem', padding: '4px 12px' }}>LOTE: {crop.batchNumber}</span>
                     </div>
                   </div>
