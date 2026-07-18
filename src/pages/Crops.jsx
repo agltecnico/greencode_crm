@@ -1057,7 +1057,7 @@ export default function Crops() {
                               <div style={{ fontSize: '1.5rem', fontWeight: 900, color: '#059669', lineHeight: 1, marginBottom: '0.5rem' }}>{ht.tuppersCount}</div>
                               <div style={{ fontSize: '0.7rem', display: 'flex', flexDirection: 'column', gap: '2px', width: '100%' }}>
                                 {cycle.soak && <div style={{ display: 'flex', justifyContent: 'space-between', color: '#3b82f6' }}><span>💧</span><span>{cycle.soak}</span></div>}
-                                <div style={{ display: 'flex', justifyContent: 'space-between', color: '#8b5cf6' }}><span>🌱</span><span>{cycle.germ}</span></div>
+                                <div style={{ display: 'flex', justifyContent: 'space-between', color: '#c026d3', fontWeight: 'bold' }}><span>🌱</span><span>{cycle.germ}</span></div>
                                 {cycle.dark && <div style={{ display: 'flex', justifyContent: 'space-between', color: '#475569' }}><span>🌑</span><span>{cycle.dark}</span></div>}
                                 <div style={{ display: 'flex', justifyContent: 'space-between', color: '#eab308' }}><span>☀️</span><span>{cycle.light}</span></div>
                                 <div style={{ display: 'flex', justifyContent: 'space-between', color: '#10b981', fontWeight: 'bold' }}><span>✂️</span><span>{cycle.harvest}</span></div>
