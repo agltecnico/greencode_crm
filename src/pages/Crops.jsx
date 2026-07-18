@@ -1,5 +1,5 @@
 import { useState, useMemo, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useData } from '../context/DataContext';
 import EmployeeTasks from '../components/EmployeeTasks';
 import Supplies from './Supplies';
@@ -48,6 +48,30 @@ export default function Crops() {
   // Modals state
   const [isSowModalOpen, setIsSowModalOpen] = useState(false);
   const [isHarvestModalOpen, setIsHarvestModalOpen] = useState(false);
+  const [searchParams, setSearchParams] = useSearchParams();
+
+  useEffect(() => {
+    const action = searchParams.get('action');
+    if (action === 'sow') {
+      const cId = searchParams.get('cropTypeId');
+      const trays = searchParams.get('trays');
+      if (cId) {
+        setNewCrop(prev => ({ ...prev, cropTypeId: cId, traysCount: trays || 1, selectedSeedBatchId: '' }));
+        setIsSowModalOpen(true);
+        // Clean URL so it doesn't reopen on refresh
+        setSearchParams({});
+      }
+    } else if (action === 'harvest') {
+      const cId = searchParams.get('cropTypeId');
+      if (cId) {
+        // We might not know the specific crop ID, but we know it's a harvest action. 
+        // We'll just open the modal.
+        setIsHarvestModalOpen(true);
+        setSearchParams({});
+      }
+    }
+  }, [searchParams, setSearchParams]);
+
   const [showPhaseChangeModal, setShowPhaseChangeModal] = useState(null);
   const [pendingPhase, setPendingPhase] = useState(null);
 
@@ -351,61 +375,7 @@ export default function Crops() {
                 <button onClick={() => setIsSowModalOpen(false)} style={{ background: 'none', border: 'none', color: 'white', fontSize: '1.5rem', cursor: 'pointer', opacity: 0.8 }} onMouseOver={e=>e.currentTarget.style.opacity=1} onMouseOut={e=>e.currentTarget.style.opacity=0.8}>&times;</button>
               </div>
               <div style={{ padding: '2rem' }}>
-                  {(() => {
-                    const today = new Date();
-                    const targetDayOfWeek = today.getDay() || 7;
-                    const tasks = [];
-                    
-                    (harvestTargets || []).forEach(routine => {
-                      const cType = (cropTypes || []).find(ct => ct.id === routine.productId);
-                      if(!cType) return;
-                      
-                      const plantWd = routine.targetDayOfWeek;
-                      
-                      const isPlanted = (crops || []).some(c => {
-                        if(c.cropTypeId !== cType.id) return false;
-                        if(!c.datePlanted) return false;
-                        const cDate = new Date(c.datePlanted);
-                        cDate.setHours(0,0,0,0);
-                        const tDate = new Date(today);
-                        tDate.setHours(0,0,0,0);
-                        return Math.abs((cDate - tDate) / 86400000) < 1; 
-                      });
-                      
-                      if(plantWd === targetDayOfWeek && !isPlanted) {
-                        tasks.push({
-                          cropTypeId: cType.id,
-                          name: cType.name,
-                          trays: routine.tuppersCount
-                        });
-                      }
-                    });
-
-                    if (tasks.length > 0) {
-                      return (
-                        <div style={{ marginBottom: '1.5rem', backgroundColor: '#f0fdf4', padding: '1rem', borderRadius: '0.75rem', border: '1px solid #bbf7d0' }}>
-                          <h4 style={{ fontWeight: 'bold', color: '#166534', marginBottom: '0.5rem', display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.95rem' }}>
-                            <span>📋</span> Pendiente según el Planificador para Hoy
-                          </h4>
-                          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-                            {tasks.map((t, idx) => (
-                              <div key={idx} 
-                                  onClick={() => setNewCrop(prev => ({ ...prev, cropTypeId: t.cropTypeId, traysCount: t.trays, selectedSeedBatchId: '' }))}
-                                  style={{ display: 'flex', justifyContent: 'space-between', padding: '0.75rem', backgroundColor: 'white', borderRadius: '0.5rem', border: '1px solid #cbd5e1', cursor: 'pointer', transition: 'all 0.2s', boxShadow: '0 1px 2px rgba(0,0,0,0.05)' }}
-                              >
-                                <div>
-                                  <span style={{ fontWeight: 'bold', color: '#1e293b' }}>{t.name}</span>
-                                  <div style={{ fontSize: '0.8rem', color: '#64748b' }}>{t.trays} bandejas</div>
-                                </div>
-                                <span style={{ color: '#22c55e', alignSelf: 'center', fontWeight: 'bold', fontSize: '0.85rem' }}>→ Autocompletar</span>
-                              </div>
-                            ))}
-                          </div>
-                        </div>
-                      );
-                    }
-                    return null;
-                  })()}
+                  
                   <form onSubmit={handleAddCrop} style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
                   <div>
                     <label style={{ fontSize: '0.875rem', fontWeight: 'bold', marginBottom: '0.5rem', display: 'block', color: '#334155' }}>1. ¿Qué vas a plantar?</label>

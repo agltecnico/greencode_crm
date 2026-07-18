@@ -3,6 +3,7 @@ import { useData } from '../context/DataContext';
 import '../crops.css';
 
 export default function EmployeeTasks() {
+  const navigate = useNavigate();
   const { harvestTargets, crops, seeds, cropTypes, dailyLogs, addDailyLog } = useData();
   const [timeFilter, setTimeFilter] = useState(1);
   const [selectedDayTasks, setSelectedDayTasks] = useState(null);
@@ -112,7 +113,7 @@ export default function EmployeeTasks() {
       };
 
       if(plantWd === targetDayOfWeek && !checkPlanted(0)) {
-        tasksForDate.push({ type: 'plant', title: `Plantar ${cType.name}`, desc: `Rutina semanal: ${routine.tuppersCount} bandejas`, icon: '🌱', className: 'plant' });
+        tasksForDate.push({ type: 'plant', title: `Plantar ${cType.name}`, desc: `Rutina semanal: ${routine.tuppersCount} bandejas`, icon: '🌱', className: 'plant', cropTypeId: cType.id, trays: routine.tuppersCount });
       }
       if(soakHrs > 0 && soakWd === targetDayOfWeek && !checkPlanted(-1)) {
         tasksForDate.push({ type: 'soak', title: `Remojo: ${seed.name}`, desc: `Rutina: ${soakHrs}h para ${routine.tuppersCount} bandejas.`, icon: '💧', className: 'soak' });
@@ -150,7 +151,13 @@ export default function EmployeeTasks() {
       ) : (
         <div className="task-grid">
           {dayGroup.items.map((task, i) => (
-            <div key={i} className={`task-card ${task.className}`}>
+            <div key={i} className={`task-card ${task.className}`} onClick={() => {
+              if (task.type === 'plant') {
+                navigate('/crops?action=sow&cropTypeId=' + task.cropTypeId + '&trays=' + task.trays);
+              } else if (task.type === 'harvest') {
+                navigate('/crops?action=harvest&cropTypeId=' + task.cropTypeId);
+              }
+            }} style={{ cursor: (task.type === 'plant' || task.type === 'harvest') ? 'pointer' : 'default' }}>
               <div className="task-icon">{task.icon}</div>
               <div className="task-content">
                 <h4>{task.title}</h4>
