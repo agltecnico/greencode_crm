@@ -134,31 +134,7 @@ export default function EmployeeTasks() {
       {dayGroup.items.length === 0 ? (
         <div style={{ padding: '2rem', textAlign: 'center', color: 'var(--crop-text-muted)' }}>
           🍃 Todo despejado para este día.
-            {dayGroup.isToday && (
-              <div style={{marginTop: '1rem', fontSize: '0.8rem', color: 'red', textAlign: 'left', wordBreak: 'break-all'}}>
-                DEBUG INFO:
-                <br/>DayOfWeek: {dayGroup.date.getDay()}
-                <br/>HarvestTargets count: {harvestTargets?.length || 0}
-                {harvestTargets?.map(ht => {
-                  const matchedCrop = crops?.find(c => {
-                    if (c.status === 'DISCARDED') return false;
-                    if (c.cropTypeId !== ht.productId && c.seedId !== ht.productId) return false;
-                    const cDate = new Date(c.datePlanted);
-                    cDate.setHours(0,0,0,0);
-                    const tDate = new Date(dayGroup.date);
-                    tDate.setHours(0,0,0,0);
-                    return Math.abs((cDate - tDate) / 86400000) <= 1;
-                  });
-                  return (
-                    <div key={ht.id}>
-                      - TargetDay: {ht.targetDayOfWeek} -&gt; plantWd: {Number(ht.targetDayOfWeek)}
-                      <br/>- Seed check: {seeds?.find(s => s.id === cropTypes?.find(ct => ct.id === ht.productId)?.seedId) ? 'OK' : 'FAIL'}
-                      <br/>- CheckPlanted(0): {matchedCrop ? 'MATCH: ID ' + matchedCrop.id + ' | STATUS: ' + matchedCrop.status + ' | DATE: ' + matchedCrop.datePlanted : 'NO MATCH'}
-                    </div>
-                  );
-                })}
-              </div>
-            )}
+            
         </div>
       ) : (
         <div className="task-grid">
