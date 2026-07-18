@@ -70,7 +70,10 @@ export default function Supplies() {
     const art = articles?.find(a => a.id === entry.articleId);
     return art?.name.toLowerCase().includes(searchTerm.toLowerCase()) || entry.deliveryNote?.toLowerCase().includes(searchTerm.toLowerCase()) || entry.batchNumber?.toLowerCase().includes(searchTerm.toLowerCase());
   }).sort((a,b) => new Date(b.purchaseDate) - new Date(a.purchaseDate)) || [];
-  const { currentData: paginatedStock, currentPage: sPage, totalPages: sTotal, goToPage: sGo, nextPage: sNext, prevPage: sPrev } = usePagination(filteredStock, 10);
+  const filteredStockIn = filteredStock.filter(entry => Number(entry.quantity) > 0);
+  const filteredStockOut = filteredStock.filter(entry => Number(entry.quantity) <= 0);
+  const { currentData: paginatedStockIn, currentPage: siPage, totalPages: siTotal, goToPage: siGo, nextPage: siNext, prevPage: siPrev } = usePagination(filteredStockIn, 10);
+  const { currentData: paginatedStockOut, currentPage: soPage, totalPages: soTotal, goToPage: soGo, nextPage: soNext, prevPage: soPrev } = usePagination(filteredStockOut, 10);
 
   const filteredTypes = cropTypes?.filter(c => c.name.toLowerCase().includes(searchTerm.toLowerCase())) || [];
   const { currentData: paginatedTypes, currentPage: tPage, totalPages: tTotal, goToPage: tGo, nextPage: tNext, prevPage: tPrev } = usePagination(filteredTypes, 10);
@@ -187,7 +190,7 @@ export default function Supplies() {
       <div className="admin-tabs" style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem' }}>
         <button className={`admin-tab ${activeTab === 'INVENTORY' ? 'active' : ''}`} onClick={() => setActiveTab('INVENTORY')}>Inventario (Stock)</button>
         <button className={`admin-tab ${activeTab === 'CATALOG' ? 'active' : ''}`} onClick={() => setActiveTab('CATALOG')}>Catálogo de Artículos</button>
-        <button className={`admin-tab ${activeTab === 'STOCK' ? 'active' : ''}`} onClick={() => setActiveTab('STOCK')}>Albaranes de Entrada / Gasto</button>
+        <button className={`admin-tab ${activeTab === 'STOCK' ? 'active' : ''}`} onClick={() => setActiveTab('STOCK')}>Entradas y Salidas</button>
         <button className={`admin-tab ${activeTab === 'EXPENSES' ? 'active' : ''}`} onClick={() => setActiveTab('EXPENSES')}>Historial de Gastos</button>
         <button className={`admin-tab ${activeTab === 'CROP_TYPES_LIST' ? 'active' : ''}`} onClick={() => setActiveTab('CROP_TYPES_LIST')}>Fichas de Cultivo</button>
       </div>
@@ -334,60 +337,112 @@ export default function Supplies() {
       )}
 
       {activeTab === 'STOCK' && (
-        <div style={{ animation: 'fadeIn 0.3s ease' }}>
-          <div className="flex justify-between items-center mb-4">
-             <h3 className="font-bold text-lg">Registro de Albaranes de Entrada y Gastos</h3>
-             <button className="btn btn-primary shadow-sm" onClick={() => setShowStockModal(true)}>+ Nuevo Registro</button>
-          </div>
-
-          <div className="table-container">
-            <table className="admin-table">
-              <thead>
-                <tr>
-                  <th>Fecha</th>
-                  <th>Proveedor</th>
-                  <th>Artículo</th>
-                  <th>Factura/Albarán</th>
-                  <th>Lote</th>
-                  <th>Cantidad</th>
-                  <th>Coste Total</th>
-                  <th>Acciones</th>
-                </tr>
-              </thead>
-              <tbody>
-                {paginatedStock.map(entry => {
-                  const art = articles?.find(a => a.id === entry.articleId);
-                  return (
-                    <tr key={entry.id}>
-                      <td>{new Date(entry.purchaseDate).toLocaleDateString()}</td>
-                      <td className="text-muted">{providers?.find(p => p.id === entry.providerId)?.name || '-'}</td>
-                      <td className="font-bold text-primary">{art ? getTypeLabel(art.type) + ' ' + art.name : 'Desconocido'}</td>
-                      <td className="text-muted font-mono">{entry.deliveryNote || '-'}</td>
-                      <td className="font-mono text-indigo-600">{entry.batchNumber || '-'}</td>
-                      <td>{entry.quantity} {art ? getUnitLabel(art.type) : ''}</td>
-                      <td className="font-bold text-red-600">{entry.price ? `${entry.price.toFixed(2)} €` : '-'}</td>
-                      <td>
-                        <button className="btn btn-danger" style={{ padding: '0.3rem 0.6rem', fontSize: '0.8rem', background: 'transparent', color: '#ef4444', border: '1px solid #ef4444' }} onClick={() => deleteStockEntry(entry.id)}>Borrar</button>
-                      </td>
-                    </tr>
-                  )
-                })}
-              </tbody>
-            </table>
-          </div>
-          {sTotal > 1 && (
-            <div className="pagination">
-              <button className="page-btn" onClick={sPrev} disabled={sPage === 1}>&lt; Ant</button>
-              {Array.from({ length: sTotal }, (_, i) => i + 1).map(page => (
-                <button key={page} className={`page-btn ${sPage === page ? 'active' : ''}`} onClick={() => sGo(page)}>{page}</button>
-              ))}
-              <button className="page-btn" onClick={sNext} disabled={sPage === sTotal}>Sig &gt;</button>
+          <div style={{ animation: 'fadeIn 0.3s ease' }}>
+            <div className="flex justify-between items-center mb-4">
+               <h3 className="font-bold text-lg">Registro de Albaranes de Entrada</h3>
+               <button className="btn btn-primary shadow-sm" onClick={() => setShowStockModal(true)}>+ Nuevo Registro</button>
             </div>
-          )}
-        </div>
-      )}
+  
+            <div className="table-container mb-8">
+              <table className="admin-table">
+                <thead>
+                  <tr>
+                    <th>Fecha</th>
+                    <th>Proveedor</th>
+                    <th>Artículo</th>
+                    <th>Factura/Albarán</th>
+                    <th>Lote</th>
+                    <th>Cantidad</th>
+                    <th>Coste Total</th>
+                    <th>Acciones</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {paginatedStockIn.map(entry => {
+                    const art = articles?.find(a => a.id === entry.articleId);
+                    return (
+                      <tr key={entry.id}>
+                        <td>{new Date(entry.purchaseDate || entry.date || entry.createdAt).toLocaleDateString()}</td>
+                        <td className="text-muted">{providers?.find(p => p.id === entry.providerId)?.name || '-'}</td>
+                        <td className="font-bold text-primary">{art ? getTypeLabel(art.type) + ' ' + art.name : 'Desconocido'}</td>
+                        <td className="text-muted font-mono">{entry.deliveryNote || '-'}</td>
+                        <td className="font-mono text-indigo-600">{entry.batchNumber || '-'}</td>
+                        <td>{entry.quantity} {art ? getUnitLabel(art.type) : ''}</td>
+                        <td className="font-bold text-red-600">{entry.price ? `${entry.price.toFixed(2)} €` : '-'}</td>
+                        <td>
+                          <button className="btn btn-danger" style={{ padding: '0.3rem 0.6rem', fontSize: '0.8rem', background: 'transparent', color: '#ef4444', border: '1px solid #ef4444' }} onClick={() => deleteStockEntry(entry.id)}>Borrar</button>
+                        </td>
+                      </tr>
+                    )
+                  })}
+                  {paginatedStockIn.length === 0 && (
+                    <tr><td colSpan="8" className="text-center text-slate-500 py-4">No hay albaranes de entrada.</td></tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+            {siTotal > 1 && (
+              <div className="pagination mb-8">
+                <button className="page-btn" onClick={siPrev} disabled={siPage === 1}>&lt; Ant</button>
+                {Array.from({ length: siTotal }, (_, i) => i + 1).map(page => (
+                  <button key={page} className={`page-btn ${siPage === page ? 'active' : ''}`} onClick={() => siGo(page)}>{page}</button>
+                ))}
+                <button className="page-btn" onClick={siNext} disabled={siPage === siTotal}>Sig &gt;</button>
+              </div>
+            )}
 
-      {activeTab === 'EXPENSES' && (
+            <div className="flex justify-between items-center mb-4 mt-8 pt-6 border-t border-slate-200">
+               <h3 className="font-bold text-lg text-orange-700">Historial de Salidas / Consumos</h3>
+            </div>
+            <div className="table-container border-orange-200">
+              <table className="admin-table">
+                <thead>
+                  <tr style={{ backgroundColor: '#fff7ed' }}>
+                    <th>Fecha</th>
+                    <th>Motivo</th>
+                    <th>Artículo</th>
+                    <th>Lote Sembrado</th>
+                    <th>Cantidad Extraída</th>
+                    <th>Coste</th>
+                    <th>Acciones</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {paginatedStockOut.map(entry => {
+                    const art = articles?.find(a => a.id === entry.articleId);
+                    return (
+                      <tr key={entry.id}>
+                        <td>{new Date(entry.purchaseDate || entry.date || entry.createdAt).toLocaleDateString()}</td>
+                        <td className="text-muted">{entry.notes || 'Consumo interno'}</td>
+                        <td className="font-bold text-orange-600">{art ? getTypeLabel(art.type) + ' ' + art.name : 'Desconocido'}</td>
+                        <td className="font-mono text-slate-600">{entry.batchNumber || '-'}</td>
+                        <td className="font-bold text-red-500">{entry.quantity} {art ? getUnitLabel(art.type) : ''}</td>
+                        <td className="text-muted">{entry.price ? `${entry.price.toFixed(2)} €` : '0.00 €'}</td>
+                        <td>
+                          <button className="btn btn-danger" style={{ padding: '0.3rem 0.6rem', fontSize: '0.8rem', background: 'transparent', color: '#ef4444', border: '1px solid #ef4444' }} onClick={() => deleteStockEntry(entry.id)}>Borrar</button>
+                        </td>
+                      </tr>
+                    )
+                  })}
+                  {paginatedStockOut.length === 0 && (
+                    <tr><td colSpan="7" className="text-center text-slate-500 py-4">No hay salidas registradas.</td></tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+            {soTotal > 1 && (
+              <div className="pagination">
+                <button className="page-btn" onClick={soPrev} disabled={soPage === 1}>&lt; Ant</button>
+                {Array.from({ length: soTotal }, (_, i) => i + 1).map(page => (
+                  <button key={page} className={`page-btn ${soPage === page ? 'active' : ''}`} onClick={() => soGo(page)}>{page}</button>
+                ))}
+                <button className="page-btn" onClick={soNext} disabled={soPage === soTotal}>Sig &gt;</button>
+              </div>
+            )}
+          </div>
+        )}
+  
+        {activeTab === 'EXPENSES' && (
         <div style={{ animation: 'fadeIn 0.3s ease' }}>
           <div className="card" style={{ marginBottom: '1.5rem', background: '#f8fafc', display: 'flex', gap: '1rem', flexWrap: 'wrap', alignItems: 'center' }}>
             <div>
