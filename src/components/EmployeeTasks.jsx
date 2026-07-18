@@ -87,7 +87,7 @@ export default function EmployeeTasks() {
       const seed = seeds?.find(s => s.id === cType.seedId);
       if(!seed) return;
 
-      const plantWd = routine.targetDayOfWeek;
+      const plantWd = Number(routine.targetDayOfWeek);
       const soakHrs = cType.soakingHours || 0;
       const soakOffset = soakHrs > 0 ? 1 : 0;
       const germOffset = soakOffset;
