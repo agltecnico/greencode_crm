@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useData } from '../context/DataContext';
 import EmployeeTasks from '../components/EmployeeTasks';
@@ -36,7 +36,7 @@ export default function Crops() {
   const selectedCropType = cropTypes?.find(c => c.id === newCrop.cropTypeId);
   const totalAvailableSeed = stockEntries?.filter(e => e.articleId === selectedCropType?.seedId).reduce((acc, curr) => acc + Number(curr.quantity || 0), 0) || 0;
 
-  const availableBatches = React.useMemo(() => {
+  const availableBatches = useMemo(() => {
     if (!selectedCropType?.seedId) return [];
     const entries = stockEntries?.filter(e => e.articleId === selectedCropType.seedId) || [];
     const batches = {};
@@ -55,7 +55,7 @@ export default function Crops() {
 
   const oldestBatch = availableBatches.length > 0 ? availableBatches[0].batchNumber : '';
 
-  React.useEffect(() => {
+  useEffect(() => {
     if (oldestBatch && newCrop.cropTypeId && !newCrop.selectedSeedBatchId) {
       setNewCrop(prev => ({ ...prev, selectedSeedBatchId: oldestBatch }));
     }
