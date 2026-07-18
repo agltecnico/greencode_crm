@@ -499,14 +499,7 @@ export default function Crops() {
                                 <button onClick={() => discardCrop(crop)} title="Descartar" style={{ padding: '0.25rem 0.5rem', borderRadius: '0.35rem', border: '1px solid #fecaca', color: '#dc2626', backgroundColor: 'white', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                                   <svg width="14" height="14" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
                                 </button>
-                                <button onClick={() => {
-                                    if (window.confirm('¿Confirmas que deseas avanzar este lote a la siguiente fase manualmente?')) {
-                                      advanceCropStatus(crop);
-                                    }
-                                  }} title="Avanzar Fase" style={{ padding: '0.25rem 0.5rem', borderRadius: '0.35rem', border: 'none', backgroundColor: '#1e293b', color: 'white', fontWeight: 'bold', fontSize: '0.75rem', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
-                                  <span>Siguiente</span>
-                                  <svg width="12" height="12" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5l7 7-7 7"></path></svg>
-                                </button>
+                                <button onClick={() => setShowPhaseChangeModal(crop)} title="Cambiar Fase" style={{ padding: '0.35rem 0.75rem', borderRadius: '0.5rem', border: '1px solid #cbd5e1', backgroundColor: '#f8fafc', color: '#334155', fontWeight: 'bold', fontSize: '0.75rem', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.35rem', boxShadow: '0 1px 2px rgba(0,0,0,0.05)' }}>Cambiar Fase</button>
                               </div>
                             </td>
                           </tr>
