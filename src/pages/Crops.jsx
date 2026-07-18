@@ -376,7 +376,7 @@ export default function Crops() {
                           <select className="premium-input" style={{ width: '100%', padding: '0.75rem', borderRadius: '0.5rem', border: '1px solid #86efac', background: 'white', fontSize: '0.875rem', fontWeight: 'bold' }} required value={newCrop.selectedSeedBatchId || ''} onChange={e => setNewCrop({...newCrop, selectedSeedBatchId: e.target.value})}>
                             <option value="">-- Sin stock de lotes --</option>
                             {availableBatches.map(b => (
-                              <option key={b.batchNumber} value={b.batchNumber}>{b.batchNumber} ({b.quantity.toFixed(2)} g disponibles) {b.batchNumber === oldestBatch ? ' - [FIFO Recomendado]' : ''}</option>
+                              <option key={b.batchNumber} value={b.batchNumber}>{b.batchNumber} ({b.quantity.toFixed(2)} g disponibles)</option>
                             ))}
                           </select>
                           
