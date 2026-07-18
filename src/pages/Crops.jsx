@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useData } from '../context/DataContext';
 import EmployeeTasks from '../components/EmployeeTasks';
+import Supplies from './Supplies';
 import '../crops.css';
 
 export default function Crops() {
@@ -908,6 +909,7 @@ export default function Crops() {
         {activeTab === 'planificador' && renderPlanificador()}
         {activeTab === 'historial' && renderHistorial()}
         {activeTab === 'pedidos' && renderPedidos()}
+        {activeTab === 'stock' && <Supplies />}
       </div>
       
     </div>
