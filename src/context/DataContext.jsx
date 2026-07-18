@@ -81,6 +81,13 @@ export const DataProvider = ({ children }) => {
               if (res.error) {
                 console.error("Error fetching harvest_targets:", res.error);
                 Swal.fire('Error al cargar Rutinas', 'Detalle: ' + res.error.message, 'error');
+              } else {
+                console.log("FETCHED HARVEST TARGETS:", res.data);
+                if (!res.data || res.data.length === 0) {
+                   Swal.fire('Atención', 'Supabase devolvió 0 rutinas, pero no dio error.', 'info');
+                } else {
+                   Swal.fire('Éxito', 'Supabase devolvió ' + res.data.length + ' rutinas.', 'success');
+                }
               }
               return res;
             }),
