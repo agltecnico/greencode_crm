@@ -419,6 +419,7 @@ export default function Crops() {
                   <button onClick={() => setStatusFilter('SOAKING')} style={{ padding: '0.5rem 1rem', borderRadius: '0.5rem', fontWeight: 'bold', fontSize: '0.875rem', border: 'none', cursor: 'pointer', transition: 'all 0.2s', backgroundColor: statusFilter === 'SOAKING' ? '#dbeafe' : 'transparent', color: statusFilter === 'SOAKING' ? '#1e3a8a' : '#64748b', boxShadow: statusFilter === 'SOAKING' ? '0 1px 2px rgba(0,0,0,0.05)' : 'none' }}>En Remojo</button>
                   <button onClick={() => setStatusFilter('GERMINATING')} style={{ padding: '0.5rem 1rem', borderRadius: '0.5rem', fontWeight: 'bold', fontSize: '0.875rem', border: 'none', cursor: 'pointer', transition: 'all 0.2s', backgroundColor: statusFilter === 'GERMINATING' ? '#fef3c7' : 'transparent', color: statusFilter === 'GERMINATING' ? '#92400e' : '#64748b', boxShadow: statusFilter === 'GERMINATING' ? '0 1px 2px rgba(0,0,0,0.05)' : 'none' }}>Germinando</button>
                   <button onClick={() => setStatusFilter('GROWING')} style={{ padding: '0.5rem 1rem', borderRadius: '0.5rem', fontWeight: 'bold', fontSize: '0.875rem', border: 'none', cursor: 'pointer', transition: 'all 0.2s', backgroundColor: statusFilter === 'GROWING' ? '#d1fae5' : 'transparent', color: statusFilter === 'GROWING' ? '#065f46' : '#64748b', boxShadow: statusFilter === 'GROWING' ? '0 1px 2px rgba(0,0,0,0.05)' : 'none' }}>Creciendo</button>
+                  <button onClick={() => setStatusFilter('READY')} style={{ padding: '0.5rem 1rem', borderRadius: '0.5rem', fontWeight: 'bold', fontSize: '0.875rem', border: 'none', cursor: 'pointer', transition: 'all 0.2s', backgroundColor: statusFilter === 'READY' ? '#fce7f3' : 'transparent', color: statusFilter === 'READY' ? '#be185d' : '#64748b', boxShadow: statusFilter === 'READY' ? '0 1px 2px rgba(0,0,0,0.05)' : 'none' }}>Listos</button>
                 </div>
               </div>
 
@@ -557,7 +558,7 @@ export default function Crops() {
                     <span>2. Selecciona las bandejas que vas a cortar:</span>
                   </label>
                   <div className="max-h-48 overflow-y-auto border border-slate-300 rounded-lg p-2 bg-slate-50 flex flex-col gap-2">
-                    {(crops?.filter(c => c.status === 'GROWING') || []).map(crop => {
+                    {(crops?.filter(c => c.status === 'GROWING' || c.status === 'READY') || []).map(crop => {
                       const cType = cropTypes?.find(c => c.id === crop.seedId || c.id === crop.cropTypeId);
                       const isChecked = newHarvest.selectedCropIds.includes(crop.id);
                       
@@ -594,7 +595,7 @@ export default function Crops() {
                         </label>
                       );
                     })}
-                    {(crops?.filter(c => c.status === 'GROWING') || []).length === 0 && (
+                    {(crops?.filter(c => c.status === 'GROWING' || c.status === 'READY') || []).length === 0 && (
                       <p className="text-slate-500 text-sm text-center py-2">No hay cultivos listos para cosechar.</p>
                     )}
                   </div>
@@ -617,7 +618,7 @@ export default function Crops() {
       <div className="premium-card mt-6">
         <h3 className="premium-card-title mb-4">🌱 Cultivos Listos para Cosechar</h3>
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {(crops?.filter(c => c.status === 'GROWING') || []).map(crop => {
+          {(crops?.filter(c => c.status === 'GROWING' || c.status === 'READY') || []).map(crop => {
             const cType = cropTypes?.find(c => c.id === crop.seedId || c.id === crop.cropTypeId);
             const daysAlive = Math.floor((new Date() - new Date(crop.datePlanted || crop.plantedAt)) / (1000 * 60 * 60 * 24));
             
@@ -643,7 +644,7 @@ export default function Crops() {
               </div>
             );
           })}
-          {(crops?.filter(c => c.status === 'GROWING') || []).length === 0 && (
+          {(crops?.filter(c => c.status === 'GROWING' || c.status === 'READY') || []).length === 0 && (
             <div className="col-span-full text-center py-6 bg-gray-50 rounded-xl border border-dashed border-gray-300">
               <p className="text-gray-500">No hay cultivos en fase de crecimiento actualmente.</p>
             </div>

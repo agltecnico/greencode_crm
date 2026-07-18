@@ -117,6 +117,7 @@ export const DataProvider = ({ children }) => {
         if (stockEntriesData) setStockEntries(stockEntriesData);
         if (cropTypesData) setCropTypes(cropTypesData);
         if (cropsData) setCrops(cropsData);
+          if (cropsData && cropTypesData) autoAdvanceCrops(cropsData, cropTypesData);
         if (harvestTargetsData) setHarvestTargets(harvestTargetsData);
         if (harvestsData) setHarvests(harvestsData);
         if (dailyLogsData) setDailyLogs(dailyLogsData);
@@ -347,7 +348,7 @@ export const DataProvider = ({ children }) => {
   };
 
   const advanceCropStatus = async (crop) => {
-    const sequence = ['SOAKING', 'GERMINATING', 'GROWING', 'HARVESTED'];
+    const sequence = ['SOAKING', 'GERMINATING', 'GROWING', 'READY'];
     const currentIdx = sequence.indexOf(crop.status ? crop.status.toUpperCase() : 'SOWED');
     if (currentIdx === -1) {
       // If it's SOWED, advance to GERMINATING
