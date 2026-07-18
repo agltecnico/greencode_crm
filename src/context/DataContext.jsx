@@ -306,7 +306,7 @@ export const DataProvider = ({ children }) => {
         traysCount: trays,
         gramsPerTray: cType.seedGrams || 0,
         substrateCostPerTray: 0,
-        status: cType.soakingHours > 0 ? 'SOAKING' : 'SOWED',
+        status: (parseInt(cType.soakDays) > 0) ? 'SOAKING' : 'GERMINATING',
         datePlanted: new Date().toISOString(),
         batchNumber: newCrop.selectedSeedBatchId || 'SIN_LOTE'
       };
