@@ -344,8 +344,13 @@ export const DataProvider = ({ children }) => {
     await supabase.from('crops').update(updatedFields).eq('id', id);
   };
   const deleteCrop = async (id) => {
-    setCrops(prev => prev.filter(i => i.id !== id));
-    await supabase.from('crops').delete().eq('id', id);
+    const { error } = await supabase.from('crops').delete().eq('id', id);
+    if (error) {
+      console.error("Error deleting crop:", error);
+      Swal.fire('Error', 'No se pudo eliminar de la base de datos: ' + error.message, 'error');
+    } else {
+      setCrops(prev => prev.filter(i => i.id !== id));
+    }
   };
 
     const setCropPhase = async (crop, nextStatus) => {
