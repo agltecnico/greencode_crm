@@ -198,11 +198,25 @@ export default function Crops() {
       }
 
     const product = products?.find(p => p.id === newHarvest.productId);
-    generateLabelPDF(product?.name || 'Desconocido', batchNum, product?.shelfLifeDays || 10, newHarvest.tuppersCount, product?.nutritionalInfo, getVarietiesText(product?.recipeSeeds));
+    
     
     setNewHarvest({ productId: '', tuppersCount: 1, selectedCropUsages: {} });
     setIsHarvestModalOpen(false);
-    Swal.fire({ title: '¡Cosecha Registrada!', text: `Se ha guardado el lote de Sanidad: ${batchNum}. Generando etiquetas PDF...`, icon: 'success', confirmButtonColor: '#10b981' });
+    
+      Swal.fire({ 
+        title: '¡Cosecha Registrada!', 
+        text: `Se ha guardado el lote de Sanidad: ${batchNum}. ¿Deseas imprimir las etiquetas ahora?`, 
+        icon: 'success', 
+        showCancelButton: true,
+        confirmButtonColor: '#10b981',
+        cancelButtonColor: '#64748b',
+        confirmButtonText: 'Sí, imprimir PDF',
+        cancelButtonText: 'Cerrar'
+      }).then((result) => {
+        if (result.isConfirmed) {
+          generateLabelPDF(product?.name || 'Desconocido', batchNum, product?.shelfLifeDays || 10, newHarvest.tuppersCount, product?.nutritionalInfo, getVarietiesText(product?.recipeSeeds));
+        }
+      });
   };
 
   const handleProductSelect = (productId) => {
