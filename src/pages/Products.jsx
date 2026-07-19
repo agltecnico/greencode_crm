@@ -13,7 +13,8 @@ export default function Products() {
     price: '', 
     shelfLifeDays: 10,
     isMix: false,
-    recipeSeeds: []
+    recipeSeeds: [],
+    nutritionalInfo: { energy: '', fat: '', saturatedFat: '', carbs: '', sugars: '', protein: '', salt: '' }
   });
 
   const handleSubmit = (e) => {
@@ -47,7 +48,8 @@ export default function Products() {
       price: product.price,
       shelfLifeDays: product.shelfLifeDays || 10,
       isMix: product.recipeSeeds && product.recipeSeeds.length > 1,
-      recipeSeeds: product.recipeSeeds || []
+      recipeSeeds: product.recipeSeeds || [],
+      nutritionalInfo: product.nutritionalInfo || { energy: '', fat: '', saturatedFat: '', carbs: '', sugars: '', protein: '', salt: '' }
     });
     setEditingId(product.id);
     setIsAdding(true);
@@ -59,7 +61,7 @@ export default function Products() {
   const cancelForm = () => {
     setIsAdding(false);
     setEditingId(null);
-    setFormData({ name: '', price: '', shelfLifeDays: 10, isMix: false, recipeSeeds: [] });
+    setFormData({ name: '', price: '', shelfLifeDays: 10, isMix: false, recipeSeeds: [], nutritionalInfo: { energy: '', fat: '', saturatedFat: '', carbs: '', sugars: '', protein: '', salt: '' } });
   };
 
   const handleDeleteProduct = (productId) => {
@@ -400,6 +402,40 @@ export default function Products() {
                       )}
                     </div>
                   )}
+
+                  <div className="form-group mb-0 p-4 bg-emerald-50 rounded-lg border border-emerald-200 mt-4">
+                    <label className="form-label font-bold text-emerald-800 mb-3">Información Nutricional (Valores medios por 100g)</label>
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                      <div>
+                        <label className="text-xs font-semibold text-slate-600 block mb-1">Energía (kcal)</label>
+                        <input type="number" step="0.1" className="premium-input w-full text-sm p-2" value={formData.nutritionalInfo?.energy || ''} onChange={e => setFormData({...formData, nutritionalInfo: {...formData.nutritionalInfo, energy: e.target.value}})} placeholder="Ej. 25" />
+                      </div>
+                      <div>
+                        <label className="text-xs font-semibold text-slate-600 block mb-1">Grasas (g)</label>
+                        <input type="number" step="0.1" className="premium-input w-full text-sm p-2" value={formData.nutritionalInfo?.fat || ''} onChange={e => setFormData({...formData, nutritionalInfo: {...formData.nutritionalInfo, fat: e.target.value}})} placeholder="Ej. 0.5" />
+                      </div>
+                      <div>
+                        <label className="text-xs font-semibold text-slate-600 block mb-1">Grasas Sat. (g)</label>
+                        <input type="number" step="0.1" className="premium-input w-full text-sm p-2" value={formData.nutritionalInfo?.saturatedFat || ''} onChange={e => setFormData({...formData, nutritionalInfo: {...formData.nutritionalInfo, saturatedFat: e.target.value}})} placeholder="Ej. 0.1" />
+                      </div>
+                      <div>
+                        <label className="text-xs font-semibold text-slate-600 block mb-1">Hidratos (g)</label>
+                        <input type="number" step="0.1" className="premium-input w-full text-sm p-2" value={formData.nutritionalInfo?.carbs || ''} onChange={e => setFormData({...formData, nutritionalInfo: {...formData.nutritionalInfo, carbs: e.target.value}})} placeholder="Ej. 3.0" />
+                      </div>
+                      <div>
+                        <label className="text-xs font-semibold text-slate-600 block mb-1">Azúcares (g)</label>
+                        <input type="number" step="0.1" className="premium-input w-full text-sm p-2" value={formData.nutritionalInfo?.sugars || ''} onChange={e => setFormData({...formData, nutritionalInfo: {...formData.nutritionalInfo, sugars: e.target.value}})} placeholder="Ej. 1.2" />
+                      </div>
+                      <div>
+                        <label className="text-xs font-semibold text-slate-600 block mb-1">Proteínas (g)</label>
+                        <input type="number" step="0.1" className="premium-input w-full text-sm p-2" value={formData.nutritionalInfo?.protein || ''} onChange={e => setFormData({...formData, nutritionalInfo: {...formData.nutritionalInfo, protein: e.target.value}})} placeholder="Ej. 2.5" />
+                      </div>
+                      <div>
+                        <label className="text-xs font-semibold text-slate-600 block mb-1">Sal (g)</label>
+                        <input type="number" step="0.1" className="premium-input w-full text-sm p-2" value={formData.nutritionalInfo?.salt || ''} onChange={e => setFormData({...formData, nutritionalInfo: {...formData.nutritionalInfo, salt: e.target.value}})} placeholder="Ej. 0.05" />
+                      </div>
+                    </div>
+                  </div>
 
                   <div className="flex gap-2 justify-end mt-4">
                     <button type="button" className="btn btn-secondary" onClick={cancelForm}>Cancelar</button>
