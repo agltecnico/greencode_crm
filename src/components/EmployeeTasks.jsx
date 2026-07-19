@@ -118,8 +118,7 @@ export default function EmployeeTasks() {
       const lightOffset = darkOffset + Number(cType.darknessDays || 0);
       const harvestOffset = lightOffset + Number(cType.lightDays || 0);
 
-      const soakWd = (plantWd - 1 + 7) % 7;
-      const germWd = (plantWd + germOffset) % 7;
+            const germWd = (plantWd + germOffset) % 7;
       const darkWd = (plantWd + darkOffset) % 7;
       const lightWd = (plantWd + lightOffset) % 7;
       const harvestWd = (plantWd + harvestOffset) % 7;
@@ -139,6 +138,28 @@ export default function EmployeeTasks() {
 
       if(plantWd === targetDayOfWeek && !checkPlanted(0)) {
         tasksForDate.push({ type: 'plant', title: `Plantar ${cType.name}`, desc: `Rutina semanal: ${routine.tuppersCount} bandejas`, icon: '🌱', className: 'plant', cropTypeId: cType.id, trays: routine.tuppersCount });
+      }
+      
+      const hasDarkness = Number(cType.darknessDays) > 0;
+
+      if(germWd === targetDayOfWeek && !checkPlanted(germOffset)) {
+        // Germination happens automatically on plant or after soak, usually don't need a manual task for germ if we just planted, 
+        // but if soak was 1 day, then germ is the day after.
+        if (soakHrs > 0) {
+           // tasksForDate.push({ type: 'germ', title: `A Germinación: ${cType.name}`, desc: `Desde remojo (Rutina)`, icon: '🌱', className: 'germ', cropTypeId: cType.id });
+        }
+      }
+
+      if(hasDarkness && darkWd === targetDayOfWeek && !checkPlanted(darkOffset)) {
+        tasksForDate.push({ type: 'dark', title: `A Oscuridad: ${cType.name}`, desc: `Rutina esperada`, icon: '🌑', className: 'dark', cropTypeId: cType.id });
+      }
+
+      if(lightWd === targetDayOfWeek && !checkPlanted(lightOffset)) {
+        tasksForDate.push({ type: 'light', title: `A Luz: ${cType.name}`, desc: `Rutina esperada`, icon: '☀️', className: 'light', cropTypeId: cType.id });
+      }
+
+      if(harvestWd === targetDayOfWeek && !checkPlanted(harvestOffset)) {
+        tasksForDate.push({ type: 'harvest', title: `Cosechar ${cType.name}`, desc: `Rutina esperada: ${routine.tuppersCount} bandejas`, icon: '✂️', className: 'harvest', cropTypeId: cType.id });
       }
     });
 
