@@ -1216,7 +1216,7 @@ export default function Crops() {
                 🖥️ Lanzar en Modo TV
               </button>
             </div>
-            <EmployeeTasks />
+            <EmployeeTasks onTaskAction={(task) => { if (task.type === 'plant') { setNewCrop(prev => ({ ...prev, cropTypeId: task.cropTypeId, traysCount: task.trays || 1, selectedSeedBatchId: '' })); setIsSowModalOpen(true); } else if (task.type === 'harvest') { setIsHarvestModalOpen(true); } }} />
           </div>
         )}
         {activeTab === 'lotes' && renderLotes()}

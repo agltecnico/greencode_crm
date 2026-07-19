@@ -3,7 +3,7 @@ import { useState } from 'react';
 import { useData } from '../context/DataContext';
 import '../crops.css';
 
-export default function EmployeeTasks() {
+export default function EmployeeTasks({ onTaskAction }) {
   const navigate = useNavigate();
   const { 
     harvestTargets, crops, seeds, cropTypes, 
@@ -276,9 +276,9 @@ export default function EmployeeTasks() {
                     toggleTaskSelection(task);
                   } else {
                     if (task.type === 'plant') {
-                      navigate('?action=sow&cropTypeId=' + task.cropTypeId + '&trays=' + task.trays);
+                      if(onTaskAction){onTaskAction(task)}else{navigate('/crops?action=sow&cropTypeId=' + task.cropTypeId + '&trays=' + task.trays)}
                     } else if (task.type === 'harvest') {
-                      navigate('?action=harvest&cropTypeId=' + task.cropTypeId);
+                      if(onTaskAction){onTaskAction(task)}else{navigate('/crops?action=harvest&cropTypeId=' + task.cropTypeId)}
                     }
                   }
                 }} 
