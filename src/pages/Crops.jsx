@@ -388,7 +388,7 @@ export default function Crops() {
 
   const renderLotes = () => {
     // Solo mostramos cultivos vivos y que tengan al menos 1 bandeja física
-    const activeCropsList = crops?.filter(c => c.status !== 'HARVESTED' && c.status !== 'DISCARDED' && c.traysCount > 0) || [];
+    const activeCropsList = crops?.filter(c => c.status !== 'HARVESTED' && c.status !== 'DISCARDED' && (c.traysCount > 0 || c.trays > 0)) || [];
 
     return (
       <div style={{ animation: 'fadeIn 0.3s ease' }}>
@@ -706,7 +706,7 @@ export default function Crops() {
         </h3>
         <div style={{ padding: '1.5rem' }}>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: '1.5rem' }}>
-            {(crops?.filter(c => (c.status === 'LIGHT' || c.status === 'READY') && c.traysCount > 0) || []).map(crop => {
+            {(crops?.filter(c => c.status === 'READY' && (c.traysCount > 0 || c.trays > 0)) || []).map(crop => {
               const cType = cropTypes?.find(c => c.id === crop.seedId || c.id === crop.cropTypeId);
               const daysAlive = Math.floor((new Date() - new Date(crop.datePlanted || crop.plantedAt)) / (1000 * 60 * 60 * 24));
               
@@ -1354,7 +1354,7 @@ export default function Crops() {
                       const hasRecipe = harvestProduct.recipeSeeds && harvestProduct.recipeSeeds.length > 0;
                       const allowedSeedIds = hasRecipe ? harvestProduct.recipeSeeds.map(rs => rs.seedId) : [];
 
-                      let availableCrops = crops?.filter(c => (c.status === 'LIGHT' || c.status === 'READY') && c.traysCount > 0) || [];
+                      let availableCrops = crops?.filter(c => c.status === 'READY' && (c.traysCount > 0 || c.trays > 0)) || [];
                       
                       // Filter by recipe if it has one
                       if (hasRecipe) {
@@ -1383,12 +1383,13 @@ export default function Crops() {
                           <div className="flex flex-col gap-2">
                             {varietyCrops.map(crop => {
                               const consumed = newHarvest.selectedCropUsages[crop.id] || 0;
+                              const currentTrays = crop.traysCount !== undefined ? crop.traysCount : crop.trays;
                               return (
                                 <div key={crop.id} className={`flex items-center justify-between gap-3 p-3 rounded border transition-colors ${consumed > 0 ? 'bg-indigo-50 border-indigo-300' : 'bg-slate-50 border-slate-200 hover:border-slate-300'}`}>
                                   <div className="flex-1">
                                     <div className="flex justify-between items-center mb-1">
                                       <span className="font-semibold text-slate-700 text-sm">Lote: <span className="font-mono bg-white border px-2 py-0.5 rounded text-indigo-700">{crop.batchNumber}</span></span>
-                                      <span className="text-xs text-slate-500 bg-white px-2 py-0.5 rounded border">Disp: <strong className="text-slate-700">{crop.traysCount}</strong> uds</span>
+                                      <span className="text-xs text-slate-500 bg-white px-2 py-0.5 rounded border">Disp: <strong className="text-slate-700">{currentTrays}</strong> uds</span>
                                     </div>
                                     <div className="text-xs text-slate-500">Cultivado hace {Math.floor((new Date() - new Date(crop.datePlanted || crop.plantedAt)) / (1000 * 60 * 60 * 24))} días</div>
                                   </div>
@@ -1398,7 +1399,7 @@ export default function Crops() {
                                     <input 
                                       type="number"
                                       min="0"
-                                      max={crop.traysCount}
+                                      max={currentTrays}
                                       value={consumed}
                                       onChange={(e) => {
                                         let val = parseInt(e.target.value) || 0;
