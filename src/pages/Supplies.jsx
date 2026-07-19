@@ -236,38 +236,39 @@ export default function Supplies() {
                     .filter(a => a.name.toLowerCase().includes(searchTerm.toLowerCase()))
                     .forEach(a => {
                       const entries = stockEntries?.filter(e => e.articleId === a.id) || [];
-                      let totalQuantity = 0;
-                      let costSum = 0;
-                      let count = 0;
-                      const provIds = new Set();
-                      
+                      const groups = {};
                       entries.forEach(e => {
-                        totalQuantity += Number(e.quantity || 0);
+                        const batch = e.batchNumber || 'SIN_LOTE';
+                        if (!groups[batch]) groups[batch] = { article: a, batchNumber: batch, totalQuantity: 0, costSum: 0, count: 0, provIds: new Set() };
+                        groups[batch].totalQuantity += Number(e.quantity || 0);
                         if (Number(e.price) > 0 && Number(e.quantity) > 0) {
-                          costSum += (Number(e.price) / Number(e.quantity));
-                          count++;
+                          groups[batch].costSum += (Number(e.price) / Number(e.quantity));
+                          groups[batch].count++;
                         }
                         if (e.providerId && e.providerId !== 'INTERNAL' && Number(e.quantity) > 0) {
-                          provIds.add(e.providerId);
+                          groups[batch].provIds.add(e.providerId);
                         }
                       });
                       
-                      if (Math.abs(totalQuantity) > 0.001) {
-                        inventoryGroups.push({ article: a, totalQuantity, costSum, count, provIds });
-                      }
+                      Object.values(groups).forEach(g => {
+                        // Rounding to avoid floating point issues
+                        if (Math.abs(g.totalQuantity) > 0.001) {
+                          inventoryGroups.push(g);
+                        }
+                      });
                     });
 
-                return inventoryGroups.map((g, idx) => {
+                  return inventoryGroups.map((g, idx) => {
                     const avgCost = g.count > 0 ? (g.costSum / g.count) : getAverageUnitCost(g.article.id);
                     const totalValue = g.totalQuantity * avgCost;
                     const provNames = Array.from(g.provIds).map(pid => providers?.find(p => p.id === pid)?.name || 'Desconocido').join(', ') || 'Varios / Sin Asignar';
 
                     return (
-                      <tr key={`${g.article.id}-${idx}`}>
+                      <tr key={`${g.article.id}-${g.batchNumber}-${idx}`}>
                         <td className="font-medium text-slate-500">{getTypeLabel(g.article.type)}</td>
                         <td className="font-bold text-slate-800">
                           {g.article.name}
-                          <div className="text-xs text-slate-500 mt-1 font-normal">Prov: {provNames}</div>
+                          <div className="text-xs text-slate-500 mt-1 font-normal">Lote: <span className="font-bold text-slate-700 bg-slate-100 px-1 rounded">{g.batchNumber}</span> | Prov: {provNames}</div>
                         </td>
                         <td className="text-slate-600">{avgCost.toFixed(2)} € / {getUnitLabel(g.article.type)}</td>
                         <td className="font-bold text-emerald-600 text-lg">{g.totalQuantity.toFixed(2)} <span className="text-sm font-normal text-slate-500">{getUnitLabel(g.article.type)}</span></td>
