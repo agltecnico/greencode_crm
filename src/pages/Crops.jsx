@@ -586,8 +586,8 @@ export default function Crops() {
     <div style={{ animation: 'fadeIn 0.3s ease' }}>
       <div className="flex justify-between items-center mb-6">
         <div>
-          <h2 className="text-2xl font-bold text-gray-800">🔪 Envasado y Sanidad</h2>
-          <p className="text-gray-500">Registra lo cosechado y genera etiquetas.</p>
+          <h2 className="text-2xl font-bold text-gray-800">🔪 Envasado y Pedidos</h2>
+          <p className="text-gray-500">Registra lo cosechado y gestiona el inventario de ventas.</p>
         </div>
         <button onClick={() => setIsHarvestModalOpen(true)} className="btn btn-primary" style={{ background: '#0f172a', color: 'white', border: 'none', padding: '0.75rem 1.5rem', borderRadius: '8px', fontWeight: 'bold', cursor: 'pointer' }}>
           + Registrar Cosecha
@@ -731,12 +731,14 @@ export default function Crops() {
 
       <div className="premium-card mt-6" style={{ background: '#ffffff', borderRadius: '16px', border: '1px solid #e2e8f0', boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.05)', overflow: 'hidden', marginTop: '2rem' }}>
         <h3 className="premium-card-title" style={{ margin: 0, padding: '1.25rem 1.5rem', background: '#f8fafc', borderBottom: '1px solid #e2e8f0', display: 'flex', alignItems: 'center', gap: '0.75rem', color: '#1e293b', fontSize: '1.25rem' }}>
-          <span style={{ fontSize: '1.5rem' }}>🏷️</span> Historial de Lotes de Sanidad
+          <span style={{ fontSize: '1.5rem' }}>🏷️</span> Histórico de Ventas
         </h3>
         <div style={{ padding: '1.5rem' }}>
           <div style={{ display: 'grid', gap: '1rem' }}>
             {harvests?.slice().reverse().map(h => {
               const product = products?.find(p => p.id === h.productId);
+              const harvestCrops = crops?.filter(c => h.selectedCropIds?.includes(c.id)) || [];
+              
               return (
                 <div key={h.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '1.25rem', backgroundColor: '#f8fafc', borderRadius: '12px', border: '1px solid #cbd5e1', transition: 'background-color 0.2s, border-color 0.2s' }} onMouseEnter={e => { e.currentTarget.style.backgroundColor = '#f1f5f9'; e.currentTarget.style.borderColor = '#94a3b8'; }} onMouseLeave={e => { e.currentTarget.style.backgroundColor = '#f8fafc'; e.currentTarget.style.borderColor = '#cbd5e1'; }}>
                   <div style={{ flex: 1 }}>
@@ -745,12 +747,29 @@ export default function Crops() {
                       <span style={{ fontSize: '0.75rem', backgroundColor: '#dcfce7', color: '#166534', padding: '0.25rem 0.6rem', borderRadius: '999px', fontFamily: 'monospace', fontWeight: 'bold', border: '1px solid #bbf7d0' }}>Lote: {h.batchNumber}</span>
                     </div>
                     <div style={{ display: 'flex', gap: '1.5rem', fontSize: '0.9rem', color: '#64748b' }}>
-                      <span style={{ display: 'flex', alignItems: 'center', gap: '0.25rem' }}>📅 Envasado: <strong style={{ color: '#334155' }}>{new Date(h.harvestDate).toLocaleDateString()}</strong></span>
-                      <span style={{ display: 'flex', alignItems: 'center', gap: '0.25rem' }}>📦 Cantidad: <strong style={{ color: '#334155' }}>{h.tuppersCount} tuppers</strong></span>
+                      <span style={{ display: 'flex', alignItems: 'center', gap: '0.25rem' }}>📅 Fecha: <strong style={{ color: '#334155' }}>{new Date(h.harvestDate).toLocaleDateString()}</strong></span>
+                      <span style={{ display: 'flex', alignItems: 'center', gap: '0.25rem' }}>📦 Vendidos/Envasados: <strong style={{ color: '#334155' }}>{h.tuppersCount} tuppers</strong></span>
                     </div>
+                    
+                    {harvestCrops.length > 0 && (
+                      <div style={{ marginTop: '0.75rem', padding: '0.5rem', background: '#e2e8f0', borderRadius: '8px', fontSize: '0.85rem', color: '#475569' }}>
+                        <strong style={{ display: 'block', marginBottom: '0.25rem', color: '#1e293b' }}>🌱 Composición (Lotes de Semilla):</strong>
+                        <ul style={{ margin: 0, paddingLeft: '1.25rem' }}>
+                          {harvestCrops.map(c => {
+                            const cType = cropTypes?.find(ct => ct.id === c.cropTypeId || ct.id === c.seedId);
+                            return (
+                              <li key={c.id}>
+                                {cType?.name || 'Variedad'}: <strong style={{ color: '#0f172a' }}>{c.batchNumber || 'SIN LOTE'}</strong>
+                              </li>
+                            );
+                          })}
+                        </ul>
+                      </div>
+                    )}
+                    
                   </div>
                   <button 
-                    style={{ backgroundColor: 'white', border: '1px solid #cbd5e1', padding: '0.75rem 1.25rem', borderRadius: '8px', cursor: 'pointer', fontWeight: 'bold', color: '#334155', display: 'flex', alignItems: 'center', gap: '0.5rem', boxShadow: '0 1px 2px rgba(0,0,0,0.05)', transition: 'all 0.2s' }}
+                    style={{ backgroundColor: 'white', border: '1px solid #cbd5e1', padding: '0.75rem 1.25rem', borderRadius: '8px', cursor: 'pointer', fontWeight: 'bold', color: '#334155', display: 'flex', alignItems: 'center', gap: '0.5rem', boxShadow: '0 1px 2px rgba(0,0,0,0.05)', transition: 'all 0.2s', marginLeft: '1rem' }}
                     onMouseOver={e => { e.currentTarget.style.borderColor = '#94a3b8'; e.currentTarget.style.backgroundColor = '#f8fafc'; }}
                     onMouseOut={e => { e.currentTarget.style.borderColor = '#cbd5e1'; e.currentTarget.style.backgroundColor = 'white'; }}
                     onClick={() => generateLabelPDF(product?.name || '', h.batchNumber, product?.shelfLifeDays || 10, h.tuppersCount)}
