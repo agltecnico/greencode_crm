@@ -520,6 +520,19 @@ export const DataProvider = ({ children }) => {
     if (!error && data) setHarvests(prev => prev.map(i => i.id === tempId ? data[0] : i));
     return tempId;
   };
+    const addProductMovement = async (item) => {
+    const tempId = Date.now().toString();
+    const newItem = { ...item, id: tempId, createdAt: new Date().toISOString() };
+    setProductMovements(prev => [...prev, newItem]);
+    const { data, error } = await supabase.from('product_movements').insert([newItem]).select();
+    if (!error && data) {
+      setProductMovements(prev => prev.map(i => i.id === tempId ? data[0] : i));
+    } else if (error) {
+      console.error('Error adding product movement:', error);
+    }
+    return tempId;
+  };
+  
   const updateHarvest = async (id, updatedFields) => {
     setHarvests(prev => prev.map(i => i.id === id ? { ...i, ...updatedFields } : i));
     await supabase.from('harvests').update(updatedFields).eq('id', id);
@@ -891,7 +904,8 @@ export const DataProvider = ({ children }) => {
       dailyLogs, addDailyLog, updateDailyLog, deleteDailyLog,
 
       clients, addClient, updateClient, deleteClient,
-      products, addProduct, updateProduct, deleteProduct,
+      productMovements, addProductMovement,
+        products, addProduct, updateProduct, deleteProduct,
       orders, addOrder, updateOrderList, deleteOrder, markOrderAsDelivered, saveSignedDeliveryNote,
       deliveryNotes, updateDeliveryNote, deleteDeliveryNote,
       invoices, addInvoice, deleteInvoice, importData, markInvoiceAsPaid,
