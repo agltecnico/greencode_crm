@@ -5,9 +5,18 @@ import '../crops.css';
 
 export default function EmployeeTasks() {
   const navigate = useNavigate();
-  const { harvestTargets, crops, seeds, cropTypes, dailyLogs, addDailyLog } = useData();
-  const [timeFilter, setTimeFilter] = useState(7);
+  const { 
+    harvestTargets, crops, seeds, cropTypes, 
+    stockEntries, sowCrop, advanceCropStatus, deleteHarvestTarget
+  } = useData();
+  
+  const [timeFilter, setTimeFilter] = useState(1);
   const [selectedDayTasks, setSelectedDayTasks] = useState(null);
+  
+  const [isMultiSelectMode, setIsMultiSelectMode] = useState(false);
+  const [selectedTasks, setSelectedTasks] = useState([]);
+  const [isSowModalOpen, setIsSowModalOpen] = useState(false);
+  const [batchSelections, setBatchSelections] = useState({});
 
   const activeCrops = crops?.filter(c => c.status !== 'HARVESTED' && c.status !== 'DISCARDED') || [];
   
@@ -49,253 +58,340 @@ export default function EmployeeTasks() {
       let phaseStr = '';
       
       const st = crop.status || 'SOWED';
+      const hasDarkness = Number(cType?.darknessDays || 0) > 0;
 
-        const hasDarkness = Number(cType?.darknessDays || 0) > 0;
-
-        if (isToday) {
-          if (daysSincePlanted >= germDay && (st === 'SOAKING' || st === 'SOWED')) { 
-            action = 'move'; phaseStr = 'GERMINACIÓN'; 
-          }
-          else if (st === 'GERMINATING') {
-            if (hasDarkness && daysSincePlanted >= darkDay) {
-              action = 'move'; phaseStr = 'OSCURIDAD';
-            } else if (!hasDarkness && daysSincePlanted >= lightDay) {
-              action = 'move'; phaseStr = 'LUZ';
-            }
-          }
-          else if (daysSincePlanted >= lightDay && st === 'DARKNESS') { 
-            action = 'move'; phaseStr = 'LUZ'; 
-          }
-          else if (daysSincePlanted >= harvestDay && st === 'LIGHT') { 
-            action = 'harvest'; 
-          }
-        } else {
-          // Future days: we just look at exactly the day match, regardless of current status
-          if (daysSincePlanted === germDay) { 
-            action = 'move'; phaseStr = 'GERMINACIÓN'; 
-          }
-          else if (hasDarkness && daysSincePlanted === darkDay) { 
-            action = 'move'; phaseStr = 'OSCURIDAD'; 
-          }
-          else if (daysSincePlanted === lightDay) { 
-            action = 'move'; phaseStr = 'LUZ'; 
-          }
-          else if (daysSincePlanted === harvestDay) { 
-            action = 'harvest'; 
+      if (isToday) {
+        if (daysSincePlanted >= germDay && (st === 'SOAKING' || st === 'SOWED')) { 
+          action = 'move'; phaseStr = 'GERMINACIÓN'; 
+        }
+        else if (st === 'GERMINATING') {
+          if (hasDarkness && daysSincePlanted >= darkDay) {
+            action = 'move'; phaseStr = 'OSCURIDAD';
+          } else if (!hasDarkness && daysSincePlanted >= lightDay) {
+            action = 'move'; phaseStr = 'LUZ';
           }
         }
+        else if (daysSincePlanted >= lightDay && st === 'DARKNESS') { 
+          action = 'move'; phaseStr = 'LUZ'; 
+        }
+        else if (daysSincePlanted >= harvestDay && st === 'LIGHT') { 
+          action = 'harvest'; 
+        }
+      } else {
+        if (daysSincePlanted === germDay) { 
+          action = 'move'; phaseStr = 'GERMINACIÓN'; 
+        }
+        else if (hasDarkness && daysSincePlanted === darkDay) { 
+          action = 'move'; phaseStr = 'OSCURIDAD'; 
+        }
+        else if (daysSincePlanted === lightDay) { 
+          action = 'move'; phaseStr = 'LUZ'; 
+        }
+        else if (daysSincePlanted === harvestDay) { 
+          action = 'harvest'; 
+        }
+      }
 
-        if (action === 'move') {
+      if (action === 'move') {
         tasksForDate.push({
+          id: `move-${dateKey}-${crop.id}`,
           type: 'move',
           title: `Mover a ${phaseStr}`,
           desc: `${crop.traysCount} bandejas de ${seed.name} (Lote: ${crop.batchNumber})`,
-          icon: '🪴',
-          className: 'move'
+          icon: '🔄',
+          className: 'move',
+          cropId: crop.id
         });
       } else if (action === 'harvest') {
         tasksForDate.push({
+          id: `harv-${dateKey}-${crop.id}`,
           type: 'harvest',
           title: `¡COSECHAR!`,
           desc: `${crop.traysCount} bandejas de ${seed.name} (Lote: ${crop.batchNumber})`,
-          icon: '📦',
-          className: 'harvest', cropTypeId: cType.id
+          icon: '✂️',
+          className: 'harvest',
+          cropId: crop.id,
+          cropTypeId: cType.id
         });
       }
     });
 
     harvestTargets?.forEach(routine => {
-      const cType = cropTypes?.find(ct => ct.id == routine.productId);
+      const cType = cropTypes?.find(c => c.id === routine.cropTypeId);
       if(!cType) return;
-      let seed = seeds?.find(s => s.id === cType.seedId);
-      if(!seed) seed = { name: 'Semilla Desconocida' };
 
-      const plantWd = Number(routine.targetDayOfWeek);
-      const soakHrs = cType.soakingHours || 0;
-      const soakOffset = soakHrs > 0 ? 1 : 0;
-      const germOffset = soakOffset;
-      const darkOffset = soakOffset + Number(cType.germinationDays || 0);
-      const lightOffset = darkOffset + Number(cType.darknessDays || 0);
-      const harvestOffset = lightOffset + Number(cType.lightDays || 0);
+      const daysToHarvest = Number(cType.soakingHours > 0 ? 1 : 0) + Number(cType.germinationDays) + Number(cType.darknessDays) + Number(cType.lightDays);
+      
+      const plantWd = (routine.targetDayOfWeek - daysToHarvest + 700) % 7;
+      const soakHrs = Number(cType.soakingHours || 0);
+      let germWd = plantWd;
+      if (soakHrs > 0) germWd = (plantWd + 1) % 7;
 
-            const germWd = (plantWd + germOffset) % 7;
-      const darkWd = (plantWd + darkOffset) % 7;
-      const lightWd = (plantWd + lightOffset) % 7;
-      const harvestWd = (plantWd + harvestOffset) % 7;
-
-      const checkPlanted = (offset) => {
-        const tDate = new Date(targetDate);
-        tDate.setDate(tDate.getDate() - offset);
-        tDate.setHours(0,0,0,0);
-        return crops.some(c => {
-          if (c.status === 'DISCARDED' || c.status === 'HARVESTED') return false;
-            if (c.cropTypeId != routine.productId && c.seedId != routine.productId) return false;
-          const cDate = new Date(c.datePlanted);
-          cDate.setHours(0,0,0,0);
-          return Math.abs((cDate - tDate) / 86400000) <= 1;
-        });
-      };
+      const darkWd = (germWd + Number(cType.germinationDays)) % 7;
+      const lightWd = (darkWd + Number(cType.darknessDays)) % 7;
+      const harvestWd = routine.targetDayOfWeek;
 
       if(plantWd == targetDayOfWeek) {
-        tasksForDate.push({ type: 'plant', title: `Plantar ${cType.name}`, desc: `Rutina semanal: ${routine.tuppersCount} bandejas`, icon: '🌱', className: 'plant', cropTypeId: cType.id, trays: routine.tuppersCount });
+        tasksForDate.push({ 
+          id: `plant-${dateKey}-${routine.id}`,
+          type: 'plant', 
+          title: `Siembra de ${cType.name}`, 
+          desc: `Rutina esperada: ${routine.tuppersCount} bandejas`, 
+          icon: '🌱', 
+          className: 'plant', 
+          cropTypeId: cType.id, 
+          trays: routine.tuppersCount, 
+          routineId: routine.id 
+        });
       }
-      
+
       const hasDarkness = Number(cType.darknessDays) > 0;
 
-      if(germWd == targetDayOfWeek) {
-        // Germination happens automatically on plant or after soak, usually don't need a manual task for germ if we just planted, 
-        // but if soak was 1 day, then germ is the day after.
-        if (soakHrs > 0) {
-           // tasksForDate.push({ type: 'germ', title: `A Germinación: ${cType.name}`, desc: `Desde remojo (Rutina)`, icon: '🌱', className: 'germ', cropTypeId: cType.id });
-        }
-      }
-
       if(hasDarkness && darkWd == targetDayOfWeek) {
-        tasksForDate.push({ type: 'dark', title: `A Oscuridad: ${cType.name}`, desc: `Rutina esperada`, icon: '🌑', className: 'dark', cropTypeId: cType.id });
+        tasksForDate.push({ 
+          id: `rout-dark-${dateKey}-${routine.id}`,
+          type: 'dark', title: `A Oscuridad: ${cType.name}`, desc: `Rutina esperada`, icon: '🌑', className: 'dark', cropTypeId: cType.id 
+        });
       }
 
       if(lightWd == targetDayOfWeek) {
-        tasksForDate.push({ type: 'light', title: `A Luz: ${cType.name}`, desc: `Rutina esperada`, icon: '☀️', className: 'light', cropTypeId: cType.id });
+        tasksForDate.push({ 
+          id: `rout-light-${dateKey}-${routine.id}`,
+          type: 'light', title: `A Luz: ${cType.name}`, desc: `Rutina esperada`, icon: '☀️', className: 'light', cropTypeId: cType.id 
+        });
       }
 
       if(harvestWd == targetDayOfWeek) {
-        tasksForDate.push({ type: 'harvest', title: `Cosechar ${cType.name}`, desc: `Rutina esperada: ${routine.tuppersCount} bandejas`, icon: '✂️', className: 'harvest', cropTypeId: cType.id });
+        tasksForDate.push({ 
+          id: `rout-harv-${dateKey}-${routine.id}`,
+          type: 'harvest', title: `Cosechar ${cType.name}`, desc: `Rutina esperada: ${routine.tuppersCount} bandejas`, icon: '✂️', className: 'harvest', cropTypeId: cType.id 
+        });
       }
     });
 
-    // Always push the date so the user sees empty days as requested
     allTasks.push({ date: targetDate, isToday, items: tasksForDate });
   });
 
-  
+  const toggleTaskSelection = (task) => {
+    // Only allow selecting plant and move tasks for batch completion
+    if (task.type !== 'plant' && task.type !== 'move') {
+      alert("Solo se pueden completar automáticamente las tareas de Siembra y Cambio de Fase.");
+      return;
+    }
+    
+    if (selectedTasks.find(t => t.id === task.id)) {
+      setSelectedTasks(selectedTasks.filter(t => t.id !== task.id));
+    } else {
+      setSelectedTasks([...selectedTasks, task]);
+    }
+  };
+
+  const handleBatchActionClick = () => {
+    const plants = selectedTasks.filter(t => t.type === 'plant');
+    if (plants.length > 0) {
+      // Open modal to configure seed batches
+      const initialBatches = {};
+      plants.forEach(p => {
+        initialBatches[p.id] = 'SIN_LOTE';
+      });
+      setBatchSelections(initialBatches);
+      setIsSowModalOpen(true);
+    } else {
+      // Just process moves directly
+      executeBatch([]);
+    }
+  };
+
+  const executeBatch = async (configuredPlants) => {
+    try {
+      // Execute moves
+      const moves = selectedTasks.filter(t => t.type === 'move');
+      for (const m of moves) {
+        await advanceCropStatus(m.cropId);
+      }
+
+      // Execute plants
+      for (const p of configuredPlants) {
+        await sowCrop({ 
+          cropTypeId: p.cropTypeId, 
+          traysCount: p.trays, 
+          selectedSeedBatchId: p.selectedSeedBatchId 
+        });
+        // We do not delete routine from harvestTargets! The routine is persistent.
+      }
+
+      alert(`¡Se han completado ${selectedTasks.length} tareas automáticamente!`);
+      setSelectedTasks([]);
+      setIsMultiSelectMode(false);
+      setIsSowModalOpen(false);
+    } catch (err) {
+      alert("Error procesando tareas: " + err.message);
+    }
+  };
+
   const renderDetailedDay = (dayGroup) => (
     <div className={`task-day-group ${dayGroup.isToday ? 'is-today' : ''}`}>
       <div className="task-day-header">
         <span className="task-day-title">
-          {dayGroup.isToday ? '📅 TAREAS DE HOY' : dayGroup.date.toLocaleDateString('es-ES', { weekday: 'long', day: 'numeric', month: 'short' })}
+          {dayGroup.isToday ? '🎯 TAREAS DE HOY' : dayGroup.date.toLocaleDateString('es-ES', { weekday: 'long', day: 'numeric', month: 'short' })}
         </span>
       </div>
       {dayGroup.items.length === 0 ? (
         <div style={{ padding: '2rem', textAlign: 'center', color: 'var(--crop-text-muted)' }}>
-          🍃 Todo despejado para este día.
-            
+          ✨ Todo despejado para este día.
         </div>
       ) : (
         <div className="task-grid">
-          {dayGroup.items.map((task, i) => (
-            <div key={i} className={`task-card ${task.className}`} onClick={() => {
-                if (task.type === 'plant') {
-                  window.location.href = '/crops?action=sow&cropTypeId=' + task.cropTypeId + '&trays=' + task.trays;
-                } else if (task.type === 'harvest') {
-                  window.location.href = '/crops?action=harvest&cropTypeId=' + task.cropTypeId;
-                }
-              }} style={{ cursor: (task.type === 'plant' || task.type === 'harvest') ? 'pointer' : 'default' }}>
-              <div className="task-icon">{task.icon}</div>
-              <div className="task-content">
-                <h4>{task.title}</h4>
-                <p>{task.desc}</p>
+          {dayGroup.items.map((task, i) => {
+            const isSelected = selectedTasks.some(t => t.id === task.id);
+            return (
+              <div 
+                key={task.id || i} 
+                className={`task-card ${task.className} ${isSelected ? 'selected' : ''}`} 
+                onClick={() => {
+                  if (isMultiSelectMode) {
+                    toggleTaskSelection(task);
+                  } else {
+                    if (task.type === 'plant') {
+                      window.location.href = '/crops?action=sow&cropTypeId=' + task.cropTypeId + '&trays=' + task.trays;
+                    } else if (task.type === 'harvest') {
+                      window.location.href = '/crops?action=harvest&cropTypeId=' + task.cropTypeId;
+                    }
+                  }
+                }} 
+                style={{ 
+                  cursor: (isMultiSelectMode || task.type === 'plant' || task.type === 'harvest') ? 'pointer' : 'default',
+                  border: isSelected ? '2px solid #22c55e' : '',
+                  transform: isSelected ? 'scale(0.98)' : '',
+                  position: 'relative'
+                }}
+              >
+                {isMultiSelectMode && (task.type === 'plant' || task.type === 'move') && (
+                  <div style={{ position: 'absolute', top: '10px', right: '10px' }}>
+                    <input type="checkbox" checked={isSelected} readOnly style={{ transform: 'scale(1.5)', accentColor: '#22c55e' }} />
+                  </div>
+                )}
+                <div className="task-icon">{task.icon}</div>
+                <div className="task-content">
+                  <h4>{task.title}</h4>
+                  <p>{task.desc}</p>
+                </div>
               </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       )}
     </div>
   );
 
-
   return (
     <div className="crops-module">
-      <div className="tasks-header">
+      <div className="tasks-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '1rem' }}>
         <div className="tasks-title-area">
           <h2>Dashboard de Tareas</h2>
           <p>Controla el pulso de tu invernadero en tiempo real y a futuro.</p>
         </div>
 
-        <div className="time-filters">
-          {[
-            { v: 1, l: 'HOY' },
-            { v: 7, l: '7 DÍAS' },
-            { v: 30, l: '30 DÍAS' }
-          ].map(f => (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', alignItems: 'flex-end' }}>
+          <div className="time-filters">
+            {[
+              { v: 1, l: 'HOY' },
+              { v: 7, l: '7 DÍAS' },
+              { v: 30, l: '30 DÍAS' }
+            ].map(f => (
+              <button 
+                key={f.v}
+                onClick={() => setTimeFilter(f.v)}
+                className={`time-filter-btn ${timeFilter === f.v ? 'active' : ''}`}
+              >
+                {f.l}
+              </button>
+            ))}
+          </div>
+
+          <div style={{ display: 'flex', gap: '10px' }}>
             <button 
-              key={f.v}
-              onClick={() => setTimeFilter(f.v)}
-              className={`time-filter-btn \${timeFilter === f.v ? 'active' : ''}`}
+              className={`btn ${isMultiSelectMode ? 'btn-secondary' : 'btn-primary'}`}
+              onClick={() => {
+                setIsMultiSelectMode(!isMultiSelectMode);
+                setSelectedTasks([]);
+              }}
             >
-              {f.l}
+              {isMultiSelectMode ? 'Cancelar Selección' : 'Selección Múltiple'}
             </button>
-          ))}
+
+            {isMultiSelectMode && selectedTasks.length > 0 && (
+              <button className="btn btn-success" onClick={handleBatchActionClick}>
+                Completar ({selectedTasks.length})
+              </button>
+            )}
+          </div>
         </div>
       </div>
 
-      
-        
-        
-        <div className="tasks-list-area">
-          {timeFilter === 1 ? (
-            // TODAY VIEW (Detailed)
-            allTasks.map((dayGroup, idx) => (
-              <div key={idx}>
-                {renderDetailedDay(dayGroup)}
-              </div>
-            ))
-          ) : (
-            // CALENDAR GRID VIEW (7 or 30 days)
-            <div style={{ 
-              display: 'grid', 
-              gridTemplateColumns: timeFilter === 7 ? 'repeat(auto-fit, minmax(120px, 1fr))' : 'repeat(auto-fill, minmax(100px, 1fr))', 
-              gap: '1rem' 
-            }}>
-              {allTasks.map((dayGroup, idx) => {
-                const dayName = dayGroup.date.toLocaleDateString('es-ES', { weekday: 'short' });
-                const dayNum = dayGroup.date.getDate();
-                const taskCount = dayGroup.items.length;
-                
-                return (
-                  <div 
-                    key={idx} 
-                    onClick={() => setSelectedDayTasks(dayGroup)}
-                    style={{
-                      background: dayGroup.isToday ? '#f0fdf4' : 'white',
-                      border: dayGroup.isToday ? '2px solid #22c55e' : '1px solid #cbd5e1',
-                      borderRadius: '12px',
-                      padding: '1rem',
-                      cursor: 'pointer',
-                      display: 'flex',
-                      flexDirection: 'column',
-                      alignItems: 'center',
-                      gap: '0.5rem',
-                      transition: 'transform 0.2s, boxShadow 0.2s',
-                      boxShadow: '0 4px 6px -1px rgba(0,0,0,0.05)'
-                    }}
-                    onMouseEnter={(e) => { e.currentTarget.style.transform = 'translateY(-2px)'; e.currentTarget.style.boxShadow = '0 10px 15px -3px rgba(0,0,0,0.1)'; }}
-                    onMouseLeave={(e) => { e.currentTarget.style.transform = 'none'; e.currentTarget.style.boxShadow = '0 4px 6px -1px rgba(0,0,0,0.05)'; }}
-                  >
-                    <div style={{ fontWeight: 'bold', color: dayGroup.isToday ? '#166534' : '#64748b', textTransform: 'capitalize' }}>
-                      {dayName}
-                    </div>
-                    <div style={{ fontSize: '2rem', fontWeight: '900', color: dayGroup.isToday ? '#15803d' : '#1e293b' }}>
-                      {dayNum}
-                    </div>
-                    
-                    {taskCount > 0 ? (
-                      <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap', justifyContent: 'center' }}>
-                        {dayGroup.items.slice(0,3).map((t, i) => (
-                          <span key={i} title={t.title} style={{ fontSize: '1.2rem' }}>{t.icon}</span>
-                        ))}
-                        {taskCount > 3 && <span style={{ fontSize: '0.8rem', fontWeight: 'bold', color: '#64748b' }}>+{taskCount - 3}</span>}
-                      </div>
-                    ) : (
-                      <div style={{ fontSize: '0.8rem', color: '#cbd5e1' }}>Libre</div>
-                    )}
-                  </div>
-                )
-              })}
+      <div className="tasks-list-area">
+        {timeFilter === 1 ? (
+          allTasks.map((dayGroup, idx) => (
+            <div key={idx}>
+              {renderDetailedDay(dayGroup)}
             </div>
-          )}
-        </div>
+          ))
+        ) : (
+          <div style={{ 
+            display: 'grid', 
+            gridTemplateColumns: timeFilter === 7 ? 'repeat(auto-fit, minmax(120px, 1fr))' : 'repeat(auto-fill, minmax(100px, 1fr))', 
+            gap: '1rem' 
+          }}>
+            {allTasks.map((dayGroup, idx) => {
+              const dayName = dayGroup.date.toLocaleDateString('es-ES', { weekday: 'short' });
+              const dayNum = dayGroup.date.getDate();
+              const taskCount = dayGroup.items.length;
+              
+              return (
+                <div 
+                  key={idx} 
+                  onClick={() => setSelectedDayTasks(dayGroup)}
+                  style={{
+                    background: dayGroup.isToday ? '#f0fdf4' : 'white',
+                    border: dayGroup.isToday ? '2px solid #22c55e' : '1px solid #cbd5e1',
+                    borderRadius: '12px',
+                    padding: '1rem',
+                    cursor: 'pointer',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    alignItems: 'center',
+                    gap: '0.5rem',
+                    transition: 'transform 0.2s, boxShadow 0.2s',
+                    boxShadow: '0 4px 6px -1px rgba(0,0,0,0.05)'
+                  }}
+                  onMouseEnter={(e) => { e.currentTarget.style.transform = 'translateY(-2px)'; e.currentTarget.style.boxShadow = '0 10px 15px -3px rgba(0,0,0,0.1)'; }}
+                  onMouseLeave={(e) => { e.currentTarget.style.transform = 'none'; e.currentTarget.style.boxShadow = '0 4px 6px -1px rgba(0,0,0,0.05)'; }}
+                >
+                  <div style={{ fontWeight: 'bold', color: dayGroup.isToday ? '#166534' : '#64748b', textTransform: 'capitalize' }}>
+                    {dayName}
+                  </div>
+                  <div style={{ fontSize: '2rem', fontWeight: '900', color: dayGroup.isToday ? '#15803d' : '#1e293b' }}>
+                    {dayNum}
+                  </div>
+                  
+                  {taskCount > 0 ? (
+                    <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap', justifyContent: 'center' }}>
+                      {dayGroup.items.slice(0,3).map((t, i) => (
+                        <span key={i} title={t.title} style={{ fontSize: '1.2rem' }}>{t.icon}</span>
+                      ))}
+                      {taskCount > 3 && <span style={{ fontSize: '0.8rem', fontWeight: 'bold', color: '#64748b' }}>+{taskCount - 3}</span>}
+                    </div>
+                  ) : (
+                    <div style={{ fontSize: '0.8rem', color: '#cbd5e1' }}>Libre</div>
+                  )}
+                </div>
+              )
+            })}
+          </div>
+        )}
+      </div>
 
-{selectedDayTasks && (
+      {selectedDayTasks && (
         <div style={{
           position: 'fixed', top: 0, left: 0, width: '100vw', height: '100vh',
           background: 'rgba(15, 23, 42, 0.7)', backdropFilter: 'blur(4px)',
@@ -317,6 +413,78 @@ export default function EmployeeTasks() {
         </div>
       )}
 
+      {isSowModalOpen && (
+        <div className="modal-backdrop" style={{
+          position: 'fixed', top: 0, left: 0, width: '100vw', height: '100vh',
+          background: 'rgba(15, 23, 42, 0.7)', backdropFilter: 'blur(4px)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 99999
+        }}>
+          <div className="modal-content" style={{ 
+            background: 'white', padding: '2rem', borderRadius: '16px', 
+            width: '90%', maxWidth: '600px', maxHeight: '90vh', overflowY: 'auto' 
+          }}>
+            <h3 style={{ fontSize: '1.5rem', fontWeight: 'bold', marginBottom: '1rem', color: '#065f46' }}>
+              Confirmar Siembras Automáticas
+            </h3>
+            <p style={{ marginBottom: '1.5rem', color: '#475569' }}>
+              Por favor, asigna el lote de semilla correcto para cada cultivo antes de procesar las siembras.
+            </p>
+            
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem', marginBottom: '1.5rem' }}>
+              {selectedTasks.filter(t => t.type === 'plant').map(task => {
+                const cType = cropTypes?.find(c => c.id === task.cropTypeId);
+                const seedId = cType?.seedId;
+                const seedStock = stockEntries?.filter(e => e.articleId === seedId) || [];
+                const groups = {};
+                seedStock.forEach(e => {
+                  const b = e.batchNumber || 'SIN_LOTE';
+                  if(!groups[b]) groups[b] = 0;
+                  groups[b] += Number(e.quantity || 0);
+                });
+
+                return (
+                  <div key={task.id} style={{ background: '#f8fafc', padding: '1rem', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
+                    <div style={{ fontWeight: 'bold', marginBottom: '0.25rem' }}>{task.title}</div>
+                    <div style={{ fontSize: '0.9rem', color: '#64748b', marginBottom: '1rem' }}>{task.desc}</div>
+                    
+                    <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 'bold', color: '#0f172a' }}>
+                      Lote de Semilla a Utilizar
+                    </label>
+                    <select 
+                      style={{ width: '100%', padding: '0.75rem', borderRadius: '8px', border: '1px solid #cbd5e1' }}
+                      value={batchSelections[task.id] || 'SIN_LOTE'}
+                      onChange={(e) => setBatchSelections({...batchSelections, [task.id]: e.target.value})}
+                    >
+                      <option value="SIN_LOTE">Sin Lote (Por defecto)</option>
+                      {Object.entries(groups).filter(([_, qty]) => qty > 0).map(([batch, qty]) => (
+                        <option key={batch} value={batch}>
+                          Lote: {batch} ({qty}g disponibles)
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                );
+              })}
+            </div>
+
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '1rem' }}>
+              <button className="btn btn-secondary" onClick={() => setIsSowModalOpen(false)}>Cancelar</button>
+              <button 
+                className="btn btn-success" 
+                onClick={() => {
+                  const plants = selectedTasks.filter(t => t.type === 'plant').map(t => ({
+                    ...t,
+                    selectedSeedBatchId: batchSelections[t.id] || 'SIN_LOTE'
+                  }));
+                  executeBatch(plants);
+                }}
+              >
+                Confirmar y Sembrar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
