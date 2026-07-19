@@ -459,82 +459,7 @@ export default function Crops() {
           </button>
         </div>
 
-        {isSowModalOpen && (
-          <div style={modalOverlayStyle}>
-            <div style={{ ...modalCardStyle, maxWidth: '500px', padding: 0, overflow: 'hidden' }}>
-              <div style={{ background: 'linear-gradient(135deg, #10b981, #059669)', padding: '1.5rem', color: 'white', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-                  <div style={{ backgroundColor: 'rgba(255,255,255,0.2)', padding: '0.5rem', borderRadius: '0.5rem', fontSize: '1.5rem' }}>🌱</div>
-                  <div>
-                    <h3 style={{ fontWeight: 'bold', fontSize: '1.25rem', margin: 0 }}>Registrar Siembra</h3>
-                    <p style={{ color: '#d1fae5', fontSize: '0.875rem', margin: 0 }}>Añade nuevas bandejas al invernadero</p>
-                  </div>
-                </div>
-                <button onClick={() => setIsSowModalOpen(false)} style={{ background: 'none', border: 'none', color: 'white', fontSize: '1.5rem', cursor: 'pointer', opacity: 0.8 }} onMouseOver={e=>e.currentTarget.style.opacity=1} onMouseOut={e=>e.currentTarget.style.opacity=0.8}>&times;</button>
-              </div>
-              <div style={{ padding: '2rem' }}>
-                  
-                  <form onSubmit={handleAddCrop} style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
-                  <div>
-                    <label style={{ fontSize: '0.875rem', fontWeight: 'bold', marginBottom: '0.5rem', display: 'block', color: '#334155' }}>1. ¿Qué vas a plantar?</label>
-                    <select className="premium-input" style={{ width: '100%', padding: '1rem', borderRadius: '0.75rem', border: '2px solid #e2e8f0', background: '#f8fafc', fontSize: '1rem', fontWeight: '500', boxSizing: 'border-box' }} required value={newCrop.cropTypeId} onChange={e=>setNewCrop({...newCrop, cropTypeId: e.target.value, selectedSeedBatchId: ''})}>
-                      <option value="">Selecciona una variedad...</option>
-                      {cropTypes?.map(c => (
-                        <option key={c.id} value={c.id}>{c.name}</option>
-                      ))}
-                    </select>
-                  </div>
-                  
-                  {selectedCropType && (
-                      <div style={{ background: '#f0fdf4', padding: '1.25rem', borderRadius: '0.75rem', border: '1px solid #bbf7d0', display: 'flex', gap: '1rem', alignItems: 'flex-start', flexDirection: 'column' }}>
-                        <div style={{ display: 'flex', gap: '1rem', width: '100%' }}>
-                          <div style={{ fontSize: '1.5rem', marginTop: '0.25rem' }}>🌱</div>
-                          <div style={{ flex: 1 }}>
-                            <label style={{ fontSize: '0.75rem', fontWeight: 'bold', textTransform: 'uppercase', letterSpacing: '0.05em', color: '#166534', display: 'block', marginBottom: '0.25rem' }}>Inventario Disponible Total</label>
-                            <p style={{ fontSize: '1.25rem', fontWeight: '900', color: '#14532d', margin: 0 }}>
-                              {totalAvailableSeed.toFixed(2)} g 
-                              {selectedCropType.seedGrams > 0 && <span style={{ fontSize: '0.875rem', fontWeight: '600', color: '#15803d', marginLeft: '0.5rem' }}>(Max. {Math.floor(totalAvailableSeed / selectedCropType.seedGrams)} bandejas)</span>}
-                            </p>
-                          </div>
-                        </div>
-
-                        <div style={{ width: '100%', marginTop: '0.5rem', paddingTop: '0.5rem', borderTop: '1px dashed #bbf7d0' }}>
-                          <label style={{ fontSize: '0.75rem', fontWeight: 'bold', textTransform: 'uppercase', letterSpacing: '0.05em', color: '#166534', display: 'block', marginBottom: '0.5rem' }}>Selecciona el Lote de Semillas (Trazabilidad)</label>
-                          <select className="premium-input" style={{ width: '100%', padding: '0.75rem', borderRadius: '0.5rem', border: '1px solid #86efac', background: 'white', fontSize: '0.875rem', fontWeight: 'bold' }} required value={newCrop.selectedSeedBatchId || ''} onChange={e => setNewCrop({...newCrop, selectedSeedBatchId: e.target.value})}>
-                            <option value="">-- Sin stock de lotes --</option>
-                            {availableBatches.map(b => (
-                              <option key={b.batchNumber} value={b.batchNumber}>{b.batchNumber} ({b.quantity.toFixed(2)} g disponibles)</option>
-                            ))}
-                          </select>
-                          
-                          {newCrop.selectedSeedBatchId && newCrop.selectedSeedBatchId !== oldestBatch && (
-                            <div style={{ marginTop: '0.75rem', display: 'flex', alignItems: 'flex-start', gap: '0.5rem', backgroundColor: '#fffbeb', padding: '0.75rem', borderRadius: '0.5rem', border: '1px solid #fde68a' }}>
-                              <span style={{ fontSize: '1.25rem' }}>⚠️</span>
-                              <p style={{ margin: 0, fontSize: '0.75rem', color: '#92400e', fontWeight: 'bold', lineHeight: 1.4 }}>Aviso: Hay semillas de un lote más antiguo en stock ({oldestBatch}). Se recomienda encarecidamente usar el método FIFO para evitar caducidades y mermas.</p>
-                            </div>
-                          )}
-                          
-                          <p style={{ fontSize: '0.75rem', color: '#15803d', marginTop: '0.75rem', lineHeight: 1.5 }}>Al plantar, se descontará automáticamente el consumo asignándolo al lote seleccionado para garantizar la trazabilidad.</p>
-                        </div>
-                      </div>
-                    )}
-
-                  <div>
-                    <label style={{ fontSize: '0.875rem', fontWeight: 'bold', marginBottom: '0.5rem', display: 'block', color: '#334155' }}>2. ¿Cuántas bandejas son?</label>
-                    <input type="number" required min="1" className="premium-input" style={{ width: '100%', padding: '1rem', borderRadius: '0.75rem', border: '2px solid #e2e8f0', fontSize: '1.5rem', fontWeight: '900', color: '#0f172a', textAlign: 'center', boxSizing: 'border-box' }} value={newCrop.traysCount} onChange={e=>setNewCrop({...newCrop, traysCount: Number(e.target.value)})}/>
-                  </div>
-
-                  <div style={{ display: 'flex', gap: '0.75rem', marginTop: '1rem' }}>
-                    <button type="button" onClick={() => setIsSowModalOpen(false)} style={{ flex: '1', padding: '0.75rem 1rem', borderRadius: '0.75rem', border: '2px solid #e2e8f0', color: '#475569', fontWeight: 'bold', backgroundColor: 'white', cursor: 'pointer', transition: 'background-color 0.2s' }} onMouseOver={e=>e.currentTarget.style.backgroundColor='#f8fafc'} onMouseOut={e=>e.currentTarget.style.backgroundColor='white'}>Cancelar</button>
-                    <button type="submit" disabled={selectedCropType && totalAvailableSeed <= 0} style={{ flex: '1', padding: '0.75rem 1rem', borderRadius: '0.75rem', border: 'none', color: 'white', fontWeight: 'bold', background: 'linear-gradient(135deg, #10b981, #059669)', cursor: (selectedCropType && totalAvailableSeed <= 0) ? 'not-allowed' : 'pointer', opacity: (selectedCropType && totalAvailableSeed <= 0) ? 0.5 : 1, boxShadow: '0 4px 6px -1px rgba(16, 185, 129, 0.2)' }}>
-                      {selectedCropType && totalAvailableSeed <= 0 ? 'Sin Semilla' : 'Confirmar Siembra'}
-                    </button>
-                  </div>
-                </form>
-              </div>
-            </div>
-          </div>
-        )}
+        
 
         {sowTab === 'activos' && (
             <div style={{ animation: 'fadeIn 0.3s ease' }}>
@@ -668,83 +593,7 @@ export default function Crops() {
         </button>
       </div>
 
-      {isHarvestModalOpen && (
-        <div style={modalOverlayStyle}>
-          <div style={modalCardStyle}>
-            <div className="flex justify-between items-center mb-4">
-              <h3 className="font-bold text-xl">🔪 Registrar Cosecha y Envasado</h3>
-              <button onClick={() => setIsHarvestModalOpen(false)} style={{ background: 'none', border: 'none', fontSize: '1.5rem', cursor: 'pointer' }}>&times;</button>
-            </div>
-              <form onSubmit={handleRegisterHarvest} className="flex flex-col gap-4">
-                <div>
-                  <label className="text-sm font-semibold mb-1 block">1. ¿Qué producto final vas a envasar?</label>
-                  <select className="premium-input w-full" style={{ padding: '0.75rem', borderRadius: '8px', border: '1px solid #cbd5e1' }} required value={newHarvest.productId} onChange={e=>handleProductSelect(e.target.value)}>
-                    <option value="">-- Seleccionar --</option>
-                    {products?.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
-                  </select>
-                </div>
-
-                <div>
-                  <label className="text-sm font-semibold mb-2 block flex justify-between">
-                    <span>2. Selecciona las bandejas que vas a cortar:</span>
-                  </label>
-                  <div className="max-h-48 overflow-y-auto border border-slate-300 rounded-lg p-2 bg-slate-50 flex flex-col gap-2">
-                    {(crops?.filter(c => c.status === 'LIGHT' || c.status === 'READY') || []).map(crop => {
-                      const cType = cropTypes?.find(c => c.id === crop.seedId || c.id === crop.cropTypeId);
-                      const isChecked = newHarvest.selectedCropIds.includes(crop.id);
-                      
-                      const harvestProduct = products?.find(p => p.id === newHarvest.productId);
-                      const hasRecipe = harvestProduct?.recipeSeeds && harvestProduct.recipeSeeds.length > 0;
-                      const allowedSeedIds = hasRecipe ? harvestProduct.recipeSeeds.map(rs => rs.seedId) : [];
-                      
-                      const actualSeedId = crop.seedId || cropTypes?.find(ct => ct.id === crop.cropTypeId)?.seedId;
-                      const isAllowed = !hasRecipe || allowedSeedIds.includes(actualSeedId);
-
-                      return (
-                        <label key={crop.id} className={`flex items-center gap-3 p-2 bg-white rounded border cursor-pointer transition-colors ${!isAllowed ? 'opacity-40 border-red-100 bg-red-50 cursor-not-allowed' : isChecked ? 'border-green-500 bg-green-50' : 'border-slate-200 hover:bg-slate-50'}`}>
-                          <input 
-                            type="checkbox" 
-                            className="w-5 h-5 text-green-600 rounded focus:ring-green-500 disabled:opacity-50"
-                            checked={isChecked}
-                            disabled={!isAllowed}
-                            onChange={(e) => {
-                              if (e.target.checked) {
-                                setNewHarvest(prev => ({ ...prev, selectedCropIds: [...prev.selectedCropIds, crop.id] }));
-                              } else {
-                                setNewHarvest(prev => ({ ...prev, selectedCropIds: prev.selectedCropIds.filter(id => id !== crop.id) }));
-                              }
-                            }}
-                          />
-                          <div className="flex-1 flex justify-between">
-                            <span className="font-semibold text-slate-700">{cType?.name || 'Desconocido'} <span className="font-normal text-slate-500 text-sm">({crop.traysCount} bandejas)</span></span>
-                            {!isAllowed && hasRecipe ? (
-                              <span className="text-xs text-red-500 font-bold px-2 py-1">No permitido en la receta</span>
-                            ) : (
-                              <span className="text-xs bg-slate-200 text-slate-600 px-2 py-1 rounded font-mono">{crop.batchNumber}</span>
-                            )}
-                          </div>
-                        </label>
-                      );
-                    })}
-                    {(crops?.filter(c => c.status === 'LIGHT' || c.status === 'READY') || []).length === 0 && (
-                      <p className="text-slate-500 text-sm text-center py-2">No hay cultivos listos para cosechar.</p>
-                    )}
-                  </div>
-                </div>
-
-                <div>
-                  <label className="text-sm font-semibold mb-1 block">3. ¿Cuántos tuppers en total han salido?</label>
-                  <input type="number" className="premium-input w-full" style={{ padding: '0.75rem', borderRadius: '8px', border: '1px solid #cbd5e1' }} required min="1" value={newHarvest.tuppersCount} onChange={e=>setNewHarvest({...newHarvest, tuppersCount: e.target.value})}/>
-                </div>
-                <div className="flex justify-end gap-2 mt-4">
-                  <button type="button" onClick={() => setIsHarvestModalOpen(false)} className="btn btn-secondary" style={{ padding: '0.75rem 1.5rem', borderRadius: '8px', border: '1px solid #cbd5e1', background: 'white' }}>Cancelar</button>
-                  <button type="submit" className="btn btn-primary" style={{ background: '#0f172a', color: 'white', border: 'none', padding: '0.75rem 1.5rem', borderRadius: '8px', fontWeight: 'bold' }}>
-                    🖨️ Registrar e Imprimir
-                  </button>
-                </div>
-              </form>
-            </div></div>
-      )}
+      
 
       <div className="premium-card mt-6">
         <h3 className="premium-card-title mb-4">🌱 Cultivos Listos para Cosechar</h3>
@@ -1228,7 +1077,162 @@ export default function Crops() {
       </div>
       
     
-      {showPhaseChangeModal && (
+      {isSowModalOpen && (
+          <div style={modalOverlayStyle}>
+            <div style={{ ...modalCardStyle, maxWidth: '500px', padding: 0, overflow: 'hidden' }}>
+              <div style={{ background: 'linear-gradient(135deg, #10b981, #059669)', padding: '1.5rem', color: 'white', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                  <div style={{ backgroundColor: 'rgba(255,255,255,0.2)', padding: '0.5rem', borderRadius: '0.5rem', fontSize: '1.5rem' }}>🌱</div>
+                  <div>
+                    <h3 style={{ fontWeight: 'bold', fontSize: '1.25rem', margin: 0 }}>Registrar Siembra</h3>
+                    <p style={{ color: '#d1fae5', fontSize: '0.875rem', margin: 0 }}>Añade nuevas bandejas al invernadero</p>
+                  </div>
+                </div>
+                <button onClick={() => setIsSowModalOpen(false)} style={{ background: 'none', border: 'none', color: 'white', fontSize: '1.5rem', cursor: 'pointer', opacity: 0.8 }} onMouseOver={e=>e.currentTarget.style.opacity=1} onMouseOut={e=>e.currentTarget.style.opacity=0.8}>&times;</button>
+              </div>
+              <div style={{ padding: '2rem' }}>
+                  
+                  <form onSubmit={handleAddCrop} style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+                  <div>
+                    <label style={{ fontSize: '0.875rem', fontWeight: 'bold', marginBottom: '0.5rem', display: 'block', color: '#334155' }}>1. ¿Qué vas a plantar?</label>
+                    <select className="premium-input" style={{ width: '100%', padding: '1rem', borderRadius: '0.75rem', border: '2px solid #e2e8f0', background: '#f8fafc', fontSize: '1rem', fontWeight: '500', boxSizing: 'border-box' }} required value={newCrop.cropTypeId} onChange={e=>setNewCrop({...newCrop, cropTypeId: e.target.value, selectedSeedBatchId: ''})}>
+                      <option value="">Selecciona una variedad...</option>
+                      {cropTypes?.map(c => (
+                        <option key={c.id} value={c.id}>{c.name}</option>
+                      ))}
+                    </select>
+                  </div>
+                  
+                  {selectedCropType && (
+                      <div style={{ background: '#f0fdf4', padding: '1.25rem', borderRadius: '0.75rem', border: '1px solid #bbf7d0', display: 'flex', gap: '1rem', alignItems: 'flex-start', flexDirection: 'column' }}>
+                        <div style={{ display: 'flex', gap: '1rem', width: '100%' }}>
+                          <div style={{ fontSize: '1.5rem', marginTop: '0.25rem' }}>🌱</div>
+                          <div style={{ flex: 1 }}>
+                            <label style={{ fontSize: '0.75rem', fontWeight: 'bold', textTransform: 'uppercase', letterSpacing: '0.05em', color: '#166534', display: 'block', marginBottom: '0.25rem' }}>Inventario Disponible Total</label>
+                            <p style={{ fontSize: '1.25rem', fontWeight: '900', color: '#14532d', margin: 0 }}>
+                              {totalAvailableSeed.toFixed(2)} g 
+                              {selectedCropType.seedGrams > 0 && <span style={{ fontSize: '0.875rem', fontWeight: '600', color: '#15803d', marginLeft: '0.5rem' }}>(Max. {Math.floor(totalAvailableSeed / selectedCropType.seedGrams)} bandejas)</span>}
+                            </p>
+                          </div>
+                        </div>
+
+                        <div style={{ width: '100%', marginTop: '0.5rem', paddingTop: '0.5rem', borderTop: '1px dashed #bbf7d0' }}>
+                          <label style={{ fontSize: '0.75rem', fontWeight: 'bold', textTransform: 'uppercase', letterSpacing: '0.05em', color: '#166534', display: 'block', marginBottom: '0.5rem' }}>Selecciona el Lote de Semillas (Trazabilidad)</label>
+                          <select className="premium-input" style={{ width: '100%', padding: '0.75rem', borderRadius: '0.5rem', border: '1px solid #86efac', background: 'white', fontSize: '0.875rem', fontWeight: 'bold' }} required value={newCrop.selectedSeedBatchId || ''} onChange={e => setNewCrop({...newCrop, selectedSeedBatchId: e.target.value})}>
+                            <option value="">-- Sin stock de lotes --</option>
+                            {availableBatches.map(b => (
+                              <option key={b.batchNumber} value={b.batchNumber}>{b.batchNumber} ({b.quantity.toFixed(2)} g disponibles)</option>
+                            ))}
+                          </select>
+                          
+                          {newCrop.selectedSeedBatchId && newCrop.selectedSeedBatchId !== oldestBatch && (
+                            <div style={{ marginTop: '0.75rem', display: 'flex', alignItems: 'flex-start', gap: '0.5rem', backgroundColor: '#fffbeb', padding: '0.75rem', borderRadius: '0.5rem', border: '1px solid #fde68a' }}>
+                              <span style={{ fontSize: '1.25rem' }}>⚠️</span>
+                              <p style={{ margin: 0, fontSize: '0.75rem', color: '#92400e', fontWeight: 'bold', lineHeight: 1.4 }}>Aviso: Hay semillas de un lote más antiguo en stock ({oldestBatch}). Se recomienda encarecidamente usar el método FIFO para evitar caducidades y mermas.</p>
+                            </div>
+                          )}
+                          
+                          <p style={{ fontSize: '0.75rem', color: '#15803d', marginTop: '0.75rem', lineHeight: 1.5 }}>Al plantar, se descontará automáticamente el consumo asignándolo al lote seleccionado para garantizar la trazabilidad.</p>
+                        </div>
+                      </div>
+                    )}
+
+                  <div>
+                    <label style={{ fontSize: '0.875rem', fontWeight: 'bold', marginBottom: '0.5rem', display: 'block', color: '#334155' }}>2. ¿Cuántas bandejas son?</label>
+                    <input type="number" required min="1" className="premium-input" style={{ width: '100%', padding: '1rem', borderRadius: '0.75rem', border: '2px solid #e2e8f0', fontSize: '1.5rem', fontWeight: '900', color: '#0f172a', textAlign: 'center', boxSizing: 'border-box' }} value={newCrop.traysCount} onChange={e=>setNewCrop({...newCrop, traysCount: Number(e.target.value)})}/>
+                  </div>
+
+                  <div style={{ display: 'flex', gap: '0.75rem', marginTop: '1rem' }}>
+                    <button type="button" onClick={() => setIsSowModalOpen(false)} style={{ flex: '1', padding: '0.75rem 1rem', borderRadius: '0.75rem', border: '2px solid #e2e8f0', color: '#475569', fontWeight: 'bold', backgroundColor: 'white', cursor: 'pointer', transition: 'background-color 0.2s' }} onMouseOver={e=>e.currentTarget.style.backgroundColor='#f8fafc'} onMouseOut={e=>e.currentTarget.style.backgroundColor='white'}>Cancelar</button>
+                    <button type="submit" disabled={selectedCropType && totalAvailableSeed <= 0} style={{ flex: '1', padding: '0.75rem 1rem', borderRadius: '0.75rem', border: 'none', color: 'white', fontWeight: 'bold', background: 'linear-gradient(135deg, #10b981, #059669)', cursor: (selectedCropType && totalAvailableSeed <= 0) ? 'not-allowed' : 'pointer', opacity: (selectedCropType && totalAvailableSeed <= 0) ? 0.5 : 1, boxShadow: '0 4px 6px -1px rgba(16, 185, 129, 0.2)' }}>
+                      {selectedCropType && totalAvailableSeed <= 0 ? 'Sin Semilla' : 'Confirmar Siembra'}
+                    </button>
+                  </div>
+                </form>
+              </div>
+            </div>
+          </div>
+        )}
+
+{isHarvestModalOpen && (
+        <div style={modalOverlayStyle}>
+          <div style={modalCardStyle}>
+            <div className="flex justify-between items-center mb-4">
+              <h3 className="font-bold text-xl">🔪 Registrar Cosecha y Envasado</h3>
+              <button onClick={() => setIsHarvestModalOpen(false)} style={{ background: 'none', border: 'none', fontSize: '1.5rem', cursor: 'pointer' }}>&times;</button>
+            </div>
+              <form onSubmit={handleRegisterHarvest} className="flex flex-col gap-4">
+                <div>
+                  <label className="text-sm font-semibold mb-1 block">1. ¿Qué producto final vas a envasar?</label>
+                  <select className="premium-input w-full" style={{ padding: '0.75rem', borderRadius: '8px', border: '1px solid #cbd5e1' }} required value={newHarvest.productId} onChange={e=>handleProductSelect(e.target.value)}>
+                    <option value="">-- Seleccionar --</option>
+                    {products?.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+                  </select>
+                </div>
+
+                <div>
+                  <label className="text-sm font-semibold mb-2 block flex justify-between">
+                    <span>2. Selecciona las bandejas que vas a cortar:</span>
+                  </label>
+                  <div className="max-h-48 overflow-y-auto border border-slate-300 rounded-lg p-2 bg-slate-50 flex flex-col gap-2">
+                    {(crops?.filter(c => c.status === 'LIGHT' || c.status === 'READY') || []).map(crop => {
+                      const cType = cropTypes?.find(c => c.id === crop.seedId || c.id === crop.cropTypeId);
+                      const isChecked = newHarvest.selectedCropIds.includes(crop.id);
+                      
+                      const harvestProduct = products?.find(p => p.id === newHarvest.productId);
+                      const hasRecipe = harvestProduct?.recipeSeeds && harvestProduct.recipeSeeds.length > 0;
+                      const allowedSeedIds = hasRecipe ? harvestProduct.recipeSeeds.map(rs => rs.seedId) : [];
+                      
+                      const actualSeedId = crop.seedId || cropTypes?.find(ct => ct.id === crop.cropTypeId)?.seedId;
+                      const isAllowed = !hasRecipe || allowedSeedIds.includes(actualSeedId);
+
+                      return (
+                        <label key={crop.id} className={`flex items-center gap-3 p-2 bg-white rounded border cursor-pointer transition-colors ${!isAllowed ? 'opacity-40 border-red-100 bg-red-50 cursor-not-allowed' : isChecked ? 'border-green-500 bg-green-50' : 'border-slate-200 hover:bg-slate-50'}`}>
+                          <input 
+                            type="checkbox" 
+                            className="w-5 h-5 text-green-600 rounded focus:ring-green-500 disabled:opacity-50"
+                            checked={isChecked}
+                            disabled={!isAllowed}
+                            onChange={(e) => {
+                              if (e.target.checked) {
+                                setNewHarvest(prev => ({ ...prev, selectedCropIds: [...prev.selectedCropIds, crop.id] }));
+                              } else {
+                                setNewHarvest(prev => ({ ...prev, selectedCropIds: prev.selectedCropIds.filter(id => id !== crop.id) }));
+                              }
+                            }}
+                          />
+                          <div className="flex-1 flex justify-between">
+                            <span className="font-semibold text-slate-700">{cType?.name || 'Desconocido'} <span className="font-normal text-slate-500 text-sm">({crop.traysCount} bandejas)</span></span>
+                            {!isAllowed && hasRecipe ? (
+                              <span className="text-xs text-red-500 font-bold px-2 py-1">No permitido en la receta</span>
+                            ) : (
+                              <span className="text-xs bg-slate-200 text-slate-600 px-2 py-1 rounded font-mono">{crop.batchNumber}</span>
+                            )}
+                          </div>
+                        </label>
+                      );
+                    })}
+                    {(crops?.filter(c => c.status === 'LIGHT' || c.status === 'READY') || []).length === 0 && (
+                      <p className="text-slate-500 text-sm text-center py-2">No hay cultivos listos para cosechar.</p>
+                    )}
+                  </div>
+                </div>
+
+                <div>
+                  <label className="text-sm font-semibold mb-1 block">3. ¿Cuántos tuppers en total han salido?</label>
+                  <input type="number" className="premium-input w-full" style={{ padding: '0.75rem', borderRadius: '8px', border: '1px solid #cbd5e1' }} required min="1" value={newHarvest.tuppersCount} onChange={e=>setNewHarvest({...newHarvest, tuppersCount: e.target.value})}/>
+                </div>
+                <div className="flex justify-end gap-2 mt-4">
+                  <button type="button" onClick={() => setIsHarvestModalOpen(false)} className="btn btn-secondary" style={{ padding: '0.75rem 1.5rem', borderRadius: '8px', border: '1px solid #cbd5e1', background: 'white' }}>Cancelar</button>
+                  <button type="submit" className="btn btn-primary" style={{ background: '#0f172a', color: 'white', border: 'none', padding: '0.75rem 1.5rem', borderRadius: '8px', fontWeight: 'bold' }}>
+                    🖨️ Registrar e Imprimir
+                  </button>
+                </div>
+              </form>
+            </div></div>
+      )}
+
+{showPhaseChangeModal && (
         <div style={modalOverlayStyle}>
           <div style={modalCardStyle}>
             <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '1.5rem', alignItems: 'center' }}>
