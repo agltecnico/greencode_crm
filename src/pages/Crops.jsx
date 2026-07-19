@@ -36,7 +36,7 @@ export default function Crops() {
     cropTypes,
     harvestTargets, addHarvestTarget, updateHarvestTarget, deleteHarvestTarget,
     harvests, addHarvest,
-    addProductMovement,
+    addProductMovement, productMovements,
     products,
     orders, clients, updateOrderList
   } = useData();
@@ -591,6 +591,55 @@ export default function Crops() {
         <button onClick={() => setIsHarvestModalOpen(true)} className="btn btn-primary" style={{ background: '#0f172a', color: 'white', border: 'none', padding: '0.75rem 1.5rem', borderRadius: '8px', fontWeight: 'bold', cursor: 'pointer' }}>
           + Registrar Cosecha
         </button>
+      </div>
+
+      <div className="premium-card mb-6" style={{ background: 'linear-gradient(135deg, #1e293b, #0f172a)', color: 'white', border: '1px solid #334155' }}>
+        <h3 className="premium-card-title mb-4" style={{ color: 'white', borderBottom: '1px solid #334155', paddingBottom: '0.75rem' }}>📦 Inventario de Producto Terminado y Reservas</h3>
+        
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+          {products?.map(product => {
+            const harvested = productMovements?.filter(m => m.productId === product.id && m.type === 'HARVEST').reduce((acc, curr) => acc + curr.quantity, 0) || 0;
+            const sold = productMovements?.filter(m => m.productId === product.id && m.type === 'ORDER').reduce((acc, curr) => acc + Math.abs(curr.quantity), 0) || 0;
+            const physicalStock = harvested - sold;
+
+            const pendingOrders = orders?.filter(o => o.status === 'PENDING' || o.status === 'PREPARED') || [];
+            const reserved = pendingOrders.reduce((acc, order) => {
+              const item = order.items?.find(i => i.productId === product.id);
+              return acc + (item ? item.quantity : 0);
+            }, 0);
+
+            const available = physicalStock - reserved;
+
+            return (
+              <div key={product.id} className="p-4 rounded-xl" style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)' }}>
+                <div className="flex justify-between items-center mb-3">
+                  <h4 className="font-bold text-lg" style={{ color: '#e2e8f0' }}>{product.name}</h4>
+                  <div className="text-xs px-2 py-1 rounded" style={{ background: '#334155', color: '#94a3b8' }}>
+                    Físico: <span style={{ color: 'white', fontWeight: 'bold' }}>{physicalStock}</span>
+                  </div>
+                </div>
+                
+                <div className="flex justify-between items-center mb-2">
+                  <span style={{ color: '#94a3b8', fontSize: '0.9rem' }}>Reservado (Pedidos)</span>
+                  <span className="font-bold text-lg" style={{ color: '#f59e0b' }}>{reserved}</span>
+                </div>
+
+                <div className="flex justify-between items-center pt-2" style={{ borderTop: '1px dashed #334155' }}>
+                  <span style={{ color: '#94a3b8', fontSize: '0.9rem' }}>Disponible</span>
+                  <span className={`font-bold text-xl ${available < 0 ? 'text-red-400' : 'text-emerald-400'}`}>
+                    {available}
+                  </span>
+                </div>
+                
+                {available < 0 && (
+                  <div className="mt-3 text-xs font-bold p-2 rounded" style={{ background: 'rgba(239, 68, 68, 0.2)', color: '#fca5a5', border: '1px solid rgba(239, 68, 68, 0.3)' }}>
+                    ⚠️ Faltan {Math.abs(available)} tuppers
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
       </div>
 
       
