@@ -276,7 +276,7 @@ export default function EmployeeTasks() {
                     toggleTaskSelection(task);
                   } else {
                     if (task.type === 'plant') {
-                      window.location.href = '/crops?action=sow&cropTypeId=' + task.cropTypeId + '&trays=' + task.trays;
+                      setSelectedTasks([task]); setBatchSelections({ [task.id]: 'SIN_LOTE' }); setIsSowModalOpen(true); setIsMultiSelectMode(true);
                     } else if (task.type === 'harvest') {
                       window.location.href = '/crops?action=harvest&cropTypeId=' + task.cropTypeId;
                     }
