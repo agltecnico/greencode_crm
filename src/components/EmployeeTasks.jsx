@@ -117,26 +117,43 @@ export default function EmployeeTasks() {
     });
 
     harvestTargets?.forEach(routine => {
-      const cType = cropTypes?.find(c => c.id === routine.cropTypeId);
+      const cType = cropTypes?.find(ct => ct.id == routine.productId);
       if(!cType) return;
+      let seed = seeds?.find(s => s.id === cType.seedId);
+      if(!seed) seed = { name: 'Semilla Desconocida' };
 
-      const daysToHarvest = Number(cType.soakingHours > 0 ? 1 : 0) + Number(cType.germinationDays) + Number(cType.darknessDays) + Number(cType.lightDays);
-      
-      const plantWd = (routine.targetDayOfWeek - daysToHarvest + 700) % 7;
-      const soakHrs = Number(cType.soakingHours || 0);
-      let germWd = plantWd;
-      if (soakHrs > 0) germWd = (plantWd + 1) % 7;
+      const plantWd = Number(routine.targetDayOfWeek);
+      const soakHrs = cType.soakingHours || 0;
+      const soakOffset = soakHrs > 0 ? 1 : 0;
+      const germOffset = soakOffset;
+      const darkOffset = soakOffset + Number(cType.germinationDays || 0);
+      const lightOffset = darkOffset + Number(cType.darknessDays || 0);
+      const harvestOffset = lightOffset + Number(cType.lightDays || 0);
 
-      const darkWd = (germWd + Number(cType.germinationDays)) % 7;
-      const lightWd = (darkWd + Number(cType.darknessDays)) % 7;
-      const harvestWd = routine.targetDayOfWeek;
+      const germWd = (plantWd + germOffset) % 7;
+      const darkWd = (plantWd + darkOffset) % 7;
+      const lightWd = (plantWd + lightOffset) % 7;
+      const harvestWd = (plantWd + harvestOffset) % 7;
 
-      if(plantWd == targetDayOfWeek) {
+      const checkPlanted = (offset) => {
+        const tDate = new Date(targetDate);
+        tDate.setDate(tDate.getDate() - offset);
+        tDate.setHours(0,0,0,0);
+        return crops.some(c => {
+          if (c.status === 'DISCARDED' || c.status === 'HARVESTED') return false;
+          if (c.cropTypeId != routine.productId && c.seedId != routine.productId) return false;
+          const cDate = new Date(c.datePlanted);
+          cDate.setHours(0,0,0,0);
+          return Math.abs((cDate - tDate) / 86400000) <= 1;
+        });
+      };
+
+      if(plantWd == targetDayOfWeek && !checkPlanted(0)) {
         tasksForDate.push({ 
           id: `plant-${dateKey}-${routine.id}`,
           type: 'plant', 
-          title: `Siembra de ${cType.name}`, 
-          desc: `Rutina esperada: ${routine.tuppersCount} bandejas`, 
+          title: `Plantar ${cType.name}`, 
+          desc: `Rutina semanal: ${routine.tuppersCount} bandejas`, 
           icon: '🌱', 
           className: 'plant', 
           cropTypeId: cType.id, 
@@ -147,21 +164,27 @@ export default function EmployeeTasks() {
 
       const hasDarkness = Number(cType.darknessDays) > 0;
 
-      if(hasDarkness && darkWd == targetDayOfWeek) {
+      if(germWd == targetDayOfWeek && !checkPlanted(germOffset)) {
+        if (soakHrs > 0) {
+           // tasksForDate.push({ type: 'germ', title: `A Germinación: ${cType.name}`, desc: `Desde remojo (Rutina)`, icon: '🌱', className: 'germ', cropTypeId: cType.id });
+        }
+      }
+
+      if(hasDarkness && darkWd == targetDayOfWeek && !checkPlanted(darkOffset)) {
         tasksForDate.push({ 
           id: `rout-dark-${dateKey}-${routine.id}`,
           type: 'dark', title: `A Oscuridad: ${cType.name}`, desc: `Rutina esperada`, icon: '🌑', className: 'dark', cropTypeId: cType.id 
         });
       }
 
-      if(lightWd == targetDayOfWeek) {
+      if(lightWd == targetDayOfWeek && !checkPlanted(lightOffset)) {
         tasksForDate.push({ 
           id: `rout-light-${dateKey}-${routine.id}`,
           type: 'light', title: `A Luz: ${cType.name}`, desc: `Rutina esperada`, icon: '☀️', className: 'light', cropTypeId: cType.id 
         });
       }
 
-      if(harvestWd == targetDayOfWeek) {
+      if(harvestWd == targetDayOfWeek && !checkPlanted(harvestOffset)) {
         tasksForDate.push({ 
           id: `rout-harv-${dateKey}-${routine.id}`,
           type: 'harvest', title: `Cosechar ${cType.name}`, desc: `Rutina esperada: ${routine.tuppersCount} bandejas`, icon: '✂️', className: 'harvest', cropTypeId: cType.id 
