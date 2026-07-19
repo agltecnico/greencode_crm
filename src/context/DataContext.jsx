@@ -42,6 +42,7 @@ export const DataProvider = ({ children }) => {
   const [crops, setCrops] = useState([]);
   const [harvestTargets, setHarvestTargets] = useState([]);
   const [harvests, setHarvests] = useState([]);
+  const [productMovements, setProductMovements] = useState([]);
   const [dailyLogs, setDailyLogs] = useState([]);
 
 
@@ -83,6 +84,7 @@ export const DataProvider = ({ children }) => {
             }),
           supabase.from('harvests').select('*').order('createdAt', { ascending: true }),
           supabase.from('daily_logs').select('*').order('date', { ascending: true }),
+          supabase.from('product_movements').select('*').order('createdAt', { ascending: true }),
         ]);
 
         if (clientsData) setClients(clientsData);
@@ -625,6 +627,29 @@ export const DataProvider = ({ children }) => {
   };
 
   const updateOrderList = async (id, updatedFields) => {
+    // ---------------- PRODUCT MOVEMENTS INTERCEPTION ----------------
+    if (updatedFields.status === 'DELIVERED') {
+      const order = orders.find(o => o.id === id);
+      if (order && order.items) {
+        // Comprobar si ya restamos el stock de este pedido para no duplicar
+        const existingMovements = productMovements.filter(m => m.referenceId === id && m.type === 'ORDER');
+        if (existingMovements.length === 0) {
+          // Crear un movimiento negativo por cada item
+          for (const item of order.items) {
+            if (item.productId && item.quantity > 0) {
+              await addProductMovement({
+                productId: item.productId,
+                quantity: -Math.abs(item.quantity),
+                type: 'ORDER',
+                referenceId: order.id
+              });
+            }
+          }
+        }
+      }
+    }
+    // ----------------------------------------------------------------
+
     setOrders(prev => prev.map(o => o.id === id ? { ...o, ...updatedFields } : o));
     await supabase.from('orders').update(updatedFields).eq('id', id);
     

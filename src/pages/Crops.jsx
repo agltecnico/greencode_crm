@@ -36,6 +36,7 @@ export default function Crops() {
     cropTypes,
     harvestTargets, addHarvestTarget, updateHarvestTarget, deleteHarvestTarget,
     harvests, addHarvest,
+    addProductMovement,
     products,
     orders, clients, updateOrderList
   } = useData();
@@ -176,6 +177,17 @@ export default function Crops() {
 
     // 2. Register the harvest product
     addHarvest({...newHarvest, harvestDate: new Date().toISOString(), batchNumber: batchNum});
+      
+      // Añadir al inventario de Nevera (Productos Finales)
+      if (newHarvest.productId && newHarvest.tuppersCount > 0) {
+        await addProductMovement({
+          productId: newHarvest.productId,
+          quantity: newHarvest.tuppersCount,
+          type: 'HARVEST',
+          referenceId: batchNum
+        });
+      }
+
     const product = products?.find(p => p.id === newHarvest.productId);
     generateLabelPDF(product?.name || 'Desconocido', batchNum, product?.shelfLifeDays || 10, newHarvest.tuppersCount);
     

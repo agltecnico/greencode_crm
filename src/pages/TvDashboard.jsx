@@ -5,7 +5,7 @@ import '../crops.css';
 
 export default function TvDashboard() {
   const [tvTab, setTvTab] = useState('tasks');
-  const { crops, cropTypes, seeds, advanceCropStatus, refreshData, orders, clients } = useData();
+  const { crops, cropTypes, seeds, advanceCropStatus, refreshData, orders, clients, products, productMovements } = useData();
 
   const translateStatus = (status) => {
     const statusMap = {
@@ -35,7 +35,7 @@ export default function TvDashboard() {
 
 
   useEffect(() => {
-    const tabs = ['tasks', 'greenhouse', 'climate', 'orders'];
+    const tabs = ['tasks', 'greenhouse', 'climate', 'orders', 'stock'];
     const rotateInterval = setInterval(() => {
       setTvTab(prev => {
         const nextIndex = (tabs.indexOf(prev) + 1) % tabs.length;
@@ -119,9 +119,25 @@ export default function TvDashboard() {
           🌡️ CLIMA ACTUAL
         </button>
 
-      </div>
-  
-        {tvTab === 'tasks' && (
+              <button 
+          onClick={() => setTvTab('stock')}
+          style={{
+            background: tvTab === 'stock' ? 'linear-gradient(135deg, #f59e0b, #ea580c)' : '#1e293b',
+            color: tvTab === 'stock' ? 'white' : '#94a3b8',
+            border: '2px solid',
+            borderColor: tvTab === 'stock' ? 'transparent' : '#334155',
+            padding: '1rem 3rem',
+            fontSize: '1.5rem',
+            fontWeight: '900',
+            borderRadius: '16px',
+            cursor: 'pointer',
+            transition: 'all 0.3s ease',
+            boxShadow: tvTab === 'stock' ? '0 10px 25px rgba(245, 158, 11, 0.3)' : 'none'
+          }}>
+          📦 STOCK NEVERA
+        </button>
+
+      </div>\n\n        {tvTab === 'tasks' && (
           <EmployeeTasks />
         )}
         
@@ -219,6 +235,70 @@ export default function TvDashboard() {
           </div>
         </div>
       )}
+
+    
+        {tvTab === 'stock' && (
+          <div style={{ animation: 'fadeIn 0.4s ease', padding: '0 2rem' }}>
+            <h2 style={{ color: '#fff', fontSize: '2.5rem', textAlign: 'center', marginBottom: '2rem' }}>📦 CONTROL DE DISPONIBILIDAD</h2>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '1.5rem' }}>
+              {(() => {
+                if (!products || !productMovements) return <p style={{color:'white'}}>Cargando datos...</p>;
+                
+                return products.map(product => {
+                  // 1. Tuppers Envasados (Stock físico)
+                  const movements = productMovements.filter(m => m.productId === product.id);
+                  const envasados = movements.reduce((sum, m) => sum + Number(m.quantity || 0), 0);
+                  
+                  // 2. Tuppers en Pedidos (Pendientes de entrega)
+                  const pendingOrders = orders?.filter(o => o.status === 'PENDIENTE' || o.status === 'PREPARED' || o.status === 'IN_TRANSIT') || [];
+                  let enPedidos = 0;
+                  pendingOrders.forEach(o => {
+                    if (o.items) {
+                      o.items.forEach(item => {
+                        if (item.productId === product.id) enPedidos += Number(item.quantity || 0);
+                      });
+                    }
+                  });
+
+                  // 3. Tuppers que Sobran (Disponibles)
+                  const sobran = envasados - enPedidos;
+
+                  if (envasados === 0 && enPedidos === 0) return null;
+
+                  return (
+                    <div key={product.id} style={{ 
+                      background: '#1e293b', 
+                      border: `3px solid ${sobran > 0 ? '#10b981' : sobran < 0 ? '#ef4444' : '#334155'}`, 
+                      borderRadius: '16px', 
+                      padding: '1.5rem',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      gap: '1rem'
+                    }}>
+                      <h3 style={{ color: '#fff', fontSize: '1.8rem', margin: 0, textAlign: 'center', borderBottom: '1px solid #334155', paddingBottom: '0.5rem' }}>{product.name}</h3>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <div style={{ textAlign: 'center' }}>
+                          <span style={{ color: '#94a3b8', fontSize: '1rem', display: 'block', textTransform: 'uppercase', fontWeight: 'bold' }}>Envasados</span>
+                          <span style={{ color: '#fff', fontSize: '2.5rem', fontWeight: '900' }}>{envasados}</span>
+                        </div>
+                        <div style={{ fontSize: '2rem', color: '#64748b' }}>-</div>
+                        <div style={{ textAlign: 'center' }}>
+                          <span style={{ color: '#fb923c', fontSize: '1rem', display: 'block', textTransform: 'uppercase', fontWeight: 'bold' }}>En Pedido</span>
+                          <span style={{ color: '#fb923c', fontSize: '2.5rem', fontWeight: '900' }}>{enPedidos}</span>
+                        </div>
+                        <div style={{ fontSize: '2rem', color: '#64748b' }}>=</div>
+                        <div style={{ textAlign: 'center', background: sobran > 0 ? 'rgba(16, 185, 129, 0.2)' : sobran < 0 ? 'rgba(239, 68, 68, 0.2)' : 'rgba(51, 65, 85, 0.5)', padding: '0.5rem 1rem', borderRadius: '12px' }}>
+                          <span style={{ color: sobran > 0 ? '#10b981' : sobran < 0 ? '#ef4444' : '#94a3b8', fontSize: '1rem', display: 'block', textTransform: 'uppercase', fontWeight: 'bold' }}>Sobran</span>
+                          <span style={{ color: sobran > 0 ? '#10b981' : sobran < 0 ? '#ef4444' : '#94a3b8', fontSize: '3rem', fontWeight: '900' }}>{sobran}</span>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                });
+              })()}
+            </div>
+          </div>
+        )}
 
     </div>
   );
