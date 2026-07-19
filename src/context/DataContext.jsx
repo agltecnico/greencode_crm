@@ -327,16 +327,16 @@ export const DataProvider = ({ children }) => {
           batchNumber: newCrop.selectedSeedBatchId || 'SIN_LOTE',
           purchaseDate: new Date().toISOString().split('T')[0],
           price: 0,
-          providerId: 'INTERNAL',
+          
           deliveryNote: `Consumo siembra lote ${batchNum}`
         });
       }
 
     // 4. Deduct Stock (Substrate)
-    if (cType.substrateId && cType.substrateGrams > 0) {
+    if (cType.substrateId && cType.substrateLiters > 0) {
       await addStockEntry({
         articleId: cType.substrateId,
-        quantity: -(Number(cType.substrateGrams) * trays),
+        quantity: -(Number(cType.substrateLiters) * trays),
         batchNumber: 'SIN_LOTE',
         purchaseDate: new Date().toISOString(),
         price: 0
