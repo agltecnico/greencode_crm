@@ -30,6 +30,8 @@ export default function Products() {
           payload.recipeSeeds = payload.recipeSeeds.slice(0, 1);
         }
 
+        delete payload.isMix;
+
       if (editingId) {
         updateProduct(editingId, payload);
       } else {
