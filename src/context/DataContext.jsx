@@ -123,7 +123,7 @@ export const DataProvider = ({ children }) => {
         if (stockEntriesData) setStockEntries(stockEntriesData);
         if (cropTypesData) setCropTypes(cropTypesData);
         if (cropsData) setCrops(cropsData);
-          if (cropsData && cropTypesData) autoAdvanceCrops(cropsData, cropTypesData);
+          // if (cropsData && cropTypesData) autoAdvanceCrops(cropsData, cropTypesData);
         if (harvestTargetsData) setHarvestTargets(harvestTargetsData);
         if (harvestsData) setHarvests(harvestsData);
         if (dailyLogsData) setDailyLogs(dailyLogsData);
