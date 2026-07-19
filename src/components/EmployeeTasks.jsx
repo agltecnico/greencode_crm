@@ -136,13 +136,13 @@ export default function EmployeeTasks() {
         });
       };
 
-      if(plantWd === targetDayOfWeek && !checkPlanted(0)) {
+      if(plantWd === targetDayOfWeek) {
         tasksForDate.push({ type: 'plant', title: `Plantar ${cType.name}`, desc: `Rutina semanal: ${routine.tuppersCount} bandejas`, icon: '🌱', className: 'plant', cropTypeId: cType.id, trays: routine.tuppersCount });
       }
       
       const hasDarkness = Number(cType.darknessDays) > 0;
 
-      if(germWd === targetDayOfWeek && !checkPlanted(germOffset)) {
+      if(germWd === targetDayOfWeek) {
         // Germination happens automatically on plant or after soak, usually don't need a manual task for germ if we just planted, 
         // but if soak was 1 day, then germ is the day after.
         if (soakHrs > 0) {
@@ -150,15 +150,15 @@ export default function EmployeeTasks() {
         }
       }
 
-      if(hasDarkness && darkWd === targetDayOfWeek && !checkPlanted(darkOffset)) {
+      if(hasDarkness && darkWd === targetDayOfWeek) {
         tasksForDate.push({ type: 'dark', title: `A Oscuridad: ${cType.name}`, desc: `Rutina esperada`, icon: '🌑', className: 'dark', cropTypeId: cType.id });
       }
 
-      if(lightWd === targetDayOfWeek && !checkPlanted(lightOffset)) {
+      if(lightWd === targetDayOfWeek) {
         tasksForDate.push({ type: 'light', title: `A Luz: ${cType.name}`, desc: `Rutina esperada`, icon: '☀️', className: 'light', cropTypeId: cType.id });
       }
 
-      if(harvestWd === targetDayOfWeek && !checkPlanted(harvestOffset)) {
+      if(harvestWd === targetDayOfWeek) {
         tasksForDate.push({ type: 'harvest', title: `Cosechar ${cType.name}`, desc: `Rutina esperada: ${routine.tuppersCount} bandejas`, icon: '✂️', className: 'harvest', cropTypeId: cType.id });
       }
     });
