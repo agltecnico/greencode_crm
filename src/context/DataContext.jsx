@@ -337,7 +337,7 @@ export const DataProvider = ({ children }) => {
       await addStockEntry({
         articleId: cType.substrateId,
         quantity: -(Number(cType.substrateGrams) * trays),
-        batchNumber: 'USO_CULTIVO',
+        batchNumber: 'SIN_LOTE',
         purchaseDate: new Date().toISOString(),
         price: 0
       });
