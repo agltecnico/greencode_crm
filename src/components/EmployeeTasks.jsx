@@ -276,9 +276,9 @@ export default function EmployeeTasks() {
                     toggleTaskSelection(task);
                   } else {
                     if (task.type === 'plant') {
-                      setSelectedTasks([task]); setBatchSelections({ [task.id]: 'SIN_LOTE' }); setIsSowModalOpen(true); setIsMultiSelectMode(true);
+                      navigate('?action=sow&cropTypeId=' + task.cropTypeId + '&trays=' + task.trays);
                     } else if (task.type === 'harvest') {
-                      window.location.href = '/crops?action=harvest&cropTypeId=' + task.cropTypeId;
+                      navigate('?action=harvest&cropTypeId=' + task.cropTypeId);
                     }
                   }
                 }} 
