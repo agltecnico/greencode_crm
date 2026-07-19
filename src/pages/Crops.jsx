@@ -198,7 +198,7 @@ export default function Crops() {
       }
 
     const product = products?.find(p => p.id === newHarvest.productId);
-    generateLabelPDF(product?.name || 'Desconocido', batchNum, product?.shelfLifeDays || 10, newHarvest.tuppersCount);
+    generateLabelPDF(product?.name || 'Desconocido', batchNum, product?.shelfLifeDays || 10, newHarvest.tuppersCount, product?.nutritionalInfo, getVarietiesText(product?.recipeSeeds));
     
     setNewHarvest({ productId: '', tuppersCount: 1, selectedCropUsages: {} });
     setIsHarvestModalOpen(false);
@@ -243,10 +243,20 @@ export default function Crops() {
     setIsHarvestModalOpen(true);
   };
 
-  const generateLabelPDF = (productName, batch, shelfLife, copies) => {
+  const generateLabelPDF = (productName, batch, shelfLife, copies, nutritionalInfo, varietiesText) => {
     import('../utils/labelPdf.js').then(module => {
-      module.generateAndPrintLabels(productName, batch, shelfLife, copies);
+      module.generateLabelPDF(productName, batch, shelfLife, copies, nutritionalInfo, varietiesText);
+    }).catch(err => {
+      console.error("Error loading PDF generator", err);
     });
+  };
+
+  const getVarietiesText = (recipeSeeds) => {
+    if (!recipeSeeds || !recipeSeeds.length) return '';
+    return recipeSeeds.map(rs => {
+      const s = seeds?.find(x => x.id === rs.seedId);
+      return s ? s.name : '';
+    }).filter(Boolean).join(', ');
   };
 
   // Modal Styles
@@ -792,7 +802,7 @@ export default function Crops() {
                     style={{ backgroundColor: 'white', border: '1px solid #cbd5e1', padding: '0.75rem 1.25rem', borderRadius: '8px', cursor: 'pointer', fontWeight: 'bold', color: '#334155', display: 'flex', alignItems: 'center', gap: '0.5rem', boxShadow: '0 1px 2px rgba(0,0,0,0.05)', transition: 'all 0.2s', marginLeft: '1rem' }}
                     onMouseOver={e => { e.currentTarget.style.borderColor = '#94a3b8'; e.currentTarget.style.backgroundColor = '#f8fafc'; }}
                     onMouseOut={e => { e.currentTarget.style.borderColor = '#cbd5e1'; e.currentTarget.style.backgroundColor = 'white'; }}
-                    onClick={() => generateLabelPDF(product?.name || '', h.batchNumber, product?.shelfLifeDays || 10, h.tuppersCount)}
+                    onClick={() => generateLabelPDF(product?.name || '', h.batchNumber, product?.shelfLifeDays || 10, h.tuppersCount, product?.nutritionalInfo, getVarietiesText(product?.recipeSeeds))}
                   >
                     <span>🖨️</span> Re-Imprimir PDF
                   </button>
