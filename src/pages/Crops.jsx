@@ -386,7 +386,7 @@ export default function Crops() {
     );
   };
 
-  const renderContent = () => {
+  const renderLotes = () => {
     // Solo mostramos cultivos vivos y que tengan al menos 1 bandeja física
     const activeCropsList = crops?.filter(c => c.status !== 'HARVESTED' && c.status !== 'DISCARDED' && c.traysCount > 0) || [];
 
