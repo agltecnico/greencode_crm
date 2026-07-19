@@ -105,7 +105,7 @@ export default function EmployeeTasks() {
     });
 
     harvestTargets?.forEach(routine => {
-      const cType = cropTypes?.find(ct => ct.id === routine.productId);
+      const cType = cropTypes?.find(ct => String(ct.id) === String(routine.productId));
       if(!cType) return;
       const seed = seeds?.find(s => s.id === cType.seedId);
       if(!seed) return;
@@ -129,7 +129,7 @@ export default function EmployeeTasks() {
         tDate.setHours(0,0,0,0);
         return crops.some(c => {
           if (c.status === 'DISCARDED' || c.status === 'HARVESTED') return false;
-            if (c.cropTypeId !== routine.productId && c.seedId !== routine.productId) return false;
+            if (String(c.cropTypeId) !== String(routine.productId) && String(c.seedId) !== String(routine.productId)) return false;
           const cDate = new Date(c.datePlanted);
           cDate.setHours(0,0,0,0);
           return Math.abs((cDate - tDate) / 86400000) <= 1;

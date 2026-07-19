@@ -374,7 +374,7 @@ export default function Crops() {
             const tasks = [];
             
             (harvestTargets || []).forEach(routine => {
-              const cType = (cropTypes || []).find(ct => ct.id === routine.productId);
+              const cType = (cropTypes || []).find(ct => String(ct.id) === String(routine.productId));
               if(!cType) return;
               
               const plantWd = Number(routine.targetDayOfWeek);
@@ -803,7 +803,7 @@ export default function Crops() {
 
   const getCycleEventsForCrop = (cType, harvestTargets) => {
     const events = [];
-    const targets = harvestTargets?.filter(t => t.productId === cType.id) || [];
+    const targets = harvestTargets?.filter(t => String(t.productId) === String(cType.id)) || [];
     
     targets.forEach(ht => {
       const sowDay = ht.targetDayOfWeek;
@@ -879,7 +879,7 @@ export default function Crops() {
   };
 
   const handleCellClick = (cType, dayIndex) => {
-    const existing = harvestTargets?.find(ht => ht.productId === cType.id && ht.targetDayOfWeek === dayIndex);
+    const existing = harvestTargets?.find(ht => String(ht.productId) === String(cType.id) && ht.targetDayOfWeek === dayIndex);
     const dayNames = ['Domingo','Lunes','Martes','Miércoles','Jueves','Viernes','Sábado'];
     if (existing) {
       Swal.fire({
@@ -961,7 +961,7 @@ export default function Crops() {
                   <tr key={cType.id} style={{ borderBottom: '1px solid #f1f5f9' }}>
                     <td style={{ padding: '1rem', fontWeight: 700, color: '#1e293b' }}>{cType.name}</td>
                     {tableDays.map(d => {
-                      const ht = harvestTargets?.find(t => t.productId === cType.id && t.targetDayOfWeek === d.idx);
+                      const ht = harvestTargets?.find(t => String(t.productId) === String(cType.id) && t.targetDayOfWeek === d.idx);
                       const eventsToday = cropEvents.filter(e => e.dayOfWeek === d.idx);
                       
                       return (
