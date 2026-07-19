@@ -6,7 +6,7 @@ import '../crops.css';
 export default function EmployeeTasks() {
   const navigate = useNavigate();
   const { harvestTargets, crops, seeds, cropTypes, dailyLogs, addDailyLog } = useData();
-  const [timeFilter, setTimeFilter] = useState(1);
+  const [timeFilter, setTimeFilter] = useState(7);
   const [selectedDayTasks, setSelectedDayTasks] = useState(null);
 
   const activeCrops = crops?.filter(c => c.status !== 'HARVESTED' && c.status !== 'DISCARDED') || [];
@@ -31,7 +31,7 @@ export default function EmployeeTasks() {
 
     activeCrops.forEach(crop => {
       const cType = cropTypes?.find(c => c.id === crop.cropTypeId || c.id === crop.seedId);
-      const seed = seeds?.find(s => s.id === cType?.seedId || s.id === crop.seedId);
+      let seed = seeds?.find(s => s.id === cType?.seedId || s.id === crop.seedId);
       if (!cType || !seed) return;
 
       const planted = new Date(crop.datePlanted || crop.plantedAt);
@@ -107,8 +107,8 @@ export default function EmployeeTasks() {
     harvestTargets?.forEach(routine => {
       const cType = cropTypes?.find(ct => ct.id == routine.productId);
       if(!cType) return;
-      const seed = seeds?.find(s => s.id === cType.seedId);
-      if(!seed) return;
+      let seed = seeds?.find(s => s.id === cType.seedId);
+      if(!seed) seed = { name: 'Semilla Desconocida' };
 
       const plantWd = Number(routine.targetDayOfWeek);
       const soakHrs = cType.soakingHours || 0;
