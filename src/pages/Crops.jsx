@@ -62,6 +62,7 @@ export default function Crops() {
 
   const [activeTab, setActiveTab] = useState('menu');
   const [sowTab, setSowTab] = useState('activos');
+  const [harvestTab, setHarvestTab] = useState('cosechar');
   const [statusFilter, setStatusFilter] = useState('ALL');
   const [historySearch, setHistorySearch] = useState('');
   const [historyPage, setHistoryPage] = useState(1);
@@ -593,6 +594,32 @@ export default function Crops() {
         </button>
       </div>
 
+      <div style={{ display: 'flex', gap: '1rem', marginBottom: '2rem', borderBottom: '2px solid #e2e8f0', paddingBottom: '0.5rem' }}>
+        <button 
+          onClick={() => setHarvestTab('cosechar')}
+          style={{ 
+            background: 'none', border: 'none', padding: '0.5rem 1rem', cursor: 'pointer', fontSize: '1.1rem', fontWeight: 'bold',
+            color: harvestTab === 'cosechar' ? '#16a34a' : '#64748b',
+            borderBottom: harvestTab === 'cosechar' ? '3px solid #16a34a' : '3px solid transparent',
+            marginBottom: '-0.65rem', transition: 'all 0.2s'
+          }}
+        >
+          🌱 Para Cosechar
+        </button>
+        <button 
+          onClick={() => setHarvestTab('inventario')}
+          style={{ 
+            background: 'none', border: 'none', padding: '0.5rem 1rem', cursor: 'pointer', fontSize: '1.1rem', fontWeight: 'bold',
+            color: harvestTab === 'inventario' ? '#0f172a' : '#64748b',
+            borderBottom: harvestTab === 'inventario' ? '3px solid #0f172a' : '3px solid transparent',
+            marginBottom: '-0.65rem', transition: 'all 0.2s'
+          }}
+        >
+          📦 Producto Terminado
+        </button>
+      </div>
+
+      {harvestTab === 'inventario' && (
       <div className="premium-card mb-6" style={{ background: 'linear-gradient(135deg, #1e293b, #0f172a)', color: 'white', border: '1px solid #334155', borderRadius: '16px', overflow: 'hidden', boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.2)' }}>
         <h3 className="premium-card-title" style={{ margin: 0, color: 'white', background: 'rgba(255,255,255,0.05)', borderBottom: '1px solid #334155', padding: '1.25rem 1.5rem', display: 'flex', alignItems: 'center', gap: '0.75rem', fontSize: '1.25rem' }}>
           <span style={{ fontSize: '1.5rem' }}>📦</span> Inventario de Producto Terminado y Reservas
@@ -611,6 +638,8 @@ export default function Crops() {
             }, 0);
 
             const available = physicalStock - reserved;
+
+            if (physicalStock <= 0 && reserved <= 0) return null;
 
             return (
               <div key={product.id} className="p-4 rounded-xl" style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)' }}>
@@ -643,10 +672,12 @@ export default function Crops() {
           })}
         </div>
       </div>
+      )}
 
       
-
-      <div className="premium-card mt-6" style={{ marginTop: '2rem', background: '#ffffff', borderRadius: '16px', border: '1px solid #e2e8f0', boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05)', overflow: 'hidden' }}>
+      {harvestTab === 'cosechar' && (
+      <>
+      <div className="premium-card mt-6" style={{ background: '#ffffff', borderRadius: '16px', border: '1px solid #e2e8f0', boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05)', overflow: 'hidden' }}>
         <h3 className="premium-card-title" style={{ margin: 0, padding: '1.25rem 1.5rem', background: 'linear-gradient(to right, #f8fafc, #ffffff)', borderBottom: '1px solid #e2e8f0', display: 'flex', alignItems: 'center', gap: '0.75rem', color: '#1e293b', fontSize: '1.25rem' }}>
           <span style={{ fontSize: '1.5rem' }}>🌱</span> Cultivos Listos para Cosechar
         </h3>
@@ -737,6 +768,8 @@ export default function Crops() {
           </div>
         </div>
       </div>
+      </>
+      )}
     </div>
   );
 
