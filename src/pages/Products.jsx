@@ -25,9 +25,10 @@ export default function Products() {
         shelfLifeDays: parseInt(formData.shelfLifeDays) || 10
       };
       
-      if (!payload.isMix) {
-        payload.recipeSeeds = [];
-      }
+      if (!payload.isMix && payload.recipeSeeds.length > 1) {
+          // Si cambian de mix a individual, nos quedamos solo con la primera semilla seleccionada (o vacío si no había)
+          payload.recipeSeeds = payload.recipeSeeds.slice(0, 1);
+        }
 
       if (editingId) {
         updateProduct(editingId, payload);
@@ -43,7 +44,7 @@ export default function Products() {
       name: product.name, 
       price: product.price,
       shelfLifeDays: product.shelfLifeDays || 10,
-      isMix: product.recipeSeeds && product.recipeSeeds.length > 0,
+      isMix: product.recipeSeeds && product.recipeSeeds.length > 1,
       recipeSeeds: product.recipeSeeds || []
     });
     setEditingId(product.id);
@@ -330,63 +331,79 @@ export default function Products() {
           {isAdding && (
             <div className="card mb-6" style={{ maxWidth: '600px' }}>
               <h3 className="font-bold mb-4 text-xl">{editingId ? 'Editar Producto' : 'Añadir Nuevo Producto'}</h3>
-              <form onSubmit={handleSubmit} className="flex flex-col gap-5">
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="form-group mb-0">
-                    <label className="form-label font-bold text-gray-300">Nombre del Producto / Variedad</label>
-                    <input type="text" className="form-control" required value={formData.name} onChange={e => setFormData({...formData, name: e.target.value})} placeholder="Ej: Brotes de Rábano o Vulcano Mix" />
-                  </div>
-                  <div className="form-group mb-0">
-                    <label className="form-label font-bold text-gray-300">Precio de Venta (€)</label>
-                    <input type="number" step="0.01" min="0" className="form-control" required value={formData.price} onChange={e => setFormData({...formData, price: e.target.value})} placeholder="Ej: 12.50" />
-                  </div>
-                </div>
-
-                <div className="form-group mb-0">
-                  <label className="form-label font-bold text-gray-300 flex items-center gap-2">
-                    Días de Caducidad
-                    <span className="text-xs text-blue-400 font-normal">Para la etiqueta de Sanidad</span>
-                  </label>
-                  <input type="number" min="1" className="form-control w-1/3" required value={formData.shelfLifeDays} onChange={e => setFormData({...formData, shelfLifeDays: e.target.value})} />
-                </div>
-
-                <div className="form-group mb-0 p-4 bg-slate-800 rounded-lg border border-slate-700">
-                  <label className="flex items-center gap-2 cursor-pointer mb-2">
-                    <input type="checkbox" checked={formData.isMix} onChange={e => setFormData({...formData, isMix: e.target.checked})} className="rounded text-green-500 focus:ring-green-500 bg-slate-700 border-slate-600" />
-                    <span className="font-bold text-gray-300">¿Es un Mix (Mezcla de varias semillas)?</span>
-                  </label>
-                  <p className="text-xs text-gray-400 mb-0">Si es un mix, el sistema te permitirá elegir qué semillas componen la receta para la Trazabilidad y el Escandallo.</p>
-                </div>
-
-                {formData.isMix && (
-                  <div className="form-group mb-0 p-4 bg-indigo-900/30 rounded-lg border border-indigo-500/30">
-                    <label className="form-label font-bold text-indigo-300 mb-3">Receta del Mix (Selecciona las semillas que lo componen)</label>
-                    <div className="grid grid-cols-2 gap-2 max-h-48 overflow-y-auto pr-2 custom-scrollbar">
-                      {(seeds || []).map(seed => {
-                        const isSelected = formData.recipeSeeds.find(s => s.seedId === seed.id);
-                        return (
-                          <div key={seed.id} 
-                            onClick={() => toggleSeedInRecipe(seed.id)}
-                            className={`p-2 rounded cursor-pointer border text-sm flex items-center gap-2 transition-colors ${isSelected ? 'bg-indigo-600 border-indigo-400 text-white' : 'bg-slate-700 border-slate-600 text-gray-300 hover:bg-slate-600'}`}>
-                            <div className={`w-4 h-4 rounded-full flex items-center justify-center border ${isSelected ? 'border-white bg-indigo-500' : 'border-slate-400 bg-slate-800'}`}>
-                              {isSelected && <div className="w-2 h-2 rounded-full bg-white"></div>}
-                            </div>
-                            <span className="truncate" title={seed.name}>{seed.name}</span>
-                          </div>
-                        );
-                      })}
+              <form onSubmit={handleSubmit} className="flex flex-col gap-4">
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="form-group mb-0">
+                      <label className="form-label font-bold text-gray-700">Nombre del Producto</label>
+                      <input type="text" className="form-input" required value={formData.name} onChange={e => setFormData({...formData, name: e.target.value})} placeholder="Ej: Tuppers Rúcula, Mix Primavera..." />
                     </div>
-                    {formData.recipeSeeds.length === 0 && (
-                      <p className="text-xs text-red-400 mt-2 font-bold">Debes seleccionar al menos una semilla para el mix.</p>
-                    )}
+                    <div className="form-group mb-0">
+                      <label className="form-label font-bold text-gray-700">Precio Venta (€)</label>
+                      <input type="number" step="0.01" className="form-input" required value={formData.price} onChange={e => setFormData({...formData, price: e.target.value})} placeholder="0.00" />
+                    </div>
                   </div>
-                )}
+                  
+                  <div className="form-group mb-0">
+                    <label className="form-label font-bold text-gray-700">Días de Caducidad (Etiqueta)</label>
+                    <input type="number" min="1" className="form-input" required value={formData.shelfLifeDays} onChange={e => setFormData({...formData, shelfLifeDays: e.target.value})} placeholder="Ej: 10" />
+                  </div>
 
-                <div className="flex gap-2 justify-end mt-2">
-                  <button type="button" className="btn btn-secondary" onClick={cancelForm}>Cancelar</button>
-                  <button type="submit" className="btn btn-primary" disabled={formData.isMix && formData.recipeSeeds.length === 0}>Guardar Producto</button>
-                </div>
-              </form>
+                  <div className="form-group mb-0 p-4 bg-slate-800 rounded-lg border border-slate-700">
+                    <label className="flex items-center gap-2 cursor-pointer mb-2">
+                      <input type="checkbox" checked={formData.isMix} onChange={e => setFormData({...formData, isMix: e.target.checked})} className="w-5 h-5 rounded text-green-500 focus:ring-green-500 bg-slate-700 border-slate-600" />
+                      <span className="font-bold text-gray-300">¿Es un Mix (Mezcla de varias variedades)?</span>
+                    </label>
+                    <p className="text-xs text-gray-400 mb-0">Si es un mix, seleccionarás múltiples semillas. Si no, seleccionarás una sola variedad base.</p>
+                  </div>
+
+                  {!formData.isMix ? (
+                    <div className="form-group mb-0 p-4 bg-slate-50 rounded-lg border border-slate-200">
+                      <label className="form-label font-bold text-slate-700 mb-2">Variedad (Semilla Principal)</label>
+                      <select 
+                        className="form-input" 
+                        required 
+                        value={formData.recipeSeeds.length > 0 ? formData.recipeSeeds[0].seedId : ''}
+                        onChange={e => setFormData({...formData, recipeSeeds: [{ seedId: e.target.value }]})}
+                      >
+                        <option value="">-- Selecciona una semilla --</option>
+                        {(seeds || []).map(seed => (
+                          <option key={seed.id} value={seed.id}>{seed.name}</option>
+                        ))}
+                      </select>
+                      {formData.recipeSeeds.length === 0 && (
+                        <p className="text-xs text-red-500 mt-2 font-bold">Debes seleccionar la semilla base para la trazabilidad.</p>
+                      )}
+                    </div>
+                  ) : (
+                    <div className="form-group mb-0 p-4 bg-indigo-900/30 rounded-lg border border-indigo-500/30">
+                      <label className="form-label font-bold text-indigo-300 mb-3">Receta del Mix (Selecciona las semillas que lo componen)</label>
+                      <div className="grid grid-cols-2 gap-2 max-h-48 overflow-y-auto pr-2 custom-scrollbar">
+                        {(seeds || []).map(seed => {
+                          const isSelected = formData.recipeSeeds.find(s => s.seedId === seed.id);
+                          return (
+                            <label key={seed.id} className={`p-2 rounded cursor-pointer border text-sm flex items-center gap-3 transition-colors ${isSelected ? 'bg-indigo-600 border-indigo-400 text-white' : 'bg-slate-700 border-slate-600 text-gray-300 hover:bg-slate-600'}`}>
+                              <input 
+                                type="checkbox"
+                                checked={!!isSelected}
+                                onChange={() => toggleSeedInRecipe(seed.id)}
+                                className="w-5 h-5 rounded text-indigo-500 focus:ring-indigo-500 border-slate-400 bg-slate-800"
+                              />
+                              <span className="truncate font-semibold" title={seed.name}>{seed.name}</span>
+                            </label>
+                          );
+                        })}
+                      </div>
+                      {formData.recipeSeeds.length === 0 && (
+                        <p className="text-xs text-red-400 mt-2 font-bold">Debes seleccionar al menos una semilla para el mix.</p>
+                      )}
+                    </div>
+                  )}
+
+                  <div className="flex gap-2 justify-end mt-4">
+                    <button type="button" className="btn btn-secondary" onClick={cancelForm}>Cancelar</button>
+                    <button type="submit" className="btn btn-primary" disabled={formData.recipeSeeds.length === 0}>Guardar Producto</button>
+                  </div>
+                </form>
             </div>
           )}
 
