@@ -151,9 +151,9 @@ export default function Crops() {
       await sowCrop(newCrop);
       setNewCrop({ cropTypeId: '', traysCount: 1, selectedSeedBatchId: '' }); 
       setIsSowModalOpen(false);
-      alert("Cultivo plantado con éxito. Stock de semillas y sustrato descontado.");
+      Swal.fire({ title: '¡Cultivo Plantado!', text: 'Stock de semillas y sustrato descontado correctamente.', icon: 'success', confirmButtonColor: '#10b981' });
     } catch (error) {
-      alert(error.message);
+      Swal.fire({ title: 'Error', text: error.message, icon: 'error', confirmButtonColor: '#ef4444' });
     }
   };
 
@@ -164,7 +164,7 @@ export default function Crops() {
     const cropIdsToHarvest = Object.keys(newHarvest.selectedCropUsages).filter(id => newHarvest.selectedCropUsages[id] > 0);
     
     if (cropIdsToHarvest.length === 0) {
-      alert("Debes indicar cuántas bandejas vas a cosechar de al menos un cultivo.");
+      Swal.fire({ title: 'Faltan datos', text: 'Debes indicar cuántas bandejas vas a cosechar de al menos un cultivo.', icon: 'warning', confirmButtonColor: '#f59e0b' });
       return;
     }
 
@@ -202,7 +202,7 @@ export default function Crops() {
     
     setNewHarvest({ productId: '', tuppersCount: 1, selectedCropUsages: {} });
     setIsHarvestModalOpen(false);
-    alert(`Cosecha registrada con el lote Sanidad: ${batchNum}. Generando PDF...`);
+    Swal.fire({ title: '¡Cosecha Registrada!', text: `Se ha guardado el lote de Sanidad: ${batchNum}. Generando etiquetas PDF...`, icon: 'success', confirmButtonColor: '#10b981' });
   };
 
   const handleProductSelect = (productId) => {
