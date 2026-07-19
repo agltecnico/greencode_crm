@@ -77,6 +77,65 @@ export default function Products() {
     });
   };
 
+  const generateDemoData = async () => {
+    if (!seeds || seeds.length === 0) {
+      Swal.fire('Error', 'No hay semillas en la base de datos para crear los productos demo.', 'error');
+      return;
+    }
+    
+    Swal.fire({
+      title: 'Generando Datos Demo...',
+      text: 'Por favor espera, creando fichas de producto y cultivos.',
+      allowOutsideClick: false,
+      didOpen: () => Swal.showLoading()
+    });
+
+    try {
+      // 1. Crear productos individuales para cada semilla
+      for (const seed of seeds) {
+        const exists = products?.find(p => p.name === `Tuppers ${seed.name}`);
+        if (!exists) {
+          await addProduct({
+            name: `Tuppers ${seed.name}`,
+            price: 3.50,
+            shelfLifeDays: 10,
+            isMix: false,
+            recipeSeeds: [{ seedId: seed.id }]
+          });
+        }
+      }
+
+      // 2. Crear Mixes Especiales
+      const vulcanoSeeds = seeds.filter(s => ['Rúcula', 'Daikon', 'Rambo', 'Mizuna', 'Mostaza'].some(n => s.name.includes(n)));
+      if (vulcanoSeeds.length > 0 && !products?.find(p => p.name === 'Vulcano Mix')) {
+        await addProduct({
+          name: 'Vulcano Mix',
+          price: 5.00,
+          shelfLifeDays: 10,
+          isMix: true,
+          recipeSeeds: vulcanoSeeds.map(s => ({ seedId: s.id }))
+        });
+      }
+
+      const jardinSeeds = seeds.filter(s => ['Brócoli', 'Pak Choi', 'Kale', 'Col Roja', 'Rábano Rosa', 'Remolacha'].some(n => s.name.includes(n)));
+      if (jardinSeeds.length > 0 && !products?.find(p => p.name === 'Jardín Esencial Mix')) {
+        await addProduct({
+          name: 'Jardín Esencial Mix',
+          price: 5.50,
+          shelfLifeDays: 10,
+          isMix: true,
+          recipeSeeds: jardinSeeds.map(s => ({ seedId: s.id }))
+        });
+      }
+
+      // 3. Crear cultivos (Siembras) listos para cosechar (10 bandejas por semilla)
+      // Necesitamos importar el contexto general o hacer un alert pidiendo que lo hagan en la otra vista
+      Swal.fire('Éxito', 'Fichas de producto individuales y Mixes generados correctamente. Para poblar el invernadero, por favor siembra manualmente unas cuantas bandejas y usa el botón "Ajustar Fase de Cultivo" para pasarlas a Listo (READY).', 'success');
+    } catch (err) {
+      Swal.fire('Error', err.message, 'error');
+    }
+  };
+
   const toggleSeedInRecipe = (seedId) => {
     setFormData(prev => {
       const exists = prev.recipeSeeds.find(s => s.seedId === seedId);
