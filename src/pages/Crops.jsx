@@ -801,45 +801,81 @@ export default function Crops() {
     </div>
   );
 
-  const calculateCycleDays = (sowDayOfWeek, cType) => {
-    const days = ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb'];
-    let currentDayOffset = 0;
+  const getCycleEventsForCrop = (cType, harvestTargets) => {
+    const events = [];
+    const targets = harvestTargets?.filter(t => t.productId === cType.id) || [];
     
-    // Soaking/Germination
-    const hasSoak = Number(cType.soakingHours) > 0;
-    if (hasSoak) currentDayOffset += 1;
-    const germDay = (sowDayOfWeek + currentDayOffset) % 7;
-    const germWeek = Math.floor((sowDayOfWeek + currentDayOffset) / 7);
+    targets.forEach(ht => {
+      const sowDay = ht.targetDayOfWeek;
+      let currentDayOffset = 0;
+      
+      // Soaking
+      const hasSoak = Number(cType.soakingHours) > 0;
+      if (hasSoak) {
+        currentDayOffset += 1;
+        events.push({
+          type: 'soak',
+          icon: '💧',
+          color: '#3b82f6',
+          dayOfWeek: (sowDay + currentDayOffset) % 7,
+          weekOffset: Math.floor((sowDay + currentDayOffset) / 7),
+          fromSowDay: sowDay
+        });
+      }
+      
+      // Germination (starts either after soak, or immediately on sowDay + germination offset?)
+      // Wait, germDay in previous logic was just the day after soaking. 
+      // Actually, germination starts immediately. If there is soaking, soaking takes 1 day, then germination starts?
+      // Yes, currentDayOffset holds the start of the current phase.
+      const germDayOfWeek = (sowDay + currentDayOffset) % 7;
+      const germWeek = Math.floor((sowDay + currentDayOffset) / 7);
+      events.push({
+        type: 'germ',
+        icon: '🌱',
+        color: '#c026d3', // Fuchsia
+        dayOfWeek: germDayOfWeek,
+        weekOffset: germWeek,
+        fromSowDay: sowDay
+      });
+      
+      // Darkness
+      currentDayOffset += Number(cType.germinationDays) || 0;
+      const hasDarkness = Number(cType.darknessDays) > 0;
+      if (hasDarkness) {
+        events.push({
+          type: 'dark',
+          icon: '🌑',
+          color: '#475569',
+          dayOfWeek: (sowDay + currentDayOffset) % 7,
+          weekOffset: Math.floor((sowDay + currentDayOffset) / 7),
+          fromSowDay: sowDay
+        });
+      }
+      
+      // Light
+      currentDayOffset += Number(cType.darknessDays) || 0;
+      events.push({
+        type: 'light',
+        icon: '☀️',
+        color: '#eab308',
+        dayOfWeek: (sowDay + currentDayOffset) % 7,
+        weekOffset: Math.floor((sowDay + currentDayOffset) / 7),
+        fromSowDay: sowDay
+      });
+      
+      // Harvest
+      currentDayOffset += Number(cType.lightDays) || 0;
+      events.push({
+        type: 'harvest',
+        icon: '✂️',
+        color: '#10b981',
+        dayOfWeek: (sowDay + currentDayOffset) % 7,
+        weekOffset: Math.floor((sowDay + currentDayOffset) / 7),
+        fromSowDay: sowDay
+      });
+    });
     
-    // Darkness
-    currentDayOffset += Number(cType.germinationDays) || 0;
-    const hasDarkness = Number(cType.darknessDays) > 0;
-    const darkDay = hasDarkness ? (sowDayOfWeek + currentDayOffset) % 7 : null;
-    const darkWeek = hasDarkness ? Math.floor((sowDayOfWeek + currentDayOffset) / 7) : 0;
-    
-    // Light
-    currentDayOffset += Number(cType.darknessDays) || 0;
-    const lightDay = (sowDayOfWeek + currentDayOffset) % 7;
-    const lightWeek = Math.floor((sowDayOfWeek + currentDayOffset) / 7);
-    
-    // Harvest
-    currentDayOffset += Number(cType.lightDays) || 0;
-    const harvestDay = (sowDayOfWeek + currentDayOffset) % 7;
-    const harvestWeek = Math.floor((sowDayOfWeek + currentDayOffset) / 7);
-    
-    const formatDay = (dayStr, weekOffset) => {
-      if (weekOffset === 0) return dayStr;
-      if (weekOffset === 1) return dayStr + ' (+1s)';
-      return dayStr + ` (+${weekOffset}s)`;
-    };
-
-    return {
-      soak: hasSoak ? days[sowDayOfWeek] : null,
-      germ: formatDay(days[germDay], germWeek),
-      dark: hasDarkness ? formatDay(days[darkDay], darkWeek) : null,
-      light: formatDay(days[lightDay], lightWeek),
-      harvest: formatDay(days[harvestDay], harvestWeek)
-    };
+    return events;
   };
 
   const handleCellClick = (cType, dayIndex) => {
@@ -889,13 +925,13 @@ export default function Crops() {
 
   const renderPlanificador = () => {
     const tableDays = [
-      { idx: 1, name: 'Lunes' },
-      { idx: 2, name: 'Martes' },
-      { idx: 3, name: 'Miércoles' },
-      { idx: 4, name: 'Jueves' },
-      { idx: 5, name: 'Viernes' },
-      { idx: 6, name: 'Sábado' },
-      { idx: 0, name: 'Domingo' }
+      { idx: 1, name: 'Lunes', short: 'Lun' },
+      { idx: 2, name: 'Martes', short: 'Mar' },
+      { idx: 3, name: 'Miércoles', short: 'Mié' },
+      { idx: 4, name: 'Jueves', short: 'Jue' },
+      { idx: 5, name: 'Viernes', short: 'Vie' },
+      { idx: 6, name: 'Sábado', short: 'Sáb' },
+      { idx: 0, name: 'Domingo', short: 'Dom' }
     ];
 
     return (
@@ -903,14 +939,12 @@ export default function Crops() {
         <div style={{ background: 'linear-gradient(135deg, #f0fdf4, #ccfbf1)', border: '1px solid #99f6e4', padding: '2rem', borderRadius: '20px', marginBottom: '2rem' }}>
           <h2 style={{ margin: '0 0 0.5rem 0', fontSize: '1.8rem', fontWeight: 900, color: '#065f46' }}>Planificador Semanal de Siembra</h2>
           <p style={{ margin: 0, color: '#047857', fontSize: '1.1rem', fontWeight: 500, lineHeight: 1.5 }}>
-            Haz clic en cualquier celda para añadir o modificar la cantidad de bandejas a sembrar.
+            Haz clic en cualquier celda para añadir o modificar la cantidad de bandejas a sembrar. Las fases del ciclo se distribuirán automáticamente en los días correspondientes.
           </p>
         </div>
 
-        
-
         <div style={{ overflowX: 'auto', background: 'white', borderRadius: '16px', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.05)', padding: '1.5rem', marginBottom: '2rem' }}>
-          <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: '800px' }}>
+          <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: '1000px', tableLayout: 'fixed' }}>
             <thead>
               <tr>
                 <th style={{ padding: '1rem', textAlign: 'left', borderBottom: '2px solid #e2e8f0', color: '#475569', width: '200px' }}>Variedad</th>
@@ -920,60 +954,85 @@ export default function Crops() {
               </tr>
             </thead>
             <tbody>
-              {cropTypes?.map(cType => (
-                <tr key={cType.id} style={{ borderBottom: '1px solid #f1f5f9' }}>
-                  <td style={{ padding: '1rem', fontWeight: 700, color: '#1e293b' }}>{cType.name}</td>
-                  {tableDays.map(d => {
-                    const ht = harvestTargets?.find(t => t.productId === cType.id && t.targetDayOfWeek === d.idx);
-                    const cycle = ht ? calculateCycleDays(d.idx, cType) : null;
-                    
-                    return (
-                      <td key={d.idx} style={{ padding: '0.5rem', verticalAlign: 'top' }}>
-                        <div 
-                          onClick={() => handleCellClick(cType, d.idx)}
-                          style={{
-                            height: '100%',
-                            minHeight: '80px',
-                            borderRadius: '12px',
-                            cursor: 'pointer',
-                            display: 'flex',
-                            flexDirection: 'column',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            padding: '0.5rem',
-                            transition: 'all 0.2s ease',
-                            border: ht ? '2px solid #10b981' : '2px dashed #cbd5e1',
-                            background: ht ? '#ecfdf5' : 'transparent',
-                          }}
-                          onMouseEnter={e => {
-                            if (!ht) e.currentTarget.style.background = '#f8fafc';
-                            e.currentTarget.style.transform = 'scale(1.02)';
-                          }}
-                          onMouseLeave={e => {
-                            if (!ht) e.currentTarget.style.background = 'transparent';
-                            e.currentTarget.style.transform = 'scale(1)';
-                          }}
-                        >
-                          {ht ? (
-                            <>
-                              <div style={{ fontSize: '1.5rem', fontWeight: 900, color: '#059669', lineHeight: 1, marginBottom: '0.5rem' }}>{ht.tuppersCount}</div>
-                              <div style={{ fontSize: '0.7rem', display: 'flex', flexDirection: 'column', gap: '2px', width: '100%' }}>
-                                {cycle.soak && <div style={{ display: 'flex', justifyContent: 'space-between', color: '#3b82f6' }}><span>💧</span><span>{cycle.soak}</span></div>}
-                                <div style={{ display: 'flex', justifyContent: 'space-between', color: '#c026d3', fontWeight: 'bold' }}><span>🌱</span><span>{cycle.germ}</span></div>
-                                {cycle.dark && <div style={{ display: 'flex', justifyContent: 'space-between', color: '#475569' }}><span>🌑</span><span>{cycle.dark}</span></div>}
-                                <div style={{ display: 'flex', justifyContent: 'space-between', color: '#eab308' }}><span>☀️</span><span>{cycle.light}</span></div>
-                                <div style={{ display: 'flex', justifyContent: 'space-between', color: '#10b981', fontWeight: 'bold' }}><span>✂️</span><span>{cycle.harvest}</span></div>
+              {cropTypes?.map(cType => {
+                const cropEvents = getCycleEventsForCrop(cType, harvestTargets);
+
+                return (
+                  <tr key={cType.id} style={{ borderBottom: '1px solid #f1f5f9' }}>
+                    <td style={{ padding: '1rem', fontWeight: 700, color: '#1e293b' }}>{cType.name}</td>
+                    {tableDays.map(d => {
+                      const ht = harvestTargets?.find(t => t.productId === cType.id && t.targetDayOfWeek === d.idx);
+                      const eventsToday = cropEvents.filter(e => e.dayOfWeek === d.idx);
+                      
+                      return (
+                        <td key={d.idx} style={{ padding: '0.5rem', verticalAlign: 'top', height: '100%' }}>
+                          <div 
+                            onClick={() => handleCellClick(cType, d.idx)}
+                            style={{
+                              height: '100%',
+                              minHeight: '90px',
+                              borderRadius: '12px',
+                              cursor: 'pointer',
+                              display: 'flex',
+                              flexDirection: 'column',
+                              alignItems: 'center',
+                              justifyContent: 'flex-start',
+                              padding: '0.5rem',
+                              transition: 'all 0.2s ease',
+                              border: ht ? '2px solid #10b981' : '2px dashed #cbd5e1',
+                              background: ht ? '#f0fdf4' : (eventsToday.length > 0 ? '#f8fafc' : 'transparent'),
+                              position: 'relative'
+                            }}
+                            onMouseEnter={e => {
+                              if (!ht) e.currentTarget.style.borderColor = '#94a3b8';
+                              e.currentTarget.style.transform = 'scale(1.02)';
+                            }}
+                            onMouseLeave={e => {
+                              if (!ht) e.currentTarget.style.borderColor = '#cbd5e1';
+                              e.currentTarget.style.transform = 'scale(1)';
+                            }}
+                          >
+                            {ht ? (
+                              <div style={{ fontSize: '1.2rem', fontWeight: 900, color: '#059669', marginBottom: '0.5rem', background: '#d1fae5', padding: '2px 8px', borderRadius: '12px' }}>
+                                📥 Siembra: {ht.tuppersCount}
                               </div>
-                            </>
-                          ) : (
-                            <div style={{ color: '#cbd5e1', fontSize: '1.5rem', fontWeight: 900 }}>+</div>
-                          )}
-                        </div>
-                      </td>
-                    );
-                  })}
-                </tr>
-              ))}
+                            ) : (
+                              eventsToday.length === 0 && <div style={{ color: '#cbd5e1', fontSize: '1.5rem', fontWeight: 900, opacity: 0.5 }}>+</div>
+                            )}
+
+                            {eventsToday.length > 0 && (
+                              <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', width: '100%' }}>
+                                {eventsToday.map((ev, i) => {
+                                  const sourceDay = tableDays.find(td => td.idx === ev.fromSowDay)?.short || '';
+                                  const weekStr = ev.weekOffset > 0 ? ` (+${ev.weekOffset}s)` : '';
+                                  return (
+                                    <div key={i} style={{ 
+                                      display: 'flex', 
+                                      alignItems: 'center', 
+                                      gap: '4px', 
+                                      fontSize: '0.75rem', 
+                                      color: ev.color, 
+                                      fontWeight: ev.type === 'harvest' || ev.type === 'germ' ? 'bold' : 'normal',
+                                      background: 'white',
+                                      padding: '2px 6px',
+                                      borderRadius: '6px',
+                                      border: `1px solid ${ev.color}40`,
+                                      boxShadow: '0 1px 2px rgba(0,0,0,0.05)'
+                                    }}>
+                                      <span>{ev.icon}</span>
+                                      <span>de {sourceDay}{weekStr}</span>
+                                    </div>
+                                  );
+                                })}
+                              </div>
+                            )}
+                          </div>
+                        </td>
+                      );
+                    })}
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         </div>
