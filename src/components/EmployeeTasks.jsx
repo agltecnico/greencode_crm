@@ -105,7 +105,7 @@ export default function EmployeeTasks() {
     });
 
     harvestTargets?.forEach(routine => {
-      const cType = cropTypes?.find(ct => String(ct.id) === String(routine.productId));
+      const cType = cropTypes?.find(ct => ct.id == routine.productId);
       if(!cType) return;
       const seed = seeds?.find(s => s.id === cType.seedId);
       if(!seed) return;
@@ -129,20 +129,20 @@ export default function EmployeeTasks() {
         tDate.setHours(0,0,0,0);
         return crops.some(c => {
           if (c.status === 'DISCARDED' || c.status === 'HARVESTED') return false;
-            if (String(c.cropTypeId) !== String(routine.productId) && String(c.seedId) !== String(routine.productId)) return false;
+            if (c.cropTypeId != routine.productId && c.seedId != routine.productId) return false;
           const cDate = new Date(c.datePlanted);
           cDate.setHours(0,0,0,0);
           return Math.abs((cDate - tDate) / 86400000) <= 1;
         });
       };
 
-      if(plantWd === targetDayOfWeek) {
+      if(plantWd == targetDayOfWeek) {
         tasksForDate.push({ type: 'plant', title: `Plantar ${cType.name}`, desc: `Rutina semanal: ${routine.tuppersCount} bandejas`, icon: '🌱', className: 'plant', cropTypeId: cType.id, trays: routine.tuppersCount });
       }
       
       const hasDarkness = Number(cType.darknessDays) > 0;
 
-      if(germWd === targetDayOfWeek) {
+      if(germWd == targetDayOfWeek) {
         // Germination happens automatically on plant or after soak, usually don't need a manual task for germ if we just planted, 
         // but if soak was 1 day, then germ is the day after.
         if (soakHrs > 0) {
@@ -150,15 +150,15 @@ export default function EmployeeTasks() {
         }
       }
 
-      if(hasDarkness && darkWd === targetDayOfWeek) {
+      if(hasDarkness && darkWd == targetDayOfWeek) {
         tasksForDate.push({ type: 'dark', title: `A Oscuridad: ${cType.name}`, desc: `Rutina esperada`, icon: '🌑', className: 'dark', cropTypeId: cType.id });
       }
 
-      if(lightWd === targetDayOfWeek) {
+      if(lightWd == targetDayOfWeek) {
         tasksForDate.push({ type: 'light', title: `A Luz: ${cType.name}`, desc: `Rutina esperada`, icon: '☀️', className: 'light', cropTypeId: cType.id });
       }
 
-      if(harvestWd === targetDayOfWeek) {
+      if(harvestWd == targetDayOfWeek) {
         tasksForDate.push({ type: 'harvest', title: `Cosechar ${cType.name}`, desc: `Rutina esperada: ${routine.tuppersCount} bandejas`, icon: '✂️', className: 'harvest', cropTypeId: cType.id });
       }
     });
