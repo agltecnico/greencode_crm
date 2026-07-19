@@ -59,6 +59,24 @@ export default function Products() {
     setFormData({ name: '', price: '', shelfLifeDays: 10, isMix: false, recipeSeeds: [] });
   };
 
+  const handleDeleteProduct = (productId) => {
+    Swal.fire({
+      title: '⚠️ ATENCIÓN ADMINISTRACIÓN',
+      text: 'Vas a eliminar permanentemente este producto del catálogo. Esta acción no se puede deshacer y afectará a la trazabilidad histórica de los envasados. ¿Estás absolutamente seguro?',
+      icon: 'warning',
+      showCancelButton: true,
+      confirmButtonColor: '#dc2626',
+      cancelButtonColor: '#64748b',
+      confirmButtonText: 'Sí, eliminar producto',
+      cancelButtonText: 'Cancelar'
+    }).then((result) => {
+      if (result.isConfirmed) {
+        deleteProduct(productId);
+        Swal.fire('Eliminado', 'El producto ha sido borrado del catálogo.', 'success');
+      }
+    });
+  };
+
   const toggleSeedInRecipe = (seedId) => {
     setFormData(prev => {
       const exists = prev.recipeSeeds.find(s => s.seedId === seedId);
@@ -322,7 +340,7 @@ export default function Products() {
                     <button className="text-blue-400 hover:text-blue-300" onClick={() => handleEditClick(product)} title="Editar">
                       <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" width="16" height="16"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" /></svg>
                     </button>
-                    <button className="text-red-400 hover:text-red-300" onClick={() => deleteProduct(product.id)} title="Eliminar">
+                    <button className="text-red-400 hover:text-red-300" onClick={() => handleDeleteProduct(product.id)} title="Eliminar">
                       <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" width="16" height="16"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
                     </button>
                   </div>

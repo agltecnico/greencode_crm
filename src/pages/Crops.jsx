@@ -44,12 +44,12 @@ export default function Crops() {
   
   const handleDeleteCrop = (crop) => {
     Swal.fire({
-      title: '¿Eliminar Siembra?',
-      text: "Esto borrará la siembra por completo de la base de datos (usar solo para errores de registro). ¿Estás seguro?",
-      icon: 'error',
+      title: '⚠️ ATENCIÓN ADMINISTRACIÓN',
+      text: 'Vas a eliminar permanentemente este registro de cultivo. Esta acción no se puede deshacer y afectará a la trazabilidad histórica. ¿Estás absolutamente seguro?',
+      icon: 'warning',
       showCancelButton: true,
       confirmButtonColor: '#dc2626',
-      cancelButtonColor: '#94a3b8',
+      cancelButtonColor: '#64748b',
       confirmButtonText: 'Sí, eliminar',
       cancelButtonText: 'Cancelar'
     }).then((result) => {
