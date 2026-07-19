@@ -100,7 +100,7 @@ export default function Crops() {
 
   const [newCrop, setNewCrop] = useState({ cropTypeId: '', traysCount: 1, selectedSeedBatchId: '' });
   const [newTarget, setNewTarget] = useState({ targetDayOfWeek: 1, productId: '', tuppersCount: 1 });
-  const [newHarvest, setNewHarvest] = useState({ productId: '', tuppersCount: 1, selectedCropIds: [] });
+  const [newHarvest, setNewHarvest] = useState({ productId: '', tuppersCount: 1, selectedCropUsages: {} });
 
   // Computed properties for seed availability
   const selectedCropType = cropTypes?.find(c => c.id === newCrop.cropTypeId);
@@ -161,23 +161,30 @@ export default function Crops() {
   
   const handleRegisterHarvest = async (e) => {
     e.preventDefault();
-    if (newHarvest.selectedCropIds.length === 0) {
-      alert("Debes seleccionar al menos una bandeja para cosechar.");
+    const cropIdsToHarvest = Object.keys(newHarvest.selectedCropUsages).filter(id => newHarvest.selectedCropUsages[id] > 0);
+    
+    if (cropIdsToHarvest.length === 0) {
+      alert("Debes indicar cuántas bandejas vas a cosechar de al menos un cultivo.");
       return;
     }
 
     const batchNum = `L-${Date.now().toString().slice(-6)}`;
     
-    // 1. Mark selected crops as HARVESTED
-    for (const cropId of newHarvest.selectedCropIds) {
+    // 1. Mark selected crops as HARVESTED or partially update trays
+    for (const cropId of cropIdsToHarvest) {
       const cropToHarvest = crops.find(c => c.id === cropId);
+      const consumedTrays = newHarvest.selectedCropUsages[cropId];
       if (cropToHarvest) {
-        await updateCrop(cropId, { status: 'HARVESTED' });
+        if (consumedTrays >= cropToHarvest.traysCount) {
+          await updateCrop(cropId, { status: 'HARVESTED' });
+        } else {
+          await updateCrop(cropId, { traysCount: cropToHarvest.traysCount - consumedTrays });
+        }
       }
     }
 
     // 2. Register the harvest product
-    addHarvest({...newHarvest, harvestDate: new Date().toISOString(), batchNumber: batchNum});
+    addHarvest({...newHarvest, selectedCropIds: cropIdsToHarvest, harvestDate: new Date().toISOString(), batchNumber: batchNum});
       
       // Añadir al inventario de Nevera (Productos Finales)
       if (newHarvest.productId && newHarvest.tuppersCount > 0) {
@@ -192,33 +199,13 @@ export default function Crops() {
     const product = products?.find(p => p.id === newHarvest.productId);
     generateLabelPDF(product?.name || 'Desconocido', batchNum, product?.shelfLifeDays || 10, newHarvest.tuppersCount);
     
-    setNewHarvest({ productId: '', tuppersCount: 1, selectedCropIds: [] });
+    setNewHarvest({ productId: '', tuppersCount: 1, selectedCropUsages: {} });
     setIsHarvestModalOpen(false);
     alert(`Cosecha registrada con el lote Sanidad: ${batchNum}. Generando PDF...`);
   };
 
   const handleProductSelect = (productId) => {
-    setNewHarvest(prev => ({ ...prev, productId }));
-    const product = products?.find(p => p.id === productId);
-    if (!product) return;
-    
-    if (product.recipeSeeds && product.recipeSeeds.length > 0) {
-      const allowedSeedIds = product.recipeSeeds.map(rs => rs.seedId);
-      const autoSelectedIds = [];
-      
-      allowedSeedIds.forEach(seedId => {
-        // Find all growing crops matching this seedId or cropTypeId (since cropType matches seedId 1-to-1 usually)
-        // Wait, crop.seedId might be null if it's relying on cropTypeId. We need to check both.
-        const matchingCrops = crops.filter(c => ['SOAKING', 'GERMINATING', 'DARKNESS', 'LIGHT', 'READY'].includes(c.status) && (c.seedId === seedId || c.cropTypeId === seedId || cropTypes?.find(ct => ct.id === c.cropTypeId)?.seedId === seedId));
-        
-        matchingCrops.sort((a, b) => new Date(a.datePlanted || a.plantedAt) - new Date(b.datePlanted || b.plantedAt));
-        if (matchingCrops.length > 0) {
-          autoSelectedIds.push(matchingCrops[0].id);
-        }
-      });
-
-      setNewHarvest(prev => ({ ...prev, selectedCropIds: autoSelectedIds }));
-    }
+    setNewHarvest(prev => ({ ...prev, productId, selectedCropUsages: {} }));
   };
 
   const generateLabelPDF = (productName, batch, shelfLife, copies) => {
@@ -705,7 +692,7 @@ export default function Crops() {
                   
                   <button 
                     onClick={() => {
-                      setNewHarvest(prev => ({ ...prev, selectedCropIds: [crop.id] }));
+                      setNewHarvest(prev => ({ ...prev, selectedCropUsages: { [crop.id]: crop.traysCount } }));
                       setIsHarvestModalOpen(true);
                     }}
                     style={{ marginTop: 'auto', width: '100%', backgroundColor: '#16a34a', color: 'white', fontWeight: 'bold', padding: '0.75rem', borderRadius: '8px', border: 'none', cursor: 'pointer', transition: 'background-color 0.2s, transform 0.1s', display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '0.5rem' }}
@@ -1301,50 +1288,82 @@ export default function Crops() {
                 </div>
 
                 <div>
-                  <label className="text-sm font-semibold mb-2 block flex justify-between">
-                    <span>2. Selecciona las bandejas que vas a cortar:</span>
+                  <label className="text-sm font-semibold mb-2 block">
+                    2. Selecciona las bandejas que vas a cortar:
                   </label>
-                  <div className="max-h-48 overflow-y-auto border border-slate-300 rounded-lg p-2 bg-slate-50 flex flex-col gap-2">
-                    {(crops?.filter(c => c.status === 'LIGHT' || c.status === 'READY') || []).map(crop => {
-                      const cType = cropTypes?.find(c => c.id === crop.seedId || c.id === crop.cropTypeId);
-                      const isChecked = newHarvest.selectedCropIds.includes(crop.id);
-                      
+                  <div className="max-h-64 overflow-y-auto border border-slate-300 rounded-lg p-2 bg-slate-50 flex flex-col gap-3">
+                    {(() => {
                       const harvestProduct = products?.find(p => p.id === newHarvest.productId);
-                      const hasRecipe = harvestProduct?.recipeSeeds && harvestProduct.recipeSeeds.length > 0;
-                      const allowedSeedIds = hasRecipe ? harvestProduct.recipeSeeds.map(rs => rs.seedId) : [];
-                      
-                      const actualSeedId = crop.seedId || cropTypes?.find(ct => ct.id === crop.cropTypeId)?.seedId;
-                      const isAllowed = !hasRecipe || allowedSeedIds.includes(actualSeedId);
+                      if (!harvestProduct) return <p className="text-slate-500 text-sm text-center py-2">Selecciona un producto primero.</p>;
 
-                      return (
-                        <label key={crop.id} className={`flex items-center gap-3 p-2 bg-white rounded border cursor-pointer transition-colors ${!isAllowed ? 'opacity-40 border-red-100 bg-red-50 cursor-not-allowed' : isChecked ? 'border-green-500 bg-green-50' : 'border-slate-200 hover:bg-slate-50'}`}>
-                          <input 
-                            type="checkbox" 
-                            className="w-5 h-5 text-green-600 rounded focus:ring-green-500 disabled:opacity-50"
-                            checked={isChecked}
-                            disabled={!isAllowed}
-                            onChange={(e) => {
-                              if (e.target.checked) {
-                                setNewHarvest(prev => ({ ...prev, selectedCropIds: [...prev.selectedCropIds, crop.id] }));
-                              } else {
-                                setNewHarvest(prev => ({ ...prev, selectedCropIds: prev.selectedCropIds.filter(id => id !== crop.id) }));
-                              }
-                            }}
-                          />
-                          <div className="flex-1 flex justify-between">
-                            <span className="font-semibold text-slate-700">{cType?.name || 'Desconocido'} <span className="font-normal text-slate-500 text-sm">({crop.traysCount} bandejas)</span></span>
-                            {!isAllowed && hasRecipe ? (
-                              <span className="text-xs text-red-500 font-bold px-2 py-1">No permitido en la receta</span>
-                            ) : (
-                              <span className="text-xs bg-slate-200 text-slate-600 px-2 py-1 rounded font-mono">{crop.batchNumber}</span>
-                            )}
+                      const hasRecipe = harvestProduct.recipeSeeds && harvestProduct.recipeSeeds.length > 0;
+                      const allowedSeedIds = hasRecipe ? harvestProduct.recipeSeeds.map(rs => rs.seedId) : [];
+
+                      let availableCrops = crops?.filter(c => c.status === 'LIGHT' || c.status === 'READY') || [];
+                      
+                      // Filter by recipe if it has one
+                      if (hasRecipe) {
+                        availableCrops = availableCrops.filter(c => {
+                          const actualSeedId = c.seedId || cropTypes?.find(ct => ct.id === c.cropTypeId)?.seedId;
+                          return allowedSeedIds.includes(actualSeedId);
+                        });
+                      }
+
+                      if (availableCrops.length === 0) {
+                        return <p className="text-slate-500 text-sm text-center py-2">No hay cultivos listos para las variedades requeridas.</p>;
+                      }
+
+                      // Group by variety
+                      const grouped = {};
+                      availableCrops.forEach(crop => {
+                        const cType = cropTypes?.find(c => c.id === crop.seedId || c.id === crop.cropTypeId);
+                        const name = cType?.name || 'Desconocido';
+                        if (!grouped[name]) grouped[name] = [];
+                        grouped[name].push(crop);
+                      });
+
+                      return Object.entries(grouped).map(([varietyName, varietyCrops]) => (
+                        <div key={varietyName} className="bg-white border border-slate-200 rounded p-2">
+                          <h4 className="font-bold text-sm text-indigo-700 mb-2 border-b pb-1">{varietyName}</h4>
+                          <div className="flex flex-col gap-2">
+                            {varietyCrops.map(crop => {
+                              const consumed = newHarvest.selectedCropUsages[crop.id] || 0;
+                              return (
+                                <div key={crop.id} className="flex items-center justify-between gap-3 p-2 bg-slate-50 rounded border border-slate-200 hover:border-indigo-300 transition-colors">
+                                  <div className="flex-1">
+                                    <div className="flex justify-between items-center">
+                                      <span className="font-semibold text-slate-700 text-sm">Lote: <span className="font-mono bg-slate-200 px-1 rounded">{crop.batchNumber}</span></span>
+                                      <span className="text-xs text-slate-500">Disp: <strong>{crop.traysCount}</strong> bandejas</span>
+                                    </div>
+                                    <div className="text-xs text-slate-400 mt-1">Días: {Math.floor((new Date() - new Date(crop.datePlanted || crop.plantedAt)) / (1000 * 60 * 60 * 24))}</div>
+                                  </div>
+                                  
+                                  <div className="flex items-center gap-2">
+                                    <span className="text-xs font-bold text-slate-500">Usar:</span>
+                                    <input 
+                                      type="number"
+                                      min="0"
+                                      max={crop.traysCount}
+                                      value={consumed}
+                                      onChange={(e) => {
+                                        let val = parseInt(e.target.value) || 0;
+                                        if (val > crop.traysCount) val = crop.traysCount;
+                                        if (val < 0) val = 0;
+                                        setNewHarvest(prev => ({
+                                          ...prev,
+                                          selectedCropUsages: { ...prev.selectedCropUsages, [crop.id]: val }
+                                        }));
+                                      }}
+                                      className="w-16 p-1 text-center border border-slate-300 rounded focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500"
+                                    />
+                                  </div>
+                                </div>
+                              );
+                            })}
                           </div>
-                        </label>
-                      );
-                    })}
-                    {(crops?.filter(c => c.status === 'LIGHT' || c.status === 'READY') || []).length === 0 && (
-                      <p className="text-slate-500 text-sm text-center py-2">No hay cultivos listos para cosechar.</p>
-                    )}
+                        </div>
+                      ));
+                    })()}
                   </div>
                 </div>
 
