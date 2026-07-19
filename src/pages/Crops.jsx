@@ -257,14 +257,7 @@ export default function Crops() {
     setIsHarvestModalOpen(true);
   };
 
-  const generateLabelPDF = (productName, batch, shelfLife, copies, nutritionalInfo, varietiesText) => {
-    import('../utils/labelPdf.js').then(module => {
-      module.generateLabelPDF(productName, batch, shelfLife, copies, nutritionalInfo, varietiesText);
-    }).catch(err => {
-      console.error("Error loading PDF generator", err);
-    });
-  };
-
+  
   const getVarietiesText = (recipeSeeds) => {
     if (!recipeSeeds || !recipeSeeds.length) return '';
     return recipeSeeds.map(rs => {
