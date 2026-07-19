@@ -206,7 +206,23 @@ export default function Crops() {
   };
 
   const handleProductSelect = (productId) => {
-    setNewHarvest(prev => ({ ...prev, productId, selectedCropUsages: {} }));
+    setNewHarvest(prev => {
+      const newProduct = products?.find(p => p.id === productId);
+      if (!newProduct) return { ...prev, productId, selectedCropUsages: {} };
+      
+      const allowedSeedIds = newProduct.recipeSeeds?.map(rs => rs.seedId) || [];
+      const validUsages = {};
+      
+      for (const [cropId, qty] of Object.entries(prev.selectedCropUsages)) {
+        const crop = crops?.find(c => c.id === cropId);
+        const actualSeedId = crop?.seedId || cropTypes?.find(ct => ct.id === crop?.cropTypeId)?.seedId;
+        if (allowedSeedIds.includes(actualSeedId)) {
+          validUsages[cropId] = qty;
+        }
+      }
+      
+      return { ...prev, productId, selectedCropUsages: validUsages };
+    });
   };
 
   const openHarvestModalForCrop = (crop) => {
@@ -218,8 +234,8 @@ export default function Crops() {
     const actualSeedId = crop.seedId || cropTypes?.find(ct => ct.id === crop.cropTypeId)?.seedId;
     if (actualSeedId) {
       const compatibleProducts = products?.filter(p => p.recipeSeeds?.some(rs => rs.seedId === actualSeedId)) || [];
-      if (compatibleProducts.length === 1) {
-        // Auto-seleccionar si solo hay una opción posible (ej. Variedad individual o único mix)
+      if (compatibleProducts.length > 0) {
+        // Auto-seleccionar el primer producto compatible por defecto para no dejar el Step 2 bloqueado
         setNewHarvest(prev => ({ ...prev, selectedCropUsages: usages, productId: compatibleProducts[0].id }));
       }
     }
