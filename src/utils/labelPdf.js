@@ -1,5 +1,5 @@
 import { jsPDF } from 'jspdf';
-import 'jspdf-autotable';
+import autoTable from 'jspdf-autotable';
 
 export const generateLabelPDF = (productName, batchNumber, shelfLifeDays, count, nutritionalInfo, varietiesText = '') => {
   try {
@@ -76,7 +76,7 @@ export const generateLabelPDF = (productName, batchNumber, shelfLifeDays, count,
 
       const tableY = infoY + 15 + (splitVarieties.length * 3);
       
-      doc.autoTable({
+      autoTable(doc, {
         startY: tableY,
         theme: 'grid',
         margin: { left: 5, right: 5 },
