@@ -3,6 +3,7 @@ import 'jspdf-autotable';
 
 export const generateLabelPDF = (productName, batchNumber, shelfLifeDays, count, nutritionalInfo, varietiesText = '') => {
   try {
+    alert("Generando PDF... Revisa tu carpeta de Descargas al terminar.");
     const todayDate = new Date();
     const expDate = new Date(todayDate.getTime() + ((shelfLifeDays || 10) * 24 * 60 * 60 * 1000));
     
@@ -104,6 +105,7 @@ export const generateLabelPDF = (productName, batchNumber, shelfLifeDays, count,
     }
 
     doc.save(`Etiquetas_${batchNumber}.pdf`);
+    alert("¡PDF descargado! Revisa la flecha de descargas arriba a la derecha en Chrome/Edge.");
   } catch (error) {
     console.error("Error al generar PDF:", error);
     alert("Error al generar las etiquetas: " + error.message);
