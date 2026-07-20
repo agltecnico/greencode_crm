@@ -204,6 +204,7 @@ export default function Crops() {
     setNewHarvest({ productId: '', tuppersCount: 1, selectedCropUsages: {} });
     setIsHarvestModalOpen(false);
     
+    setTimeout(() => {
       Swal.fire({ 
         title: '¡Cosecha Registrada!', 
         text: `Se ha guardado el lote de Sanidad: ${batchNum}. ¿Deseas imprimir las etiquetas ahora?`, 
@@ -218,6 +219,7 @@ export default function Crops() {
           handlePrintLabelsSafe(product, batchNum, newHarvest.tuppersCount);
         }
       });
+    }, 300);
   };
 
   const handleProductSelect = (productId) => {
