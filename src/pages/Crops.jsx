@@ -215,7 +215,7 @@ export default function Crops() {
         cancelButtonText: 'Cerrar'
       }).then((result) => {
         if (result.isConfirmed) {
-          generateLabelPDF(product?.name || 'Desconocido', batchNum, product?.shelfLifeDays || 10, newHarvest.tuppersCount, product?.nutritionalInfo, getVarietiesText(product?.recipeSeeds));
+          handlePrintLabelsSafe(product, batchNum, newHarvest.tuppersCount);
         }
       });
   };
@@ -260,11 +260,35 @@ export default function Crops() {
 
   
   const getVarietiesText = (recipeSeeds) => {
-    if (!recipeSeeds || !recipeSeeds.length) return '';
-    return recipeSeeds.map(rs => {
-      const s = seeds?.find(x => x.id === rs.seedId);
-      return s ? s.name : '';
-    }).filter(Boolean).join(', ');
+    try {
+      if (!Array.isArray(recipeSeeds)) return '';
+      if (recipeSeeds.length === 0) return '';
+      return recipeSeeds.map(rs => {
+        // We use stockEntries or articles if seeds is not available, but since seeds isn't in useData
+        // we will just return empty string or we can find it in articles.
+        const s = articles?.find(x => x.id === rs.seedId);
+        return s ? s.name : '';
+      }).filter(Boolean).join(', ');
+    } catch (e) {
+      console.error("Error en getVarietiesText:", e);
+      return '';
+    }
+  };
+
+  const handlePrintLabelsSafe = (product, batchNum, tuppersCount) => {
+    try {
+      generateLabelPDF(
+        product?.name || 'Desconocido', 
+        batchNum, 
+        product?.shelfLifeDays || 10, 
+        tuppersCount, 
+        product?.nutritionalInfo, 
+        getVarietiesText(product?.recipeSeeds)
+      );
+    } catch (e) {
+      console.error("Error llamando a generateLabelPDF:", e);
+      Swal.fire('Error', 'Hubo un error al preparar la etiqueta: ' + e.message, 'error');
+    }
   };
 
   // Modal Styles
