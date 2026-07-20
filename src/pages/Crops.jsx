@@ -2,6 +2,7 @@
 import { useState, useMemo, useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useData } from '../context/DataContext';
+import { generateLabelPDF } from '../utils/labelPdf.js';
 import EmployeeTasks from '../components/EmployeeTasks';
 import Supplies from './Supplies';
 import '../crops.css';
