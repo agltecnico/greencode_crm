@@ -649,20 +649,58 @@ export const DataProvider = ({ children }) => {
       const order = orders.find(o => o.id === id);
       if (order && order.items) {
         // Comprobar si ya restamos el stock de este pedido para no duplicar
-        const existingMovements = productMovements.filter(m => m.referenceId === id && m.type === 'ORDER');
-        if (existingMovements.length === 0) {
-          // Crear un movimiento negativo por cada item
-          for (const item of order.items) {
-            if (item.productId && item.quantity > 0) {
-              await addProductMovement({
-                productId: item.productId,
-                quantity: -Math.abs(item.quantity),
-                type: 'ORDER',
-                referenceId: order.id
-              });
+        const existingMovements = productMovements.filter(m => m.type === 'ORDER' && (m.referenceId === id || m.referenceId.startsWith(id + '|')));
+          if (existingMovements.length === 0) {
+            for (const item of order.items) {
+              if (item.productId && item.quantity > 0) {
+                let quantityToFulfill = item.quantity;
+                
+                const harvestMovements = productMovements
+                  .filter(m => m.type === 'HARVEST' && m.productId === item.productId)
+                  .sort((a, b) => new Date(a.createdAt || a.date) - new Date(b.createdAt || b.date));
+                  
+                const batchStats = {};
+                for (const hm of harvestMovements) {
+                  const batch = hm.referenceId;
+                  if (!batchStats[batch]) batchStats[batch] = 0;
+                  batchStats[batch] += hm.quantity;
+                }
+                
+                const orderMovements = productMovements.filter(m => m.type === 'ORDER' && m.productId === item.productId);
+                for (const om of orderMovements) {
+                  if (om.referenceId && om.referenceId.includes('|')) {
+                    const batch = om.referenceId.split('|')[1];
+                    if (batchStats[batch] !== undefined) {
+                      batchStats[batch] -= Math.abs(om.quantity);
+                    }
+                  }
+                }
+                
+                const availableBatches = Object.entries(batchStats).filter(([b, q]) => q > 0);
+                
+                for (const [batch, availableQty] of availableBatches) {
+                  if (quantityToFulfill <= 0) break;
+                  const consumeQty = Math.min(availableQty, quantityToFulfill);
+                  await addProductMovement({
+                    productId: item.productId,
+                    quantity: -consumeQty,
+                    type: 'ORDER',
+                    referenceId: `${order.id}|${batch}`
+                  });
+                  quantityToFulfill -= consumeQty;
+                }
+                
+                if (quantityToFulfill > 0) {
+                  await addProductMovement({
+                    productId: item.productId,
+                    quantity: -quantityToFulfill,
+                    type: 'ORDER',
+                    referenceId: order.id
+                  });
+                }
+              }
             }
           }
-        }
       }
     }
     // ----------------------------------------------------------------

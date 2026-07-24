@@ -684,6 +684,17 @@ export default function Crops() {
         >
           📦 Producto Terminado
         </button>
+        <button 
+          onClick={() => setHarvestTab('historico')}
+          style={{ 
+            background: 'none', border: 'none', padding: '0.5rem 1rem', cursor: 'pointer', fontSize: '1.1rem', fontWeight: 'bold',
+            color: harvestTab === 'historico' ? '#0f172a' : '#64748b',
+            borderBottom: harvestTab === 'historico' ? '3px solid #0f172a' : '3px solid transparent',
+            marginBottom: '-0.65rem', transition: 'all 0.2s'
+          }}
+        >
+          📖 Histórico y Trazabilidad
+        </button>
       </div>
 
       {harvestTab === 'inventario' && (
@@ -733,7 +744,64 @@ export default function Crops() {
                   <div className="mt-3 text-xs font-bold p-2 rounded" style={{ background: 'rgba(239, 68, 68, 0.2)', color: '#fca5a5', border: '1px solid rgba(239, 68, 68, 0.3)' }}>
                     ⚠️ Faltan {Math.abs(available)} tuppers
                   </div>
+                )}\n
+      {harvestTab === 'historico' && (
+        <div className="premium-card mb-6" style={{ background: 'white', border: '1px solid #e2e8f0', borderRadius: '16px', overflow: 'hidden', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.05)' }}>
+          <h3 style={{ margin: 0, background: '#f8fafc', borderBottom: '1px solid #e2e8f0', padding: '1.25rem 1.5rem', fontSize: '1.25rem', color: '#1e293b', fontWeight: 'bold' }}>
+            📖 Trazabilidad de Salidas
+          </h3>
+          <div style={{ padding: '1.5rem', overflowX: 'auto' }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
+              <thead>
+                <tr style={{ borderBottom: '2px solid #e2e8f0', color: '#64748b', fontSize: '0.85rem', textTransform: 'uppercase' }}>
+                  <th style={{ padding: '1rem' }}>Fecha</th>
+                  <th style={{ padding: '1rem' }}>Cliente</th>
+                  <th style={{ padding: '1rem' }}>Producto</th>
+                  <th style={{ padding: '1rem' }}>Cantidad</th>
+                  <th style={{ padding: '1rem' }}>Lote de Sanidad (Trazabilidad)</th>
+                </tr>
+              </thead>
+              <tbody>
+                {productMovements?.filter(m => m.type === 'ORDER' && m.quantity < 0).sort((a,b) => new Date(b.createdAt) - new Date(a.createdAt)).map(m => {
+                  let orderId = m.referenceId;
+                  let batchNum = 'Sin Lote';
+                  if (m.referenceId && m.referenceId.includes('|')) {
+                    const parts = m.referenceId.split('|');
+                    orderId = parts[0];
+                    batchNum = parts[1];
+                  }
+                  
+                  const order = orders?.find(o => o.id === orderId);
+                  const client = clients?.find(c => c.id === order?.clientId);
+                  const product = products?.find(p => p.id === m.productId);
+                  const harvestDate = harvests?.find(h => h.batchNumber === batchNum)?.harvestDate;
+                  
+                  return (
+                    <tr key={m.id} style={{ borderBottom: '1px solid #f1f5f9' }}>
+                      <td style={{ padding: '1rem', color: '#475569' }}>{new Date(m.createdAt).toLocaleDateString()}</td>
+                      <td style={{ padding: '1rem', fontWeight: 'bold', color: '#1e293b' }}>{client?.name || 'Venta Desconocida'}</td>
+                      <td style={{ padding: '1rem', color: '#334155' }}>{product?.name || 'Desconocido'}</td>
+                      <td style={{ padding: '1rem', color: '#ef4444', fontWeight: 'bold' }}>{m.quantity}</td>
+                      <td style={{ padding: '1rem' }}>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
+                          <span style={{ fontWeight: 'bold', color: '#0f766e' }}>{batchNum}</span>
+                          {harvestDate && <span style={{ fontSize: '0.75rem', color: '#64748b' }}>Cosechado: {new Date(harvestDate).toLocaleDateString()}</span>}
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
+                {productMovements?.filter(m => m.type === 'ORDER' && m.quantity < 0).length === 0 && (
+                  <tr>
+                    <td colSpan="5" style={{ padding: '2rem', textAlign: 'center', color: '#94a3b8' }}>No hay ventas registradas aún.</td>
+                  </tr>
                 )}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
               </div>
             );
           })}
