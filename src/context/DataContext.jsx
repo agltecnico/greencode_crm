@@ -15,7 +15,7 @@ export const DataProvider = ({ children }) => {
 
     const sanitizeForeignKeys = (obj) => {
       const copy = { ...obj };
-      ['providerId', 'seedId', 'substrateId', 'containerId', 'articleId', 'clientId'].forEach(k => {
+      ['providerId', 'varietyId', 'seedId', 'substrateId', 'containerId', 'articleId', 'clientId'].forEach(k => {
         if (copy[k] === '') copy[k] = null;
       });
       return copy;
@@ -53,6 +53,7 @@ export const DataProvider = ({ children }) => {
   });
 
   const [providers, setProviders] = useState([]);
+  const [seedVarieties, setSeedVarieties] = useState([]);
   const [articles, setArticles] = useState([]);
   const [stockEntries, setStockEntries] = useState([]);
   const [stockLots, setStockLots] = useState([]);
@@ -87,6 +88,7 @@ export const DataProvider = ({ children }) => {
           supabase.from('expenses').select('*').order('createdAt', { ascending: true }),
           supabase.from('company_profile').select('*').limit(1),
           supabase.from('providers').select('*'),
+          supabase.from('seed_varieties').select('*').order('name'),
           supabase.from('articles').select('*'),
           supabase.from('stock_entries').select('*'),
           supabase.from('stock_lots').select('*').order('receivedAt', { ascending: true }),
@@ -112,6 +114,7 @@ export const DataProvider = ({ children }) => {
           { data: expensesData },
           { data: profileData },
           { data: providersData },
+          { data: seedVarietiesData },
           { data: articlesData },
           { data: stockEntriesData },
           { data: stockLotsData },
@@ -157,6 +160,7 @@ export const DataProvider = ({ children }) => {
           }
         
         if (providersData) setProviders(providersData);
+        if (seedVarietiesData) setSeedVarieties(seedVarietiesData);
         if (articlesData) setArticles(articlesData);
         if (stockEntriesData) setStockEntries(stockEntriesData);
         if (stockLotsData) setStockLots(stockLotsData);
@@ -314,6 +318,34 @@ export const DataProvider = ({ children }) => {
   };
 
   // Unified Articles and Stock Entries
+    const addSeedVariety = async (variety) => {
+      const tempId = createId();
+      const newItem = { ...variety, id: tempId, active: variety.active ?? true };
+      setSeedVarieties(prev => [...prev, newItem]);
+      const { data, error } = await supabase.from('seed_varieties').insert([newItem]).select();
+      if (error) {
+        alert('Error guardando la variedad: ' + error.message);
+        setSeedVarieties(prev => prev.filter(i => i.id !== tempId));
+        return null;
+      }
+      if (data?.[0]) setSeedVarieties(prev => prev.map(i => i.id === tempId ? data[0] : i));
+      return data?.[0]?.id || tempId;
+    };
+    const updateSeedVariety = async (id, fields) => {
+      setSeedVarieties(prev => prev.map(i => i.id === id ? { ...i, ...fields } : i));
+      return persistOrReload(
+        () => supabase.from('seed_varieties').update(fields).eq('id', id),
+        'actualizar la variedad'
+      );
+    };
+    const deleteSeedVariety = async (id) => {
+      setSeedVarieties(prev => prev.filter(i => i.id !== id));
+      return persistOrReload(
+        () => supabase.from('seed_varieties').delete().eq('id', id),
+        'eliminar la variedad'
+      );
+    };
+
     const addArticle = async (article) => {
       const tempId = createId();
       const newItem = { ...article, id: tempId };
@@ -1314,6 +1346,7 @@ export const DataProvider = ({ children }) => {
       companyProfile, updateCompanyProfile, companyLogo, updateCompanyLogo,
 
       providers, addProvider, updateProvider, deleteProvider,
+        seedVarieties, addSeedVariety, updateSeedVariety, deleteSeedVariety,
         articles, stockEntries, stockLots, purchaseDeliveryNotes, purchaseDeliveryNoteLines,
         addArticle, updateArticle, deleteArticle, addStockEntry, updateStockEntry, deleteStockEntry,
         receivePurchaseDeliveryNote, deletePurchaseDeliveryNote,
