@@ -9,6 +9,9 @@ import '../crops.css';
 import React from 'react';
 import Swal from 'sweetalert2';
 
+const createHarvestBatchNumber = () =>
+  `L-${Date.now().toString(36).toUpperCase()}-${crypto.randomUUID().slice(0, 4).toUpperCase()}`;
+
 class ErrorBoundary extends React.Component {
   constructor(props) {
     super(props);
@@ -73,6 +76,11 @@ export default function Crops() {
   const [isSowModalOpen, setIsSowModalOpen] = useState(false);
   const [isHarvestModalOpen, setIsHarvestModalOpen] = useState(false);
   const [searchParams, setSearchParams] = useSearchParams();
+  const [showPhaseChangeModal, setShowPhaseChangeModal] = useState(null);
+  const [pendingPhase, setPendingPhase] = useState(null);
+  const [newCrop, setNewCrop] = useState({ cropTypeId: '', traysCount: 1, selectedSeedBatchId: '' });
+  const [newTarget, setNewTarget] = useState({ targetDayOfWeek: 1, productId: '', tuppersCount: 1 });
+  const [newHarvest, setNewHarvest] = useState({ productId: '', tuppersCount: 1, selectedCropUsages: {} });
 
   useEffect(() => {
     const action = searchParams.get('action');
@@ -95,13 +103,6 @@ export default function Crops() {
       }
     }
   }, [searchParams, setSearchParams]);
-
-  const [showPhaseChangeModal, setShowPhaseChangeModal] = useState(null);
-  const [pendingPhase, setPendingPhase] = useState(null);
-
-  const [newCrop, setNewCrop] = useState({ cropTypeId: '', traysCount: 1, selectedSeedBatchId: '' });
-  const [newTarget, setNewTarget] = useState({ targetDayOfWeek: 1, productId: '', tuppersCount: 1 });
-  const [newHarvest, setNewHarvest] = useState({ productId: '', tuppersCount: 1, selectedCropUsages: {} });
 
   // Computed properties for seed availability
   const selectedCropType = cropTypes?.find(c => c.id === newCrop.cropTypeId);
@@ -130,7 +131,7 @@ export default function Crops() {
     if (oldestBatch && newCrop.cropTypeId && !newCrop.selectedSeedBatchId) {
       setNewCrop(prev => ({ ...prev, selectedSeedBatchId: oldestBatch }));
     }
-  }, [oldestBatch, newCrop.cropTypeId]);
+  }, [oldestBatch, newCrop.cropTypeId, newCrop.selectedSeedBatchId]);
 
   const handleAddCrop = async (e) => { 
     e.preventDefault(); 
@@ -169,7 +170,7 @@ export default function Crops() {
       return;
     }
 
-    const batchNum = `L-${Date.now().toString().slice(-6)}`;
+    const batchNum = createHarvestBatchNumber();
     
     // 1. Mark selected crops as HARVESTED or partially update trays
     for (const cropId of cropIdsToHarvest) {
@@ -178,24 +179,33 @@ export default function Crops() {
       if (cropToHarvest) {
         const remaining = cropToHarvest.traysCount - consumedTrays;
         if (remaining <= 0) {
-          await updateCrop(cropId, { traysCount: 0, status: 'HARVESTED' });
+          const result = await updateCrop(cropId, { traysCount: 0, status: 'HARVESTED' });
+          if (result?.error) return;
         } else {
-          await updateCrop(cropId, { traysCount: remaining });
+          const result = await updateCrop(cropId, { traysCount: remaining });
+          if (result?.error) return;
         }
       }
     }
 
     // 2. Register the harvest product
-    addHarvest({...newHarvest, selectedCropIds: cropIdsToHarvest, harvestDate: new Date().toISOString(), batchNumber: batchNum});
+    const harvestId = await addHarvest({
+      ...newHarvest,
+      selectedCropIds: cropIdsToHarvest,
+      harvestDate: new Date().toISOString(),
+      batchNumber: batchNum
+    });
+    if (!harvestId) return;
       
       // Añadir al inventario de Nevera (Productos Finales)
       if (newHarvest.productId && newHarvest.tuppersCount > 0) {
-        await addProductMovement({
+        const movementId = await addProductMovement({
           productId: newHarvest.productId,
           quantity: newHarvest.tuppersCount,
           type: 'HARVEST',
           referenceId: batchNum
         });
+        if (!movementId) return;
       }
 
     const product = products?.find(p => p.id === newHarvest.productId);

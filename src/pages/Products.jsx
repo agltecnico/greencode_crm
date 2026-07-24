@@ -1,5 +1,6 @@
 import { useState, useMemo } from 'react';
 import { useData } from '../context/DataContext';
+import Swal from 'sweetalert2';
 
 export default function Products() {
   const { products, addProduct, updateProduct, deleteProduct, seeds, productMovements, orders } = useData();

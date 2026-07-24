@@ -97,7 +97,11 @@ export default function Invoices() {
        return new Date(inv.date).getFullYear() === year && isSameType;
     });
     
-    const seqStr = String(typedInvoicesThisYear.length + 1).padStart(4, '0');
+    const lastSequence = typedInvoicesThisYear.reduce((max, invoice) => {
+      const sequence = Number(String(invoice.invoiceNumber || '').split('-').pop());
+      return Number.isFinite(sequence) ? Math.max(max, sequence) : max;
+    }, 0);
+    const seqStr = String(lastSequence + 1).padStart(4, '0');
     const invoiceNumber = documentType === 'SUMMARY' ? `ALB${year}-${seqStr}` : `F${year}-${seqStr}`;
 
     const subtotal = calculateInvoiceTotal();
