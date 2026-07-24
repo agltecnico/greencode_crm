@@ -38,7 +38,7 @@ export default function Crops() {
   const { requireAdmin } = useAdminMode();
   const { 
     crops, sowCrop, updateCrop, advanceCropStatus, setCropPhase, discardCrop, deleteCrop,
-    stockEntries, stockLots, articles,
+    stockEntries, stockLots, articles, seedVarieties,
     cropTypes,
     harvestTargets, addHarvestTarget, updateHarvestTarget, deleteHarvestTarget,
     harvests, addHarvest,
@@ -46,6 +46,22 @@ export default function Crops() {
     products,
     orders, clients, updateOrderList
   } = useData();
+
+  const cropVarietyId = (crop) => {
+    const cropType = cropTypes?.find(ct => ct.id === crop?.cropTypeId || ct.id === crop?.seedId);
+    if (cropType?.varietyId) return cropType.varietyId;
+    const seedId = crop?.seedId || cropType?.seedId;
+    return articles?.find(article => article.id === seedId)?.varietyId || null;
+  };
+
+  const productVarietyIds = (product) => {
+    if (Array.isArray(product?.recipeVarieties) && product.recipeVarieties.length) {
+      return product.recipeVarieties.map(item => item.varietyId);
+    }
+    return (product?.recipeSeeds || []).map(item =>
+      articles?.find(article => article.id === item.seedId)?.varietyId
+    ).filter(Boolean);
+  };
 
   
   const handleDeleteCrop = async (crop) => {
@@ -230,13 +246,12 @@ export default function Crops() {
       const newProduct = products?.find(p => p.id === productId);
       if (!newProduct) return { ...prev, productId, selectedCropUsages: {} };
       
-      const allowedSeedIds = newProduct.recipeSeeds?.map(rs => rs.seedId) || [];
+      const allowedVarietyIds = productVarietyIds(newProduct);
       const validUsages = {};
       
       for (const [cropId, qty] of Object.entries(prev.selectedCropUsages)) {
         const crop = crops?.find(c => c.id === cropId);
-        const actualSeedId = crop?.seedId || cropTypes?.find(ct => ct.id === crop?.cropTypeId)?.seedId;
-        if (allowedSeedIds.includes(actualSeedId)) {
+        if (allowedVarietyIds.includes(cropVarietyId(crop))) {
           validUsages[cropId] = qty;
         }
       }
@@ -251,9 +266,9 @@ export default function Crops() {
     setNewHarvest(prev => ({ ...prev, selectedCropUsages: usages, productId: '' }));
     
     // 2. Buscar si hay algún producto que encaje con esta semilla
-    const actualSeedId = crop.seedId || cropTypes?.find(ct => ct.id === crop.cropTypeId)?.seedId;
-    if (actualSeedId) {
-      const compatibleProducts = products?.filter(p => p.recipeSeeds?.some(rs => rs.seedId === actualSeedId)) || [];
+    const actualVarietyId = cropVarietyId(crop);
+    if (actualVarietyId) {
+      const compatibleProducts = products?.filter(p => productVarietyIds(p).includes(actualVarietyId)) || [];
       if (compatibleProducts.length > 0) {
         // Auto-seleccionar el primer producto compatible por defecto para no dejar el Step 2 bloqueado
         setNewHarvest(prev => ({ ...prev, selectedCropUsages: usages, productId: compatibleProducts[0].id }));
@@ -288,7 +303,8 @@ export default function Crops() {
         product?.shelfLifeDays || 10, 
         tuppersCount, 
         product?.nutritionalInfo, 
-        getVarietiesText(product?.recipeSeeds)
+        (productVarietyIds(product).map(id => seedVarieties?.find(v => v.id === id)?.name).filter(Boolean).join(', ')
+          || getVarietiesText(product?.recipeSeeds))
       );
     } catch (e) {
       console.error("Error llamando a generateLabelPDF:", e);
@@ -1448,14 +1464,11 @@ export default function Crops() {
             {(() => {
               // Calcular bandejas listas por producto
               const getReadyTrays = (p) => {
-                const hasRecipe = p.recipeSeeds && p.recipeSeeds.length > 0;
+                const allowedIds = productVarietyIds(p);
+                const hasRecipe = allowedIds.length > 0;
                 let avail = crops?.filter(c => c.status === 'READY' && (c.traysCount > 0 || c.trays > 0)) || [];
                 if (hasRecipe) {
-                  const allowedIds = p.recipeSeeds.map(rs => rs.seedId);
-                  avail = avail.filter(c => {
-                    const actualSeedId = c.seedId || cropTypes?.find(ct => ct.id === c.cropTypeId)?.seedId;
-                    return allowedIds.includes(actualSeedId);
-                  });
+                  avail = avail.filter(c => allowedIds.includes(cropVarietyId(c)));
                 }
                 return avail.reduce((acc, c) => acc + (c.traysCount || c.trays || 0), 0);
               };
@@ -1481,14 +1494,13 @@ export default function Crops() {
               const harvestProduct = products?.find(p => p.id === newHarvest.productId);
               if (!harvestProduct) return <div style={{ textAlign: 'center', color: '#94a3b8', padding: '1rem 0' }}>Selecciona un producto arriba para ver las bandejas.</div>;
 
-              const hasRecipe = harvestProduct.recipeSeeds && harvestProduct.recipeSeeds.length > 0;
-              const allowedSeedIds = hasRecipe ? harvestProduct.recipeSeeds.map(rs => rs.seedId) : [];
+              const allowedVarietyIds = productVarietyIds(harvestProduct);
+              const hasRecipe = allowedVarietyIds.length > 0;
 
               let availableCrops = crops?.filter(c => c.status === 'READY' && (c.traysCount > 0 || c.trays > 0)) || [];
               if (hasRecipe) {
                 availableCrops = availableCrops.filter(c => {
-                  const actualSeedId = c.seedId || cropTypes?.find(ct => ct.id === c.cropTypeId)?.seedId;
-                  return allowedSeedIds.includes(actualSeedId);
+                  return allowedVarietyIds.includes(cropVarietyId(c));
                 });
               }
 

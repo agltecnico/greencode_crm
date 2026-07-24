@@ -6,7 +6,8 @@ import Swal from 'sweetalert2';
 
 export default function Supplies() {
   const { 
-    providers, 
+    providers,
+    seedVarieties, addSeedVariety, updateSeedVariety, deleteSeedVariety,
     articles, addArticle, updateArticle, deleteArticle,
     stockEntries, stockLots, purchaseDeliveryNotes, receivePurchaseDeliveryNote, deletePurchaseDeliveryNote,
     deleteStockEntry,
@@ -23,7 +24,8 @@ export default function Supplies() {
   const [expProvider, setExpProvider] = useState('');
 
   // Forms State
-  const [newArticle, setNewArticle] = useState({ name: '', type: 'SEMILLA', minStock: 0, providerId: '', unit: 'g', supplierReference: '' });
+  const [newArticle, setNewArticle] = useState({ name: '', type: 'SEMILLA', minStock: 0, providerId: '', varietyId: '', unit: 'g', supplierReference: '' });
+  const [newVariety, setNewVariety] = useState({ name: '', description: '' });
   const [editingArticleId, setEditingArticleId] = useState(null);
   const [editedArticle, setEditedArticle] = useState(null);
   const [editingCropTypeId, setEditingCropTypeId] = useState(null);
@@ -42,10 +44,16 @@ export default function Supplies() {
   // Handlers
   const handleAddArticle = e => { 
     e.preventDefault(); 
-    const payload = { ...newArticle, providerId: newArticle.providerId || null };
+    const payload = { ...newArticle, providerId: newArticle.providerId || null, varietyId: newArticle.type === 'SEMILLA' ? newArticle.varietyId : null };
     addArticle(payload);
-    setNewArticle({name:'', type:'SEMILLA', minStock: 0, providerId: '', unit: 'g', supplierReference: ''});
+    setNewArticle({name:'', type:'SEMILLA', minStock: 0, providerId: '', varietyId: '', unit: 'g', supplierReference: ''});
     setShowArticleModal(false);
+  };
+
+  const handleAddVariety = async e => {
+    e.preventDefault();
+    const created = await addSeedVariety({ name: newVariety.name.trim().toUpperCase(), description: newVariety.description.trim(), active: true });
+    if (created) setNewVariety({ name: '', description: '' });
   };
   
   const handleAddStockEntry = async e => {
@@ -85,6 +93,7 @@ export default function Supplies() {
   const handleAddCropType = e => {
     e.preventDefault();
     const payload = { ...newType };
+    payload.varietyId = articles?.find(article => article.id === payload.seedId)?.varietyId || null;
     if (payload.providerId === '') payload.providerId = null;
     if (payload.substrateId === '') payload.substrateId = null;
     if (payload.containerId === '') payload.containerId = null;
@@ -226,6 +235,7 @@ export default function Supplies() {
       <div className="admin-tabs" style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem' }}>
         <button className={`admin-tab ${activeTab === 'INVENTORY' ? 'active' : ''}`} onClick={() => setActiveTab('INVENTORY')}>Inventario (Stock)</button>
         <button className={`admin-tab ${activeTab === 'CATALOG' ? 'active' : ''}`} onClick={() => setActiveTab('CATALOG')}>Catálogo de Artículos</button>
+        <button className={`admin-tab ${activeTab === 'VARIETIES' ? 'active' : ''}`} onClick={() => setActiveTab('VARIETIES')}>Variedades</button>
         <button className={`admin-tab ${activeTab === 'STOCK' ? 'active' : ''}`} onClick={() => setActiveTab('STOCK')}>Albaranes de Entrada</button>
           <button className={`admin-tab ${activeTab === 'STOCK_OUT' ? 'active' : ''}`} onClick={() => setActiveTab('STOCK_OUT')}>Salidas / Consumos</button>
         <button className={`admin-tab ${activeTab === 'EXPENSES' ? 'active' : ''}`} onClick={() => setActiveTab('EXPENSES')}>Historial de Gastos</button>
@@ -313,6 +323,42 @@ export default function Supplies() {
                     );
                   });
                 })()}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
+      {activeTab === 'VARIETIES' && (
+        <div style={{ animation: 'fadeIn 0.3s ease' }}>
+          <div className="premium-card mb-4">
+            <h3 className="font-bold text-lg mb-2">Catálogo de variedades agronómicas</h3>
+            <p className="text-muted text-sm mb-4">La variedad no depende del proveedor. Después se crea una referencia de compra por cada proveedor.</p>
+            <form onSubmit={handleAddVariety} className="grid grid-cols-1 md:grid-cols-3 gap-3">
+              <input required className="premium-input" placeholder="Nombre (ej. RÁBANO RAMBO)" value={newVariety.name} onChange={e => setNewVariety({ ...newVariety, name: e.target.value })} />
+              <input className="premium-input" placeholder="Descripción opcional" value={newVariety.description} onChange={e => setNewVariety({ ...newVariety, description: e.target.value })} />
+              <button className="btn btn-primary" type="submit">+ Crear variedad</button>
+            </form>
+          </div>
+          <div className="table-container">
+            <table className="admin-table">
+              <thead><tr><th>Variedad</th><th>Descripción</th><th>Estado</th><th>Acciones</th></tr></thead>
+              <tbody>
+                {seedVarieties?.map(variety => (
+                  <tr key={variety.id}>
+                    <td className="font-bold">{variety.name}</td>
+                    <td>{variety.description || '-'}</td>
+                    <td>{variety.active === false ? 'Inactiva' : 'Activa'}</td>
+                    <td>
+                      <div className="flex gap-2">
+                        <button className="btn btn-secondary" onClick={() => updateSeedVariety(variety.id, { active: variety.active === false })}>
+                          {variety.active === false ? 'Activar' : 'Desactivar'}
+                        </button>
+                        {isAdminMode && <button className="btn btn-danger" onClick={() => runAdminDelete('Solo se puede borrar si no tiene referencias, fichas o productos asociados.', () => deleteSeedVariety(variety.id))}>Eliminar</button>}
+                      </div>
+                    </td>
+                  </tr>
+                ))}
               </tbody>
             </table>
           </div>
@@ -736,6 +782,7 @@ export default function Supplies() {
                                 if (payload.substrateId === '') payload.substrateId = null;
                                 if (payload.containerId === '') payload.containerId = null;
                                 if (payload.seedId === '') payload.seedId = null;
+                                payload.varietyId = articles?.find(article => article.id === payload.seedId)?.varietyId || null;
                                 updateCropType(c.id, payload); 
                                 setEditingCropTypeId(null); 
                               }}>Guardar Ficha</button>
@@ -830,6 +877,15 @@ export default function Supplies() {
               </div>
               {['SEMILLA', 'SUSTRATO', 'ENVASE', 'OTRO'].includes(newArticle.type) && (
                 <>
+                  {newArticle.type === 'SEMILLA' && (
+                    <div>
+                      <label className="form-label">Variedad agronómica</label>
+                      <select required className="form-control" value={newArticle.varietyId} onChange={e => setNewArticle({...newArticle, varietyId: e.target.value})}>
+                        <option value="">Selecciona...</option>
+                        {seedVarieties?.filter(v => v.active !== false).map(variety => <option key={variety.id} value={variety.id}>{variety.name}</option>)}
+                      </select>
+                    </div>
+                  )}
                   <div>
                     <label className="form-label">Proveedor de esta referencia</label>
                     <select required className="form-control" value={newArticle.providerId} onChange={e => setNewArticle({...newArticle, providerId: e.target.value})}>
