@@ -68,14 +68,17 @@ class GlobalErrorBoundary extends React.Component {
 }
 
 import { DataProvider } from './context/DataContext.jsx'
+import { AdminModeProvider } from './context/AdminModeContext.jsx'
 import './index.css'
 
 createRoot(document.getElementById('root')).render(
   <StrictMode>
     <BrowserRouter>
-      <DataProvider>
-        <GlobalErrorBoundary><App /></GlobalErrorBoundary>
-      </DataProvider>
+      <AdminModeProvider>
+        <DataProvider>
+          <GlobalErrorBoundary><App /></GlobalErrorBoundary>
+        </DataProvider>
+      </AdminModeProvider>
     </BrowserRouter>
   </StrictMode>,
 )

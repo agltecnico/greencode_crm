@@ -55,6 +55,9 @@ export const DataProvider = ({ children }) => {
   const [providers, setProviders] = useState([]);
   const [articles, setArticles] = useState([]);
   const [stockEntries, setStockEntries] = useState([]);
+  const [stockLots, setStockLots] = useState([]);
+  const [purchaseDeliveryNotes, setPurchaseDeliveryNotes] = useState([]);
+  const [purchaseDeliveryNoteLines, setPurchaseDeliveryNoteLines] = useState([]);
   const [cropTypes, setCropTypes] = useState([]);
 
   const [crops, setCrops] = useState([]);
@@ -86,6 +89,9 @@ export const DataProvider = ({ children }) => {
           supabase.from('providers').select('*'),
           supabase.from('articles').select('*'),
           supabase.from('stock_entries').select('*'),
+          supabase.from('stock_lots').select('*').order('receivedAt', { ascending: true }),
+          supabase.from('purchase_delivery_notes').select('*').order('date', { ascending: false }),
+          supabase.from('purchase_delivery_note_lines').select('*'),
           supabase.from('crop_types').select('*'),
           supabase.from('crops').select('*').order('createdAt', { ascending: true }),
           supabase.from('harvest_targets').select('*'),
@@ -108,6 +114,9 @@ export const DataProvider = ({ children }) => {
           { data: providersData },
           { data: articlesData },
           { data: stockEntriesData },
+          { data: stockLotsData },
+          { data: purchaseDeliveryNotesData },
+          { data: purchaseDeliveryNoteLinesData },
           { data: cropTypesData },
           { data: cropsData },
           { data: harvestTargetsData },
@@ -150,6 +159,9 @@ export const DataProvider = ({ children }) => {
         if (providersData) setProviders(providersData);
         if (articlesData) setArticles(articlesData);
         if (stockEntriesData) setStockEntries(stockEntriesData);
+        if (stockLotsData) setStockLots(stockLotsData);
+        if (purchaseDeliveryNotesData) setPurchaseDeliveryNotes(purchaseDeliveryNotesData);
+        if (purchaseDeliveryNoteLinesData) setPurchaseDeliveryNoteLines(purchaseDeliveryNoteLinesData);
         if (cropTypesData) setCropTypes(cropTypesData);
         if (cropsData) setCrops(cropsData);
           // if (cropsData && cropTypesData) autoAdvanceCrops(cropsData, cropTypesData);
@@ -359,6 +371,32 @@ export const DataProvider = ({ children }) => {
     };
 
     
+    const receivePurchaseDeliveryNote = async ({ providerId, number, date, notes = '', lines }) => {
+      const { data, error } = await persistOrReload(
+        () => supabase.rpc('receive_purchase_delivery_note', {
+          p_provider_id: providerId,
+          p_number: number,
+          p_date: date,
+          p_notes: notes,
+          p_lines: lines
+        }),
+        'guardar el albarán de entrada'
+      );
+      if (error) return null;
+      await refreshData({ force: true });
+      return data;
+    };
+
+    const deletePurchaseDeliveryNote = async (id) => {
+      const result = await persistOrReload(
+        () => supabase.rpc('delete_unused_purchase_delivery_note', { p_note_id: id }),
+        'eliminar el albarán de entrada'
+      );
+      if (result.error) return false;
+      await refreshData({ force: true });
+      return true;
+    };
+
     const addCropType = async (item) => {
       item = sanitizeForeignKeys(item);
       const tempId = createId();
@@ -454,6 +492,19 @@ export const DataProvider = ({ children }) => {
     };
 
   const sowCrop = async (newCrop) => {
+    if (newCrop.stockLotId) {
+      const { data, error } = await persistOrReload(
+        () => supabase.rpc('sow_crop_from_lot', {
+          p_crop_type_id: newCrop.cropTypeId,
+          p_trays: Number(newCrop.traysCount || 1),
+          p_stock_lot_id: newCrop.stockLotId
+        }),
+        'registrar la siembra y consumir su lote'
+      );
+      if (error) throw error;
+      await refreshData({ force: true });
+      return data?.cropId || data;
+    }
     // 1. Get the CropType definition
     const cType = cropTypes.find(c => c.id === newCrop.cropTypeId);
     if (!cType) throw new Error("Ficha de cultivo no encontrada.");
@@ -1263,7 +1314,9 @@ export const DataProvider = ({ children }) => {
       companyProfile, updateCompanyProfile, companyLogo, updateCompanyLogo,
 
       providers, addProvider, updateProvider, deleteProvider,
-        articles, stockEntries, addArticle, updateArticle, deleteArticle, addStockEntry, updateStockEntry, deleteStockEntry,
+        articles, stockEntries, stockLots, purchaseDeliveryNotes, purchaseDeliveryNoteLines,
+        addArticle, updateArticle, deleteArticle, addStockEntry, updateStockEntry, deleteStockEntry,
+        receivePurchaseDeliveryNote, deletePurchaseDeliveryNote,
         cropTypes, addCropType, updateCropType, deleteCropType,
         seeds, addSeed, updateSeed, deleteSeed,
         seedInventory, addSeedInventory, updateSeedInventory, deleteSeedInventory,

@@ -1,9 +1,11 @@
 import { useState, useMemo } from 'react';
 import { useData } from '../context/DataContext';
 import Swal from 'sweetalert2';
+import { useAdminMode } from '../context/AdminModeContext';
 
 export default function Products() {
   const { products, addProduct, updateProduct, deleteProduct, seeds, productMovements, orders } = useData();
+  const { isAdminMode, requireAdmin } = useAdminMode();
   const [activeTab, setActiveTab] = useState('NEVERA'); // 'NEVERA', 'MOVIMIENTOS', 'CATALOG'
   const [isAdding, setIsAdding] = useState(false);
   const [editingId, setEditingId] = useState(null);
@@ -66,6 +68,8 @@ export default function Products() {
   };
 
   const handleDeleteProduct = (productId) => {
+    requireAdmin().then(allowed => {
+      if (!allowed) return;
     Swal.fire({
       title: '⚠️ ATENCIÓN ADMINISTRACIÓN',
       text: 'Vas a eliminar permanentemente este producto del catálogo. Esta acción no se puede deshacer y afectará a la trazabilidad histórica de los envasados. ¿Estás absolutamente seguro?',
@@ -80,6 +84,7 @@ export default function Products() {
         deleteProduct(productId);
         Swal.fire('Eliminado', 'El producto ha sido borrado del catálogo.', 'success');
       }
+    });
     });
   };
 
@@ -455,9 +460,9 @@ export default function Products() {
                     <button className="text-blue-400 hover:text-blue-300" onClick={() => handleEditClick(product)} title="Editar">
                       <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" width="16" height="16"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" /></svg>
                     </button>
-                    <button className="text-red-400 hover:text-red-300" onClick={() => handleDeleteProduct(product.id)} title="Eliminar">
+                    {isAdminMode && <button className="text-red-400 hover:text-red-300" onClick={() => handleDeleteProduct(product.id)} title="Eliminar">
                       <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" width="16" height="16"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
-                    </button>
+                    </button>}
                   </div>
                 </div>
                 

@@ -8,6 +8,7 @@ import Supplies from './Supplies';
 import '../crops.css';
 import React from 'react';
 import Swal from 'sweetalert2';
+import { useAdminMode } from '../context/AdminModeContext';
 
 const createHarvestBatchNumber = () =>
   `L-${Date.now().toString(36).toUpperCase()}-${crypto.randomUUID().slice(0, 4).toUpperCase()}`;
@@ -34,9 +35,10 @@ class ErrorBoundary extends React.Component {
 
 export default function Crops() {
   const navigate = useNavigate();
+  const { requireAdmin } = useAdminMode();
   const { 
     crops, sowCrop, updateCrop, advanceCropStatus, setCropPhase, discardCrop, deleteCrop,
-    stockEntries, articles,
+    stockEntries, stockLots, articles,
     cropTypes,
     harvestTargets, addHarvestTarget, updateHarvestTarget, deleteHarvestTarget,
     harvests, addHarvest,
@@ -46,7 +48,8 @@ export default function Crops() {
   } = useData();
 
   
-  const handleDeleteCrop = (crop) => {
+  const handleDeleteCrop = async (crop) => {
+    if (!(await requireAdmin())) return;
     Swal.fire({
       title: '⚠️ ATENCIÓN ADMINISTRACIÓN',
       text: 'Vas a eliminar permanentemente este registro de cultivo. Esta acción no se puede deshacer y afectará a la trazabilidad histórica. ¿Estás absolutamente seguro?',
@@ -78,7 +81,7 @@ export default function Crops() {
   const [searchParams, setSearchParams] = useSearchParams();
   const [showPhaseChangeModal, setShowPhaseChangeModal] = useState(null);
   const [pendingPhase, setPendingPhase] = useState(null);
-  const [newCrop, setNewCrop] = useState({ cropTypeId: '', traysCount: 1, selectedSeedBatchId: '' });
+  const [newCrop, setNewCrop] = useState({ cropTypeId: '', traysCount: 1, stockLotId: '' });
   const [newTarget, setNewTarget] = useState({ targetDayOfWeek: 1, productId: '', tuppersCount: 1 });
   const [newHarvest, setNewHarvest] = useState({ productId: '', tuppersCount: 1, selectedCropUsages: {} });
 
@@ -88,7 +91,7 @@ export default function Crops() {
       const cId = searchParams.get('cropTypeId');
       const trays = searchParams.get('trays');
       if (cId) {
-        setNewCrop(prev => ({ ...prev, cropTypeId: cId, traysCount: trays || 1, selectedSeedBatchId: '' }));
+        setNewCrop(prev => ({ ...prev, cropTypeId: cId, traysCount: trays || 1, stockLotId: '' }));
         setIsSowModalOpen(true);
         // Clean URL so it doesn't reopen on refresh
         setSearchParams({});
@@ -106,32 +109,22 @@ export default function Crops() {
 
   // Computed properties for seed availability
   const selectedCropType = cropTypes?.find(c => c.id === newCrop.cropTypeId);
-  const totalAvailableSeed = stockEntries?.filter(e => e.articleId === selectedCropType?.seedId).reduce((acc, curr) => acc + Number(curr.quantity || 0), 0) || 0;
+  const totalAvailableSeed = stockLots?.filter(l => l.articleId === selectedCropType?.seedId).reduce((acc, curr) => acc + Number(curr.remainingQuantity || 0), 0) || 0;
 
   const availableBatches = useMemo(() => {
     if (!selectedCropType?.seedId) return [];
-    const entries = stockEntries?.filter(e => e.articleId === selectedCropType.seedId) || [];
-    const batches = {};
-    entries.forEach(e => {
-      const batch = e.batchNumber || 'SIN_LOTE';
-      if (!batches[batch]) batches[batch] = { batchNumber: batch, quantity: 0, date: e.purchaseDate || e.createdAt || '' };
-      batches[batch].quantity += Number(e.quantity || 0);
-      const eDate = e.purchaseDate || e.createdAt || '';
-      if (eDate && eDate < batches[batch].date) batches[batch].date = eDate;
-    });
-    
-    return Object.values(batches)
-      .filter(b => b.quantity > 0)
-      .sort((a, b) => String(a.date || '').localeCompare(String(b.date || ''))); // Oldest first
-  }, [selectedCropType, stockEntries]);
+    return (stockLots || [])
+      .filter(l => l.articleId === selectedCropType.seedId && Number(l.remainingQuantity || 0) > 0)
+      .sort((a, b) => String(a.receivedAt || a.createdAt || '').localeCompare(String(b.receivedAt || b.createdAt || '')));
+  }, [selectedCropType, stockLots]);
 
-  const oldestBatch = availableBatches.length > 0 ? availableBatches[0].batchNumber : '';
+  const oldestBatch = availableBatches.length > 0 ? availableBatches[0].id : '';
 
   useEffect(() => {
-    if (oldestBatch && newCrop.cropTypeId && !newCrop.selectedSeedBatchId) {
-      setNewCrop(prev => ({ ...prev, selectedSeedBatchId: oldestBatch }));
+    if (oldestBatch && newCrop.cropTypeId && !newCrop.stockLotId) {
+      setNewCrop(prev => ({ ...prev, stockLotId: oldestBatch }));
     }
-  }, [oldestBatch, newCrop.cropTypeId, newCrop.selectedSeedBatchId]);
+  }, [oldestBatch, newCrop.cropTypeId, newCrop.stockLotId]);
 
   const handleAddCrop = async (e) => { 
     e.preventDefault(); 
@@ -151,7 +144,7 @@ export default function Crops() {
         }
       }
       await sowCrop(newCrop);
-      setNewCrop({ cropTypeId: '', traysCount: 1, selectedSeedBatchId: '' }); 
+      setNewCrop({ cropTypeId: '', traysCount: 1, stockLotId: '' });
       setIsSowModalOpen(false);
       Swal.fire({ title: '¡Cultivo Plantado!', text: 'Stock de semillas y sustrato descontado correctamente.', icon: 'success', confirmButtonColor: '#10b981' });
     } catch (error) {
@@ -498,7 +491,7 @@ export default function Crops() {
                     {tasks.map((t, idx) => (
                       <div key={idx} 
                           onClick={() => {
-                            setNewCrop(prev => ({ ...prev, cropTypeId: t.cropTypeId, traysCount: t.trays, selectedSeedBatchId: '' }));
+                            setNewCrop(prev => ({ ...prev, cropTypeId: t.cropTypeId, traysCount: t.trays, stockLotId: '' }));
                             setIsSowModalOpen(true);
                           }}
                           style={{ flex: '1 1 min-content', minWidth: '250px', display: 'flex', justifyContent: 'space-between', padding: '1rem', backgroundColor: 'white', borderRadius: '0.75rem', border: '1px solid #cbd5e1', cursor: 'pointer', transition: 'all 0.2s', boxShadow: '0 1px 3px rgba(0,0,0,0.1)' }}
@@ -1337,7 +1330,7 @@ export default function Crops() {
                 🖥️ Lanzar en Modo TV
               </button>
             </div>
-            <EmployeeTasks onTaskAction={(task) => { if (task.type === 'plant') { setNewCrop(prev => ({ ...prev, cropTypeId: task.cropTypeId, traysCount: task.trays || 1, selectedSeedBatchId: '' })); setIsSowModalOpen(true); } else if (task.type === 'harvest') { setIsHarvestModalOpen(true); } }} />
+            <EmployeeTasks onTaskAction={(task) => { if (task.type === 'plant') { setNewCrop(prev => ({ ...prev, cropTypeId: task.cropTypeId, traysCount: task.trays || 1, stockLotId: '' })); setIsSowModalOpen(true); } else if (task.type === 'harvest') { setIsHarvestModalOpen(true); } }} />
           </div>
         )}
         {activeTab === 'lotes' && renderLotes()}
@@ -1367,7 +1360,7 @@ export default function Crops() {
                   <form onSubmit={handleAddCrop} style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
                   <div>
                     <label style={{ fontSize: '0.875rem', fontWeight: 'bold', marginBottom: '0.5rem', display: 'block', color: '#334155' }}>1. ¿Qué vas a plantar?</label>
-                    <select className="premium-input" style={{ width: '100%', padding: '1rem', borderRadius: '0.75rem', border: '2px solid #e2e8f0', background: '#f8fafc', fontSize: '1rem', fontWeight: '500', boxSizing: 'border-box' }} required value={newCrop.cropTypeId} onChange={e=>setNewCrop({...newCrop, cropTypeId: e.target.value, selectedSeedBatchId: ''})}>
+                    <select className="premium-input" style={{ width: '100%', padding: '1rem', borderRadius: '0.75rem', border: '2px solid #e2e8f0', background: '#f8fafc', fontSize: '1rem', fontWeight: '500', boxSizing: 'border-box' }} required value={newCrop.cropTypeId} onChange={e=>setNewCrop({...newCrop, cropTypeId: e.target.value, stockLotId: ''})}>
                       <option value="">Selecciona una variedad...</option>
                       {cropTypes?.map(c => (
                         <option key={c.id} value={c.id}>{c.name}</option>
@@ -1390,17 +1383,17 @@ export default function Crops() {
 
                         <div style={{ width: '100%', marginTop: '0.5rem', paddingTop: '0.5rem', borderTop: '1px dashed #bbf7d0' }}>
                           <label style={{ fontSize: '0.75rem', fontWeight: 'bold', textTransform: 'uppercase', letterSpacing: '0.05em', color: '#166534', display: 'block', marginBottom: '0.5rem' }}>Selecciona el Lote de Semillas (Trazabilidad)</label>
-                          <select className="premium-input" style={{ width: '100%', padding: '0.75rem', borderRadius: '0.5rem', border: '1px solid #86efac', background: 'white', fontSize: '0.875rem', fontWeight: 'bold' }} required value={newCrop.selectedSeedBatchId || ''} onChange={e => setNewCrop({...newCrop, selectedSeedBatchId: e.target.value})}>
+                          <select className="premium-input" style={{ width: '100%', padding: '0.75rem', borderRadius: '0.5rem', border: '1px solid #86efac', background: 'white', fontSize: '0.875rem', fontWeight: 'bold' }} required value={newCrop.stockLotId || ''} onChange={e => setNewCrop({...newCrop, stockLotId: e.target.value})}>
                             <option value="">-- Sin stock de lotes --</option>
                             {availableBatches.map(b => (
-                              <option key={b.batchNumber} value={b.batchNumber}>{b.batchNumber} ({b.quantity.toFixed(2)} g disponibles)</option>
+                              <option key={b.id} value={b.id}>{b.supplierBatch} ({Number(b.remainingQuantity).toFixed(2)} g disponibles)</option>
                             ))}
                           </select>
                           
-                          {newCrop.selectedSeedBatchId && newCrop.selectedSeedBatchId !== oldestBatch && (
+                          {newCrop.stockLotId && newCrop.stockLotId !== oldestBatch && (
                             <div style={{ marginTop: '0.75rem', display: 'flex', alignItems: 'flex-start', gap: '0.5rem', backgroundColor: '#fffbeb', padding: '0.75rem', borderRadius: '0.5rem', border: '1px solid #fde68a' }}>
                               <span style={{ fontSize: '1.25rem' }}>⚠️</span>
-                              <p style={{ margin: 0, fontSize: '0.75rem', color: '#92400e', fontWeight: 'bold', lineHeight: 1.4 }}>Aviso: Hay semillas de un lote más antiguo en stock ({oldestBatch}). Se recomienda encarecidamente usar el método FIFO para evitar caducidades y mermas.</p>
+                              <p style={{ margin: 0, fontSize: '0.75rem', color: '#92400e', fontWeight: 'bold', lineHeight: 1.4 }}>Aviso: hay un lote más antiguo disponible ({availableBatches[0]?.supplierBatch}). Se recomienda FIFO para evitar caducidades y mermas.</p>
                             </div>
                           )}
                           

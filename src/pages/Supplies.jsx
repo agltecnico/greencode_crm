@@ -1,14 +1,18 @@
 import { useState, useMemo } from 'react';
 import { useData } from '../context/DataContext';
 import { usePagination } from '../hooks/usePagination';
+import { useAdminMode } from '../context/AdminModeContext';
+import Swal from 'sweetalert2';
 
 export default function Supplies() {
   const { 
     providers, 
     articles, addArticle, updateArticle, deleteArticle,
-    stockEntries, addStockEntry, deleteStockEntry,
+    stockEntries, stockLots, purchaseDeliveryNotes, receivePurchaseDeliveryNote, deletePurchaseDeliveryNote,
+    deleteStockEntry,
     cropTypes, addCropType, updateCropType, deleteCropType
   } = useData();
+  const { isAdminMode, requireAdmin } = useAdminMode();
 
   const [activeTab, setActiveTab] = useState('INVENTORY');
   const [searchTerm, setSearchTerm] = useState('');
@@ -19,7 +23,7 @@ export default function Supplies() {
   const [expProvider, setExpProvider] = useState('');
 
   // Forms State
-  const [newArticle, setNewArticle] = useState({ name: '', type: 'SEMILLA', minStock: 0 });
+  const [newArticle, setNewArticle] = useState({ name: '', type: 'SEMILLA', minStock: 0, providerId: '', unit: 'g', supplierReference: '' });
   const [editingArticleId, setEditingArticleId] = useState(null);
   const [editedArticle, setEditedArticle] = useState(null);
   const [editingCropTypeId, setEditingCropTypeId] = useState(null);
@@ -38,16 +42,44 @@ export default function Supplies() {
   // Handlers
   const handleAddArticle = e => { 
     e.preventDefault(); 
-    addArticle(newArticle); 
-    setNewArticle({name:'', type:'SEMILLA', minStock: 0}); 
+    const payload = { ...newArticle, providerId: newArticle.providerId || null };
+    addArticle(payload);
+    setNewArticle({name:'', type:'SEMILLA', minStock: 0, providerId: '', unit: 'g', supplierReference: ''});
     setShowArticleModal(false);
   };
   
-  const handleAddStockEntry = e => { 
-    e.preventDefault(); 
-    addStockEntry(newStockEntry); 
-    setNewStockEntry({...newStockEntry, deliveryNote: '', batchNumber: '', providerId: '', quantity: 1, price: 0}); 
+  const handleAddStockEntry = async e => {
+    e.preventDefault();
+    const result = await receivePurchaseDeliveryNote({
+      providerId: newStockEntry.providerId,
+      number: newStockEntry.deliveryNote,
+      date: newStockEntry.purchaseDate,
+      notes: '',
+      lines: [{
+        articleId: newStockEntry.articleId,
+        supplierBatch: newStockEntry.batchNumber,
+        quantity: Number(newStockEntry.quantity),
+        totalCost: Number(newStockEntry.price)
+      }]
+    });
+    if (!result) return;
+    setNewStockEntry({...newStockEntry, deliveryNote: '', batchNumber: '', providerId: '', articleId: '', quantity: 1, price: 0});
     setShowStockModal(false);
+    await Swal.fire('Entrada registrada', 'El lote, el stock y el coste de la referencia se han actualizado.', 'success');
+  };
+
+  const runAdminDelete = async (message, action) => {
+    if (!(await requireAdmin())) return;
+    const result = await Swal.fire({
+      title: 'Acción de administrador',
+      text: message,
+      icon: 'warning',
+      showCancelButton: true,
+      confirmButtonText: 'Sí, borrar',
+      cancelButtonText: 'Cancelar',
+      confirmButtonColor: '#dc2626'
+    });
+    if (result.isConfirmed) await action();
   };
 
   const handleAddCropType = e => {
@@ -123,6 +155,10 @@ export default function Supplies() {
   // Cost calculation
   const getAverageUnitCost = (articleId, providerId = null) => {
     if (!articleId) return 0;
+    const article = articles?.find(a => a.id === articleId);
+    if (article?.currentUnitCost != null && Number(article.currentUnitCost) >= 0) {
+      return Number(article.currentUnitCost);
+    }
     let entries = stockEntries?.filter(e => e.articleId === articleId) || [];
     if (providerId) {
       const providerEntries = entries.filter(e => e.providerId === providerId);
@@ -169,7 +205,7 @@ export default function Supplies() {
 
   const totalWarehouseValue = articles?.filter(a => !['GASTO_FIJO', 'SUMINISTROS', 'MANTENIMIENTO', 'MARKETING', 'NOMINAS', 'BANDEJA'].includes(a.type))
     .reduce((sum, a) => {
-      const totalIn = stockEntries?.filter(e => e.articleId === a.id).reduce((acc, curr) => acc + Number(curr.quantity || 0), 0) || 0;
+      const totalIn = stockLots?.filter(l => l.articleId === a.id).reduce((acc, curr) => acc + Number(curr.remainingQuantity || 0), 0) || 0;
       const avgCost = getAverageUnitCost(a.id);
       return sum + (totalIn * avgCost);
     }, 0) || 0;
@@ -341,12 +377,19 @@ export default function Supplies() {
                   ) : (
                     <tr key={a.id}>
                       <td className="font-medium text-slate-500">{getTypeLabel(a.type)}</td>
-                      <td className="font-bold text-slate-800">{a.name}</td>
+                      <td className="font-bold text-slate-800">
+                        {a.name}
+                        <div className="text-xs text-slate-500">
+                          {providers?.find(provider => provider.id === a.providerId)?.name || 'Sin proveedor'}
+                          {' · '}Último: {Number(a.lastPurchaseUnitCost || 0).toFixed(4)} €/{a.unit || getUnitLabel(a.type)}
+                          {' · '}Medio: {Number(a.currentUnitCost || 0).toFixed(4)} €/{a.unit || getUnitLabel(a.type)}
+                        </div>
+                      </td>
                       <td className="font-mono text-slate-600">{['SEMILLA', 'SUSTRATO', 'ENVASE', 'OTRO'].includes(a.type) ? (a.minStock || 0) : '-'}</td>
                       <td>
                         <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'flex-end' }}>
                           <button className="btn btn-secondary" style={{ padding: '0.3rem 0.6rem', fontSize: '0.8rem', background: 'transparent' }} onClick={() => { setEditingArticleId(a.id); setEditedArticle(a); }}>Editar</button>
-                          <button className="btn btn-danger" style={{ padding: '0.3rem 0.6rem', fontSize: '0.8rem', background: 'transparent', color: '#ef4444', border: '1px solid #ef4444' }} onClick={() => deleteArticle(a.id)}>Borrar</button>
+                          {isAdminMode && <button className="btn btn-danger" style={{ padding: '0.3rem 0.6rem', fontSize: '0.8rem' }} onClick={() => runAdminDelete('Se borrará esta referencia si no tiene lotes ni cultivos relacionados.', () => deleteArticle(a.id))}>Borrar</button>}
                         </div>
                       </td>
                     </tr>
@@ -373,6 +416,26 @@ export default function Supplies() {
                <h3 className="font-bold text-lg">Registro de Albaranes de Entrada</h3>
                <button className="btn btn-primary shadow-sm" onClick={() => setShowStockModal(true)}>+ Nuevo Registro</button>
             </div>
+            {isAdminMode && purchaseDeliveryNotes.length > 0 && (
+              <div className="card" style={{ marginBottom: '1rem', border: '1px solid #fecaca', background: '#fff7f7' }}>
+                <h4 className="font-bold text-red-700 mb-3">Gestión administrativa de albaranes</h4>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem' }}>
+                  {purchaseDeliveryNotes.map(note => (
+                    <button
+                      key={note.id}
+                      type="button"
+                      className="btn btn-danger"
+                      onClick={() => runAdminDelete(
+                        `Se intentará borrar el albarán ${note.number}. Solo se permitirá si sus lotes no se han usado.`,
+                        () => deletePurchaseDeliveryNote(note.id)
+                      )}
+                    >
+                      Borrar {note.number}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
   
             <div className="table-container mb-8">
               <table className="admin-table">
@@ -401,7 +464,7 @@ export default function Supplies() {
                         <td>{entry.quantity} {art ? getUnitLabel(art.type) : ''}</td>
                         <td className="font-bold text-red-600">{entry.price ? `${entry.price.toFixed(2)} €` : '-'}</td>
                         <td>
-                          <button className="btn btn-danger" style={{ padding: '0.3rem 0.6rem', fontSize: '0.8rem', background: 'transparent', color: '#ef4444', border: '1px solid #ef4444' }} onClick={() => deleteStockEntry(entry.id)}>Borrar</button>
+                          {isAdminMode && <button className="btn btn-danger" style={{ padding: '0.3rem 0.6rem', fontSize: '0.8rem' }} onClick={() => runAdminDelete('Se borrará esta entrada de prueba.', () => deleteStockEntry(entry.id))}>Borrar</button>}
                         </td>
                       </tr>
                     )
@@ -458,7 +521,7 @@ export default function Supplies() {
                         <td className="font-bold text-red-500">{entry.quantity} {art ? getUnitLabel(art.type) : ''}</td>
                         <td className="text-muted">{entry.price ? `${entry.price.toFixed(2)} €` : '0.00 €'}</td>
                         <td>
-                          <button className="btn btn-danger" style={{ padding: '0.3rem 0.6rem', fontSize: '0.8rem', background: 'transparent', color: '#ef4444', border: '1px solid #ef4444' }} onClick={() => deleteStockEntry(entry.id)}>Borrar</button>
+                          {isAdminMode && <button className="btn btn-danger" style={{ padding: '0.3rem 0.6rem', fontSize: '0.8rem' }} onClick={() => runAdminDelete('Se borrará este consumo de prueba.', () => deleteStockEntry(entry.id))}>Borrar</button>}
                         </td>
                       </tr>
                     )
@@ -716,7 +779,7 @@ export default function Supplies() {
                       <td>
                         <div style={{ display: 'flex', gap: '0.5rem' }}>
                           <button className="btn btn-secondary" style={{ padding: '0.3rem 0.6rem', fontSize: '0.8rem', background: 'transparent' }} onClick={() => { setEditingCropTypeId(c.id); setEditedCropType(c); }}>Editar</button>
-                          <button className="btn btn-danger" style={{ padding: '0.3rem 0.6rem', fontSize: '0.8rem', background: 'transparent', color: '#ef4444', border: '1px solid #ef4444' }} onClick={() => deleteCropType(c.id)}>Borrar</button>
+                          {isAdminMode && <button className="btn btn-danger" style={{ padding: '0.3rem 0.6rem', fontSize: '0.8rem' }} onClick={() => runAdminDelete('Se borrará esta ficha si no tiene cultivos relacionados.', () => deleteCropType(c.id))}>Borrar</button>}
                         </div>
                       </td>
                     </tr>
@@ -766,6 +829,33 @@ export default function Supplies() {
                 <input required type="text" className="form-control" value={newArticle.name} onChange={e => setNewArticle({...newArticle, name: e.target.value})} />
               </div>
               {['SEMILLA', 'SUSTRATO', 'ENVASE', 'OTRO'].includes(newArticle.type) && (
+                <>
+                  <div>
+                    <label className="form-label">Proveedor de esta referencia</label>
+                    <select required className="form-control" value={newArticle.providerId} onChange={e => setNewArticle({...newArticle, providerId: e.target.value})}>
+                      <option value="">Selecciona...</option>
+                      {providers?.map(provider => <option key={provider.id} value={provider.id}>{provider.name}</option>)}
+                    </select>
+                    <p className="text-xs text-slate-500 mt-1">La misma variedad de otro proveedor debe crearse como otra referencia.</p>
+                  </div>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+                    <div>
+                      <label className="form-label">Referencia del proveedor</label>
+                      <input type="text" className="form-control" value={newArticle.supplierReference} onChange={e => setNewArticle({...newArticle, supplierReference: e.target.value})} />
+                    </div>
+                    <div>
+                      <label className="form-label">Unidad de stock</label>
+                      <select className="form-control" value={newArticle.unit} onChange={e => setNewArticle({...newArticle, unit: e.target.value})}>
+                        <option value="g">Gramos</option>
+                        <option value="kg">Kilogramos</option>
+                        <option value="l">Litros</option>
+                        <option value="ud">Unidades</option>
+                      </select>
+                    </div>
+                  </div>
+                </>
+              )}
+              {['SEMILLA', 'SUSTRATO', 'ENVASE', 'OTRO'].includes(newArticle.type) && (
                 <div>
                   <label className="form-label">Stock de Seguridad (Aviso si baja de esta cantidad)</label>
                   <input type="number" min="0" className="form-control" value={newArticle.minStock} onChange={e => setNewArticle({...newArticle, minStock: parseFloat(e.target.value) || 0})} />
@@ -788,7 +878,7 @@ export default function Supplies() {
             <form onSubmit={handleAddStockEntry} style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '1rem', alignItems: 'start' }}>
               <div>
                 <label className="form-label">Proveedor / Acreedor</label>
-                <select required className="form-control" value={newStockEntry.providerId} onChange={e => setNewStockEntry({...newStockEntry, providerId: e.target.value})}>
+                <select required className="form-control" value={newStockEntry.providerId} onChange={e => setNewStockEntry({...newStockEntry, providerId: e.target.value, articleId: ''})}>
                   <option value="">Selecciona...</option>
                   {providers?.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
                 </select>
@@ -801,16 +891,16 @@ export default function Supplies() {
                 <label className="form-label">Artículo (Semilla, Luz...)</label>
                 <select required className="form-control" value={newStockEntry.articleId} onChange={e => setNewStockEntry({...newStockEntry, articleId: e.target.value})}>
                   <option value="">Selecciona...</option>
-                  {articles?.map(a => <option key={a.id} value={a.id}>{getTypeLabel(a.type)} - {a.name}</option>)}
+                  {articles?.filter(a => a.active !== false && a.providerId === newStockEntry.providerId).map(a => <option key={a.id} value={a.id}>{getTypeLabel(a.type)} - {a.name}</option>)}
                 </select>
               </div>
               <div>
                 <label className="form-label">Nº Factura / Albarán</label>
-                <input type="text" className="form-control" placeholder="Opcional" value={newStockEntry.deliveryNote} onChange={e => setNewStockEntry({...newStockEntry, deliveryNote: e.target.value})} />
+                <input required type="text" className="form-control" placeholder="Número del documento" value={newStockEntry.deliveryNote} onChange={e => setNewStockEntry({...newStockEntry, deliveryNote: e.target.value})} />
               </div>
               <div>
                 <label className="form-label">Lote (Para Trazabilidad)</label>
-                <input type="text" className="form-control" placeholder="Solo si aplica" disabled={isExpenseOnly} value={newStockEntry.batchNumber} onChange={e => setNewStockEntry({...newStockEntry, batchNumber: e.target.value})} />
+                <input required={!isExpenseOnly} type="text" className="form-control" placeholder="Lote del proveedor" disabled={isExpenseOnly} value={newStockEntry.batchNumber} onChange={e => setNewStockEntry({...newStockEntry, batchNumber: e.target.value})} />
               </div>
               <div>
                 <label className="form-label">Cant. ({selectedArticleType ? getUnitLabel(selectedArticleType) : 'Uds'})</label>
