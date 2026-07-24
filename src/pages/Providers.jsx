@@ -1,9 +1,11 @@
 import { useState } from 'react';
 import { useData } from '../context/DataContext';
 import { usePagination } from '../hooks/usePagination';
+import { useAdminMode } from '../context/AdminModeContext';
 
 export default function Providers() {
   const { providers, addProvider, deleteProvider } = useData();
+  const { isAdminMode, requireAdmin } = useAdminMode();
   const [searchTerm, setSearchTerm] = useState('');
   const [newProvider, setNewProvider] = useState({ name: '', contact: '', phone: '', email: '' });
 
@@ -76,7 +78,9 @@ export default function Providers() {
                 <td>{p.phone || '-'}</td>
                 <td>{p.email || '-'}</td>
                 <td>
-                  <button className="btn btn-danger" style={{ padding: '0.3rem 0.6rem', fontSize: '0.8rem', background: 'transparent', color: '#ef4444', border: '1px solid #ef4444' }} onClick={() => deleteProvider(p.id)}>Borrar</button>
+                  {isAdminMode && <button className="btn btn-danger" style={{ padding: '0.3rem 0.6rem', fontSize: '0.8rem' }} onClick={async () => {
+                    if (await requireAdmin()) deleteProvider(p.id);
+                  }}>Borrar</button>}
                 </td>
               </tr>
             ))}

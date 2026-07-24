@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Outlet, NavLink } from 'react-router-dom';
 import { LayoutDashboard, Users, Truck, FileBox, ShoppingBag, FileText, Receipt, Menu, X, Sprout } from 'lucide-react';
+import AdminModeButton from './AdminModeButton';
 
 export default function Layout() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -61,6 +62,7 @@ export default function Layout() {
           </button>
           <h1 className="page-title">Microgreens CRM</h1>
           <div className="user-profile">
+            <AdminModeButton />
             {/* simple avatar placeholder */}
             <div style={{ width: 40, height: 40, borderRadius: '50%', background: 'var(--color-primary-light)', color: 'var(--color-primary-dark)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 'bold' }}>
               A
