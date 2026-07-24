@@ -101,6 +101,10 @@ CREATE TABLE expenses (
     id TEXT PRIMARY KEY,
     concept TEXT,
     amount NUMERIC,
+    "baseAmount" NUMERIC,
+    "ivaPercentage" NUMERIC,
+    total NUMERIC,
+    "paymentMethod" TEXT,
     date TIMESTAMP WITH TIME ZONE,
     category TEXT,
     "isPaid" BOOLEAN DEFAULT false,
@@ -109,6 +113,9 @@ CREATE TABLE expenses (
 
 CREATE TABLE company_profile (
     id TEXT PRIMARY KEY,
+    "fiscalName" TEXT,
+    "ownerName" TEXT,
+    "bankAccount" TEXT,
     name TEXT,
     "commercialName" TEXT,
     nif TEXT,
@@ -137,3 +144,18 @@ CREATE POLICY "public all delivery_notes" ON delivery_notes FOR ALL USING (true)
 CREATE POLICY "public all invoices" ON invoices FOR ALL USING (true);
 CREATE POLICY "public all expenses" ON expenses FOR ALL USING (true);
 CREATE POLICY "public all company_profile" ON company_profile FOR ALL USING (true);
+
+CREATE UNIQUE INDEX delivery_notes_one_per_order_idx
+    ON delivery_notes ("orderId")
+    WHERE "orderId" IS NOT NULL;
+
+-- product_movements is created in the operational schema. This index prevents
+-- duplicate FIFO consumption when two users deliver the same order concurrently.
+DO $$
+BEGIN
+    IF to_regclass('public.product_movements') IS NOT NULL THEN
+        CREATE UNIQUE INDEX IF NOT EXISTS product_movements_order_batch_idx
+            ON product_movements ("productId", "referenceId")
+            WHERE type = 'ORDER' AND "productId" IS NOT NULL AND "referenceId" IS NOT NULL;
+    END IF;
+END $$;
