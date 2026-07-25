@@ -26,6 +26,8 @@ export default function Supplies() {
   // Forms State
   const [newArticle, setNewArticle] = useState({ name: '', type: 'SEMILLA', minStock: 0, providerId: '', varietyId: '', unit: 'g', supplierReference: '' });
   const [newVariety, setNewVariety] = useState({ name: '', description: '' });
+  const [editingVarietyId, setEditingVarietyId] = useState(null);
+  const [editedVariety, setEditedVariety] = useState(null);
   const [editingArticleId, setEditingArticleId] = useState(null);
   const [editedArticle, setEditedArticle] = useState(null);
   const [editingCropTypeId, setEditingCropTypeId] = useState(null);
@@ -345,19 +347,78 @@ export default function Supplies() {
               <thead><tr><th>Variedad</th><th>Descripción</th><th>Estado</th><th>Acciones</th></tr></thead>
               <tbody>
                 {seedVarieties?.map(variety => (
-                  <tr key={variety.id}>
-                    <td className="font-bold">{variety.name}</td>
-                    <td>{variety.description || '-'}</td>
-                    <td>{variety.active === false ? 'Inactiva' : 'Activa'}</td>
-                    <td>
-                      <div className="flex gap-2">
-                        <button className="btn btn-secondary" onClick={() => updateSeedVariety(variety.id, { active: variety.active === false })}>
-                          {variety.active === false ? 'Activar' : 'Desactivar'}
-                        </button>
-                        {isAdminMode && <button className="btn btn-danger" onClick={() => runAdminDelete('Solo se puede borrar si no tiene referencias, fichas o productos asociados.', () => deleteSeedVariety(variety.id))}>Eliminar</button>}
-                      </div>
-                    </td>
-                  </tr>
+                  editingVarietyId === variety.id ? (
+                    <tr key={variety.id}>
+                      <td>
+                        <input
+                          required
+                          className="premium-input w-full"
+                          value={editedVariety.name}
+                          onChange={e => setEditedVariety({ ...editedVariety, name: e.target.value })}
+                        />
+                      </td>
+                      <td>
+                        <input
+                          className="premium-input w-full"
+                          value={editedVariety.description || ''}
+                          onChange={e => setEditedVariety({ ...editedVariety, description: e.target.value })}
+                          placeholder="Descripción opcional"
+                        />
+                      </td>
+                      <td>
+                        <select
+                          className="premium-input w-full"
+                          value={editedVariety.active === false ? 'INACTIVE' : 'ACTIVE'}
+                          onChange={e => setEditedVariety({ ...editedVariety, active: e.target.value === 'ACTIVE' })}
+                        >
+                          <option value="ACTIVE">Activa</option>
+                          <option value="INACTIVE">Inactiva</option>
+                        </select>
+                      </td>
+                      <td>
+                        <div className="flex gap-2">
+                          <button className="btn btn-primary" onClick={async () => {
+                            const name = editedVariety.name.trim().toUpperCase();
+                            if (!name) {
+                              await Swal.fire('Falta el nombre', 'La variedad debe tener un nombre.', 'warning');
+                              return;
+                            }
+                            const result = await updateSeedVariety(variety.id, {
+                              name,
+                              description: editedVariety.description?.trim() || '',
+                              active: editedVariety.active !== false
+                            });
+                            if (!result?.error) {
+                              setEditingVarietyId(null);
+                              setEditedVariety(null);
+                            }
+                          }}>Guardar</button>
+                          <button className="btn btn-secondary" onClick={() => {
+                            setEditingVarietyId(null);
+                            setEditedVariety(null);
+                          }}>Cancelar</button>
+                        </div>
+                      </td>
+                    </tr>
+                  ) : (
+                    <tr key={variety.id}>
+                      <td className="font-bold">{variety.name}</td>
+                      <td>{variety.description || '-'}</td>
+                      <td>{variety.active === false ? 'Inactiva' : 'Activa'}</td>
+                      <td>
+                        <div className="flex gap-2">
+                          <button className="btn btn-secondary" onClick={() => {
+                            setEditingVarietyId(variety.id);
+                            setEditedVariety({ ...variety });
+                          }}>Editar</button>
+                          <button className="btn btn-secondary" onClick={() => updateSeedVariety(variety.id, { active: variety.active === false })}>
+                            {variety.active === false ? 'Activar' : 'Desactivar'}
+                          </button>
+                          {isAdminMode && <button className="btn btn-danger" onClick={() => runAdminDelete('Solo se puede borrar si no tiene referencias, fichas o productos asociados.', () => deleteSeedVariety(variety.id))}>Eliminar</button>}
+                        </div>
+                      </td>
+                    </tr>
+                  )
                 ))}
               </tbody>
             </table>
