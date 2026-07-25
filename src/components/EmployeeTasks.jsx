@@ -474,56 +474,72 @@ export default function EmployeeTasks({ onTaskAction }) {
             </div>
           </div>
         ) : (
-          <div style={{ 
-            display: 'grid', 
-            gridTemplateColumns: timeFilter === 7 ? 'repeat(auto-fit, minmax(120px, 1fr))' : 'repeat(auto-fill, minmax(100px, 1fr))', 
-            gap: '1rem' 
-          }}>
-            {allTasks.map((dayGroup, idx) => {
-              const dayName = dayGroup.date.toLocaleDateString('es-ES', { weekday: 'short' });
-              const dayNum = dayGroup.date.getDate();
-              const taskCount = dayGroup.items.length;
-              
-              return (
-                <div 
-                  key={idx} 
-                  onClick={() => setSelectedDayTasks(dayGroup)}
-                  style={{
-                    background: dayGroup.isToday ? '#f0fdf4' : 'white',
-                    border: dayGroup.isToday ? '2px solid #22c55e' : '1px solid #cbd5e1',
-                    borderRadius: '12px',
-                    padding: '1rem',
-                    cursor: 'pointer',
-                    display: 'flex',
-                    flexDirection: 'column',
-                    alignItems: 'center',
-                    gap: '0.5rem',
-                    transition: 'transform 0.2s, boxShadow 0.2s',
-                    boxShadow: '0 4px 6px -1px rgba(0,0,0,0.05)'
-                  }}
-                  onMouseEnter={(e) => { e.currentTarget.style.transform = 'translateY(-2px)'; e.currentTarget.style.boxShadow = '0 10px 15px -3px rgba(0,0,0,0.1)'; }}
-                  onMouseLeave={(e) => { e.currentTarget.style.transform = 'none'; e.currentTarget.style.boxShadow = '0 4px 6px -1px rgba(0,0,0,0.05)'; }}
-                >
-                  <div style={{ fontWeight: 'bold', color: dayGroup.isToday ? '#166534' : '#64748b', textTransform: 'capitalize' }}>
-                    {dayName}
-                  </div>
-                  <div style={{ fontSize: '2rem', fontWeight: '900', color: dayGroup.isToday ? '#15803d' : '#1e293b' }}>
-                    {dayNum}
-                  </div>
-                  
-                  {taskCount > 0 ? (
-                    <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap', justifyContent: 'center' }}>
-                      {dayGroup.items.slice(0,3).map((t, i) => (
-                        <span key={i} title={t.title} style={{ fontSize: '1.2rem' }}>{t.icon}</span>
-                      ))}
-                      {taskCount > 3 && <span style={{ fontSize: '0.8rem', fontWeight: 'bold', color: '#64748b' }}>+{taskCount - 3}</span>}
+          <div style={{ overflowX: 'auto', paddingBottom: '0.5rem' }}>
+            <div style={{ minWidth: '1050px', display: 'grid', gridTemplateColumns: 'repeat(7, minmax(0, 1fr))', border: '1px solid #cbd5e1', borderRadius: '12px', overflow: 'hidden', background: '#cbd5e1', gap: '1px' }}>
+              {allTasks.map((dayGroup, idx) => (
+                <div key={idx} style={{ minHeight: '250px', background: dayGroup.isToday ? '#ecfdf5' : 'white', boxShadow: dayGroup.isToday ? 'inset 0 0 0 2px #22c55e' : 'none' }}>
+                  <div style={{ padding: '0.75rem', borderBottom: '1px solid #e2e8f0', background: dayGroup.isToday ? '#dcfce7' : '#f8fafc', textAlign: 'center' }}>
+                    <div style={{ color: dayGroup.isToday ? '#15803d' : '#64748b', fontSize: '0.75rem', fontWeight: 800, textTransform: 'uppercase' }}>
+                      {dayGroup.date.toLocaleDateString('es-ES', { weekday: 'short' })}
                     </div>
-                  ) : (
-                    <div style={{ fontSize: '0.8rem', color: '#cbd5e1' }}>Libre</div>
-                  )}
+                    <div style={{ color: dayGroup.isToday ? '#166534' : '#1e293b', fontSize: '1.35rem', fontWeight: 900 }}>
+                      {dayGroup.date.getDate()}
+                    </div>
+                    {dayGroup.isToday && <div style={{ color: '#15803d', fontSize: '0.65rem', fontWeight: 800, textTransform: 'uppercase' }}>Hoy</div>}
+                  </div>
+
+                  <div style={{ padding: '0.55rem', display: 'flex', flexDirection: 'column', gap: '0.45rem' }}>
+                    {dayGroup.items.length === 0 ? (
+                      <div style={{ color: '#94a3b8', fontSize: '0.75rem', textAlign: 'center', padding: '1.5rem 0.25rem' }}>Sin tareas</div>
+                    ) : dayGroup.items.map((task, taskIndex) => {
+                      const isSelected = selectedTasks.some(selected => selected.id === task.id);
+                      const isActionable = isMultiSelectMode || task.type === 'plant' || task.type === 'harvest';
+                      const accentColors = {
+                        plant: '#22c55e',
+                        move: '#3b82f6',
+                        dark: '#6366f1',
+                        light: '#f59e0b',
+                        harvest: '#ef4444'
+                      };
+                      return (
+                        <div
+                          key={task.id || taskIndex}
+                          onClick={() => {
+                            if (isMultiSelectMode) {
+                              toggleTaskSelection(task);
+                            } else if (task.type === 'plant') {
+                              if (onTaskAction) onTaskAction(task);
+                              else navigate('/crops?action=sow&cropTypeId=' + task.cropTypeId + '&trays=' + task.trays);
+                            } else if (task.type === 'harvest') {
+                              if (onTaskAction) onTaskAction(task);
+                              else navigate('/crops?action=harvest&cropTypeId=' + task.cropTypeId);
+                            }
+                          }}
+                          style={{
+                            position: 'relative',
+                            padding: '0.55rem',
+                            background: isSelected ? '#dcfce7' : '#f8fafc',
+                            border: isSelected ? '1px solid #22c55e' : '1px solid #e2e8f0',
+                            borderLeft: `3px solid ${accentColors[task.className] || '#94a3b8'}`,
+                            borderRadius: '7px',
+                            cursor: isActionable ? 'pointer' : 'default'
+                          }}
+                        >
+                          {isMultiSelectMode && (task.type === 'plant' || task.type === 'move') && (
+                            <input type="checkbox" checked={isSelected} readOnly style={{ position: 'absolute', top: '0.45rem', right: '0.45rem', accentColor: '#22c55e' }} />
+                          )}
+                          <div style={{ display: 'flex', alignItems: 'flex-start', gap: '0.35rem', paddingRight: isMultiSelectMode ? '1rem' : 0 }}>
+                            <span style={{ fontSize: '0.95rem', lineHeight: 1.2 }}>{task.icon}</span>
+                            <strong style={{ color: '#1e293b', fontSize: '0.72rem', lineHeight: 1.25 }}>{task.title}</strong>
+                          </div>
+                          <div style={{ color: '#64748b', fontSize: '0.66rem', lineHeight: 1.35, marginTop: '0.3rem' }}>{task.desc}</div>
+                        </div>
+                      );
+                    })}
+                  </div>
                 </div>
-              )
-            })}
+              ))}
+            </div>
           </div>
         )}
       </div>
