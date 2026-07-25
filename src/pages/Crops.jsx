@@ -37,6 +37,25 @@ const formatSowingDateTime = (dateValue) => {
   }).format(date);
 };
 
+const getCropCycleOffsets = (cropType) => {
+  const soak = Number(cropType?.soakingHours || 0) > 0 ? Math.max(1, Math.ceil(Number(cropType.soakingHours) / 24)) : 0;
+  const germination = Number(cropType?.germinationDays || 0);
+  const darkness = Number(cropType?.darknessDays || 0);
+  const light = Number(cropType?.lightDays || 0);
+  return {
+    soak,
+    germination,
+    darkness,
+    light,
+    germinationStart: soak,
+    darknessStart: soak + germination,
+    lightStart: soak + germination + darkness,
+    harvest: soak + germination + darkness + light
+  };
+};
+
+const weekDay = (value) => ((Number(value) % 7) + 7) % 7;
+
 class ErrorBoundary extends React.Component {
   constructor(props) {
     super(props);
@@ -514,7 +533,8 @@ export default function Crops() {
               const cType = (cropTypes || []).find(ct => ct.id == routine.productId);
               if(!cType) return;
               
-              const plantWd = Number(routine.targetDayOfWeek);
+              const harvestWd = Number(routine.targetDayOfWeek);
+              const plantWd = weekDay(harvestWd - getCropCycleOffsets(cType).harvest);
               
               const isPlanted = (crops || []).some(c => {
                 if(c.cropTypeId !== cType.id) return false;
@@ -990,13 +1010,24 @@ export default function Crops() {
     const targets = harvestTargets?.filter(t => t.productId == cType.id) || [];
     
     targets.forEach(ht => {
-      const sowDay = ht.targetDayOfWeek;
+      const harvestDay = Number(ht.targetDayOfWeek);
+      const cycleOffsets = getCropCycleOffsets(cType);
+      const sowDay = weekDay(harvestDay - cycleOffsets.harvest);
       let currentDayOffset = 0;
+
+      events.push({
+        type: 'sow',
+        icon: '📥',
+        color: '#059669',
+        dayOfWeek: sowDay,
+        weekOffset: 0,
+        fromSowDay: sowDay
+      });
       
       // Soaking
       const hasSoak = Number(cType.soakingHours) > 0;
       if (hasSoak) {
-        currentDayOffset += 1;
+        currentDayOffset += cycleOffsets.soak;
         events.push({
           type: 'soak',
           icon: '💧',
@@ -1053,7 +1084,7 @@ export default function Crops() {
         type: 'harvest',
         icon: '✂️',
         color: '#10b981',
-        dayOfWeek: (sowDay + currentDayOffset) % 7,
+        dayOfWeek: harvestDay,
         weekOffset: Math.floor((sowDay + currentDayOffset) / 7),
         fromSowDay: sowDay
       });
@@ -1068,7 +1099,7 @@ export default function Crops() {
     if (existing) {
       Swal.fire({
         title: 'Modificar Rutina',
-        html: `¿Cuántas bandejas quieres sembrar de <b>${cType.name}</b> los <b>${dayNames[dayIndex]}</b>?`,
+        html: `¿Cuántas bandejas quieres cosechar de <b>${cType.name}</b> los <b>${dayNames[dayIndex]}</b>?`,
         input: 'number',
         inputValue: existing.tuppersCount,
         showCancelButton: true,
@@ -1076,7 +1107,7 @@ export default function Crops() {
         confirmButtonColor: '#059669',
         denyButtonColor: '#ef4444',
         confirmButtonText: 'Actualizar',
-        denyButtonText: 'Eliminar Siembra',
+        denyButtonText: 'Eliminar Cosecha',
         cancelButtonText: 'Cancelar'
       }).then((result) => {
         if (result.isConfirmed && result.value > 0) {
@@ -1087,13 +1118,13 @@ export default function Crops() {
       });
     } else {
       Swal.fire({
-        title: 'Nueva Siembra Semanal',
-        html: `¿Cuántas bandejas quieres sembrar de <b>${cType.name}</b> los <b>${dayNames[dayIndex]}</b>?`,
+        title: 'Nueva Cosecha Semanal',
+        html: `¿Cuántas bandejas quieres cosechar de <b>${cType.name}</b> los <b>${dayNames[dayIndex]}</b>?`,
         input: 'number',
         inputValue: 1,
         showCancelButton: true,
         confirmButtonColor: '#059669',
-        confirmButtonText: 'Añadir Rutina',
+        confirmButtonText: 'Añadir Cosecha',
         cancelButtonText: 'Cancelar'
       }).then((result) => {
         if (result.isConfirmed && result.value > 0) {
@@ -1132,9 +1163,9 @@ export default function Crops() {
     return (
       <div>
         <div style={{ background: 'linear-gradient(135deg, #f0fdf4, #ccfbf1)', border: '1px solid #99f6e4', padding: '2rem', borderRadius: '20px', marginBottom: '2rem' }}>
-          <h2 style={{ margin: '0 0 0.5rem 0', fontSize: '1.8rem', fontWeight: 900, color: '#065f46' }}>Planificador Semanal de Siembra</h2>
+          <h2 style={{ margin: '0 0 0.5rem 0', fontSize: '1.8rem', fontWeight: 900, color: '#065f46' }}>Planificador Semanal por Día de Cosecha</h2>
           <p style={{ margin: 0, color: '#047857', fontSize: '1.1rem', fontWeight: 500, lineHeight: 1.5 }}>
-            Haz clic en cualquier celda para añadir o modificar la cantidad de bandejas a sembrar. Las fases del ciclo se distribuirán automáticamente en los días correspondientes.
+            Selecciona los días en los que quieres cosechar cada variedad. La siembra y las fases del ciclo se calcularán automáticamente hacia atrás. Puedes programar la misma variedad varios días por semana.
           </p>
         </div>
 
@@ -1207,7 +1238,7 @@ export default function Crops() {
                           >
                             {ht ? (
                               <div style={{ fontSize: '1.2rem', fontWeight: 900, color: '#059669', marginBottom: '0.5rem', background: '#d1fae5', padding: '2px 8px', borderRadius: '12px' }}>
-                                📥 Siembra: {ht.tuppersCount}
+                                ✂️ Cosecha: {ht.tuppersCount}
                               </div>
                             ) : (
                               eventsToday.length === 0 && <div style={{ color: '#cbd5e1', fontSize: '1.5rem', fontWeight: 900, opacity: 0.5 }}>+</div>
