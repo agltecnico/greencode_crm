@@ -1,10 +1,11 @@
 import React, { useMemo, useState } from 'react';
 import {
-  ArrowRight, CalendarDays, CheckCircle2, ClipboardList, Factory,
+  ArrowRight, CalendarDays, CheckCircle2, Download, Factory,
   Leaf, PackageCheck, Search, Sprout, Thermometer, Truck, UserRound,
   Waves, XCircle
 } from 'lucide-react';
 import { useData } from '../context/DataContext';
+import { downloadTraceabilityPdf } from '../utils/traceabilityPdf';
 import './TraceabilityExplorer.css';
 
 const normalize = value => String(value ?? '').trim().toLocaleLowerCase('es');
@@ -24,7 +25,6 @@ const TYPE_LABELS = {
   purchaseNote: 'ALBARÁN PROVEEDOR',
   crop: 'LOTE DE CULTIVO',
   harvest: 'LOTE DE VENTA',
-  order: 'PEDIDO',
   deliveryNote: 'ALBARÁN DE VENTA',
   client: 'CLIENTE',
   seed: 'SEMILLA',
@@ -70,6 +70,7 @@ export default function TraceabilityExplorer() {
   } = useData();
   const [query, setQuery] = useState('');
   const [selection, setSelection] = useState(null);
+  const [isGeneratingPdf, setIsGeneratingPdf] = useState(false);
 
   const indexes = useMemo(() => ({
     providers: new Map((providers || []).map(item => [String(item.id), item])),
@@ -107,13 +108,10 @@ export default function TraceabilityExplorer() {
       const product = indexes.products.get(String(harvest.productId));
       add('harvest', harvest.id, harvest.batchNumber || harvest.id, `${product?.name || 'Producto'} · ${formatDate(harvest.harvestDate)}`);
     });
-    (orders || []).forEach(order => {
-      const client = indexes.clients.get(String(order.clientId));
-      add('order', order.id, order.orderNumber || order.id, client?.commercialName || client?.name || order.clientName || 'Cliente');
-    });
     (deliveryNotes || []).forEach(note => {
       const number = note.deliveryNoteNumber || note.albaranNumber;
-      if (number) add('deliveryNote', note.id, number, note.clientCommercialName || note.clientName || 'Cliente', [note.orderId]);
+      const concluded = ['DELIVERED', 'DELIVERED_SIGNED', 'COMPLETED'].includes(String(note.status || '').toUpperCase());
+      if (number && concluded) add('deliveryNote', note.id, number, note.clientCommercialName || note.clientName || 'Cliente', [note.date]);
     });
     (clients || []).forEach(client => add('client', client.id, client.commercialName || client.name || client.id, 'Cliente', [client.name, client.clientNumber]));
     (articles || []).filter(article => article.type === 'SEMILLA').forEach(article => {
@@ -122,11 +120,11 @@ export default function TraceabilityExplorer() {
     });
     (products || []).forEach(product => add('product', product.id, product.name || product.id, 'Producto de venta', [product.productNumber]));
     return items;
-  }, [stockLots, purchaseDeliveryNotes, crops, harvests, orders, deliveryNotes, clients, articles, products, indexes]);
+  }, [stockLots, purchaseDeliveryNotes, crops, harvests, deliveryNotes, clients, articles, products, indexes]);
 
   const visibleCandidates = useMemo(() => {
     const term = normalize(query);
-    if (!term) return candidates.filter(item => ['supplier', 'harvest', 'order'].includes(item.type)).slice().reverse().slice(0, 6);
+    if (!term) return candidates.filter(item => ['supplier', 'harvest', 'deliveryNote'].includes(item.type)).slice().reverse().slice(0, 6);
     return candidates.filter(item => normalize(item.search).includes(term)).slice(0, 24);
   }, [candidates, query]);
 
@@ -136,6 +134,9 @@ export default function TraceabilityExplorer() {
     let relatedCrops = [];
     let relatedHarvests = [];
     let relatedOrders = [];
+    const completedOrderIds = new Set((deliveryNotes || [])
+      .filter(note => ['DELIVERED', 'DELIVERED_SIGNED', 'COMPLETED'].includes(String(note.status || '').toUpperCase()))
+      .map(note => String(note.orderId)));
 
     if (selection.type === 'supplier') relatedLots = (stockLots || []).filter(lot => String(lot.id) === String(selection.id));
     if (selection.type === 'purchaseNote') {
@@ -146,12 +147,12 @@ export default function TraceabilityExplorer() {
     if (selection.type === 'crop') relatedCrops = (crops || []).filter(crop => String(crop.id) === String(selection.id));
     if (selection.type === 'harvest') relatedHarvests = (harvests || []).filter(harvest => String(harvest.id) === String(selection.id));
     if (selection.type === 'product') relatedHarvests = (harvests || []).filter(harvest => String(harvest.productId) === String(selection.id));
-    if (selection.type === 'order') relatedOrders = (orders || []).filter(order => String(order.id) === String(selection.id));
     if (selection.type === 'deliveryNote') {
       const note = (deliveryNotes || []).find(item => String(item.id) === String(selection.id));
       relatedOrders = (orders || []).filter(order => String(order.id) === String(note?.orderId));
     }
-    if (selection.type === 'client') relatedOrders = (orders || []).filter(order => String(order.clientId) === String(selection.id));
+    if (selection.type === 'client') relatedOrders = (orders || [])
+      .filter(order => String(order.clientId) === String(selection.id) && completedOrderIds.has(String(order.id)));
 
     if (!relatedCrops.length && relatedLots.length) {
       const lotIds = new Set(relatedLots.map(lot => String(lot.id)));
@@ -181,7 +182,7 @@ export default function TraceabilityExplorer() {
       const orderIds = new Set((productMovements || [])
         .filter(movement => movement.type === 'ORDER' && batches.has(String(movement.referenceId || '').split('|')[1]))
         .map(movement => String(movement.referenceId || '').split('|')[0]));
-      relatedOrders = (orders || []).filter(order => orderIds.has(String(order.id)));
+      relatedOrders = (orders || []).filter(order => orderIds.has(String(order.id)) && completedOrderIds.has(String(order.id)));
     }
 
     const startDates = relatedCrops.map(crop => new Date(crop.datePlanted)).filter(date => !Number.isNaN(date.getTime()));
@@ -217,6 +218,19 @@ export default function TraceabilityExplorer() {
       trace.relatedOrders.length > 0
     ].filter(Boolean).length / 4) * 100)
     : 0;
+
+  const handleDownloadPdf = async () => {
+    if (!trace || !selection || isGeneratingPdf) return;
+    setIsGeneratingPdf(true);
+    try {
+      await downloadTraceabilityPdf({
+        selection: { ...selection, label: TYPE_LABELS[selection.type] },
+        trace, indexes, deliveryNotes, environmentalStats
+      });
+    } finally {
+      setIsGeneratingPdf(false);
+    }
+  };
 
   return (
     <div className="trace-page">
@@ -263,7 +277,12 @@ export default function TraceabilityExplorer() {
               <h2>{selection.title}</h2>
               <p>{selection.subtitle}</p>
             </div>
-            <div className="trace-score"><strong>{traceCompleteness}%</strong><span>cadena localizada</span></div>
+            <div className="trace-summary-actions">
+              <button type="button" className="trace-pdf-button" onClick={handleDownloadPdf} disabled={isGeneratingPdf}>
+                <Download size={17} /> {isGeneratingPdf ? 'Generando...' : 'Descargar informe PDF'}
+              </button>
+              <div className="trace-score"><strong>{traceCompleteness}%</strong><span>cadena localizada</span></div>
+            </div>
           </div>
 
           <div className="trace-scheme">
@@ -332,7 +351,7 @@ export default function TraceabilityExplorer() {
                 return (
                   <CompactRecord key={order.id} title={client?.commercialName || client?.name || order.clientName || 'Cliente'}
                     badge={deliveryNumber || order.orderNumber} accent="violet"
-                    focused={isFocused('client', 'order', 'deliveryNote')}>
+                    focused={isFocused('client', 'deliveryNote')}>
                     <Field label="Cliente" value={client?.commercialName || client?.name || order.clientName} focused={isFocused('client')} />
                     <Field label="Albarán" value={deliveryNumber} focused={isFocused('deliveryNote')} />
                     <Field label="Entrega" value={formatDate(note?.date || order.date)} />
