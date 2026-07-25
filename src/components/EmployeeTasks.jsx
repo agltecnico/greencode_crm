@@ -143,18 +143,18 @@ export default function EmployeeTasks({ onTaskAction }) {
       const cType = cropTypes?.find(ct => ct.id == routine.productId);
       if(!cType) return;
 
-      const plantWd = Number(routine.targetDayOfWeek);
+      const harvestWd = Number(routine.targetDayOfWeek);
       const soakHrs = cType.soakingHours || 0;
-      const soakOffset = soakHrs > 0 ? 1 : 0;
+      const soakOffset = soakHrs > 0 ? Math.max(1, Math.ceil(Number(soakHrs) / 24)) : 0;
       const germOffset = soakOffset;
       const darkOffset = soakOffset + Number(cType.germinationDays || 0);
       const lightOffset = darkOffset + Number(cType.darknessDays || 0);
       const harvestOffset = lightOffset + Number(cType.lightDays || 0);
+      const plantWd = ((harvestWd - harvestOffset) % 7 + 7) % 7;
 
       const germWd = (plantWd + germOffset) % 7;
       const darkWd = (plantWd + darkOffset) % 7;
       const lightWd = (plantWd + lightOffset) % 7;
-      const harvestWd = (plantWd + harvestOffset) % 7;
 
       const checkPlanted = (offset) => {
         const tDate = new Date(targetDate);
