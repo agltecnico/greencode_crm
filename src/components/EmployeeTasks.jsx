@@ -6,8 +6,8 @@ import '../crops.css';
 export default function EmployeeTasks({ onTaskAction }) {
   const navigate = useNavigate();
   const { 
-    harvestTargets, crops, seeds, cropTypes, 
-    stockEntries, sowCrop, advanceCropStatus, deleteHarvestTarget
+    harvestTargets, crops, cropTypes, seedVarieties, articles, stockLots, providers,
+    sowCrop, advanceCropStatus
   } = useData();
   
   const [timeFilter, setTimeFilter] = useState(1);
@@ -19,6 +19,29 @@ export default function EmployeeTasks({ onTaskAction }) {
   const [batchSelections, setBatchSelections] = useState({});
 
   const activeCrops = crops?.filter(c => c.status !== 'HARVESTED' && c.status !== 'DISCARDED') || [];
+
+  const getCropVarietyName = (cropType, crop = null) => {
+    const varietyId = cropType?.varietyId
+      || articles?.find(article => article.id === cropType?.seedId || article.id === crop?.seedId)?.varietyId;
+    return seedVarieties?.find(variety => variety.id === varietyId)?.name
+      || cropType?.name
+      || 'Variedad desconocida';
+  };
+
+  const getCompatibleLots = (cropType) => {
+    const varietyId = cropType?.varietyId
+      || articles?.find(article => article.id === cropType?.seedId)?.varietyId;
+    if (!varietyId) return [];
+    return (stockLots || [])
+      .filter(lot => {
+        const article = articles?.find(item => item.id === lot.articleId);
+        return article?.type === 'SEMILLA'
+          && article.varietyId === varietyId
+          && article.active !== false
+          && Number(lot.remainingQuantity || 0) > 0;
+      })
+      .sort((a, b) => String(a.receivedAt || a.createdAt || '').localeCompare(String(b.receivedAt || b.createdAt || '')));
+  };
   
   const today = new Date();
   today.setHours(0,0,0,0);
@@ -40,8 +63,8 @@ export default function EmployeeTasks({ onTaskAction }) {
 
     activeCrops.forEach(crop => {
       const cType = cropTypes?.find(c => c.id === crop.cropTypeId || c.id === crop.seedId);
-      let seed = seeds?.find(s => s.id === cType?.seedId || s.id === crop.seedId);
-      if (!cType || !seed) return;
+      if (!cType) return;
+      const varietyName = getCropVarietyName(cType, crop);
 
       const planted = new Date(crop.datePlanted || crop.plantedAt);
       planted.setHours(0,0,0,0);
@@ -97,7 +120,7 @@ export default function EmployeeTasks({ onTaskAction }) {
           id: `move-${dateKey}-${crop.id}`,
           type: 'move',
           title: `Mover a ${phaseStr}`,
-          desc: `${crop.traysCount} bandejas de ${seed.name} (Lote: ${crop.batchNumber})`,
+          desc: `${crop.traysCount} bandejas de ${varietyName} (Lote: ${crop.batchNumber})`,
           icon: '🔄',
           className: 'move',
           cropId: crop.id
@@ -107,7 +130,7 @@ export default function EmployeeTasks({ onTaskAction }) {
           id: `harv-${dateKey}-${crop.id}`,
           type: 'harvest',
           title: `¡COSECHAR!`,
-          desc: `${crop.traysCount} bandejas de ${seed.name} (Lote: ${crop.batchNumber})`,
+          desc: `${crop.traysCount} bandejas de ${varietyName} (Lote: ${crop.batchNumber})`,
           icon: '✂️',
           className: 'harvest',
           cropId: crop.id,
@@ -119,8 +142,6 @@ export default function EmployeeTasks({ onTaskAction }) {
     harvestTargets?.forEach(routine => {
       const cType = cropTypes?.find(ct => ct.id == routine.productId);
       if(!cType) return;
-      let seed = seeds?.find(s => s.id === cType.seedId);
-      if(!seed) seed = { name: 'Semilla Desconocida' };
 
       const plantWd = Number(routine.targetDayOfWeek);
       const soakHrs = cType.soakingHours || 0;
@@ -215,7 +236,8 @@ export default function EmployeeTasks({ onTaskAction }) {
       // Open modal to configure seed batches
       const initialBatches = {};
       plants.forEach(p => {
-        initialBatches[p.id] = 'SIN_LOTE';
+        const cropType = cropTypes?.find(type => type.id === p.cropTypeId);
+        initialBatches[p.id] = getCompatibleLots(cropType)[0]?.id || '';
       });
       setBatchSelections(initialBatches);
       setIsSowModalOpen(true);
@@ -238,7 +260,7 @@ export default function EmployeeTasks({ onTaskAction }) {
         await sowCrop({ 
           cropTypeId: p.cropTypeId, 
           traysCount: p.trays, 
-          selectedSeedBatchId: p.selectedSeedBatchId 
+          stockLotId: p.stockLotId
         });
         // We do not delete routine from harvestTargets! The routine is persistent.
       }
@@ -456,14 +478,7 @@ export default function EmployeeTasks({ onTaskAction }) {
             <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem', marginBottom: '1.5rem' }}>
               {selectedTasks.filter(t => t.type === 'plant').map(task => {
                 const cType = cropTypes?.find(c => c.id === task.cropTypeId);
-                const seedId = cType?.seedId;
-                const seedStock = stockEntries?.filter(e => e.articleId === seedId) || [];
-                const groups = {};
-                seedStock.forEach(e => {
-                  const b = e.batchNumber || 'SIN_LOTE';
-                  if(!groups[b]) groups[b] = 0;
-                  groups[b] += Number(e.quantity || 0);
-                });
+                const compatibleLots = getCompatibleLots(cType);
 
                 return (
                   <div key={task.id} style={{ background: '#f8fafc', padding: '1rem', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
@@ -475,13 +490,15 @@ export default function EmployeeTasks({ onTaskAction }) {
                     </label>
                     <select 
                       style={{ width: '100%', padding: '0.75rem', borderRadius: '8px', border: '1px solid #cbd5e1' }}
-                      value={batchSelections[task.id] || 'SIN_LOTE'}
+                      value={batchSelections[task.id] || compatibleLots[0]?.id || ''}
                       onChange={(e) => setBatchSelections({...batchSelections, [task.id]: e.target.value})}
                     >
-                      <option value="SIN_LOTE">Sin Lote (Por defecto)</option>
-                      {Object.entries(groups).filter(([_, qty]) => qty > 0).map(([batch, qty]) => (
-                        <option key={batch} value={batch}>
-                          Lote: {batch} ({qty}g disponibles)
+                      <option value="">Selecciona un lote...</option>
+                      {compatibleLots.map(lot => (
+                        <option key={lot.id} value={lot.id}>
+                          {lot.supplierBatch} · {articles?.find(a => a.id === lot.articleId)?.name || 'Semilla'}
+                          {' · '}{providers?.find(p => p.id === lot.providerId)?.name || 'Sin proveedor'}
+                          {' · '}{Number(lot.remainingQuantity).toFixed(2)} g
                         </option>
                       ))}
                     </select>
@@ -497,7 +514,7 @@ export default function EmployeeTasks({ onTaskAction }) {
                 onClick={() => {
                   const plants = selectedTasks.filter(t => t.type === 'plant').map(t => ({
                     ...t,
-                    selectedSeedBatchId: batchSelections[t.id] || 'SIN_LOTE'
+                    stockLotId: batchSelections[t.id] || getCompatibleLots(cropTypes?.find(c => c.id === t.cropTypeId))[0]?.id || ''
                   }));
                   executeBatch(plants);
                 }}
