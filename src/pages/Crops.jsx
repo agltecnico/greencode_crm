@@ -562,7 +562,9 @@ export default function Crops() {
                 tasks.push({
                   cropTypeId: cType.id,
                   name: cType.name,
-                  trays: routine.tuppersCount
+                  trays: routine.tuppersCount,
+                  gramsPerTray: Number(cType.seedGrams || 0),
+                  totalSeedGrams: Number(cType.seedGrams || 0) * Number(routine.tuppersCount || 0)
                 });
               }
             });
@@ -586,7 +588,9 @@ export default function Crops() {
                       >
                         <div>
                           <span style={{ fontWeight: 'bold', color: '#1e293b', fontSize: '1.1rem' }}>Sembrar {t.name}</span>
-                          <div style={{ fontSize: '0.9rem', color: '#64748b', marginTop: '0.25rem' }}>{t.trays} bandejas planificadas</div>
+                          <div style={{ fontSize: '0.9rem', color: '#64748b', marginTop: '0.25rem' }}>
+                            {t.trays} bandejas · {t.gramsPerTray} g/bandeja · {t.totalSeedGrams} g total
+                          </div>
                         </div>
                         <div style={{ display: 'flex', alignItems: 'center', color: '#22c55e', fontWeight: 'bold' }}>
                            <span style={{ backgroundColor: '#dcfce7', padding: '0.5rem 1rem', borderRadius: '999px', fontSize: '0.85rem' }}>Empezar ➔</span>
@@ -1781,6 +1785,10 @@ export default function Crops() {
                             <p style={{ fontSize: '1.25rem', fontWeight: '900', color: '#14532d', margin: 0 }}>
                               {totalAvailableSeed.toFixed(2)} g 
                               {selectedCropType.seedGrams > 0 && <span style={{ fontSize: '0.875rem', fontWeight: '600', color: '#15803d', marginLeft: '0.5rem' }}>(Max. {Math.floor(totalAvailableSeed / selectedCropType.seedGrams)} bandejas)</span>}
+                            </p>
+                            <p style={{ fontSize: '0.875rem', fontWeight: '700', color: '#15803d', margin: '0.35rem 0 0' }}>
+                              Consumo previsto: {Number(selectedCropType.seedGrams || 0)} g por bandeja
+                              {Number(newCrop.traysCount || 0) > 0 && ` · ${(Number(selectedCropType.seedGrams || 0) * Number(newCrop.traysCount || 0)).toFixed(2)} g total`}
                             </p>
                           </div>
                         </div>
