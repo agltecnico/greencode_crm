@@ -1068,9 +1068,9 @@ export const DataProvider = ({ children }) => {
                 const batchStats = {};
                 for (const hm of harvestMovements) {
                   const batch = hm.referenceId;
-                  const formatId = hm.packagingFormatId || '';
+                  const formatId = hm.packagingArticleId || hm.packagingFormatId || '';
                   const key = `${batch}::${formatId}`;
-                  if (!batchStats[key]) batchStats[key] = { batch, formatId, quantity: 0 };
+                  if (!batchStats[key]) batchStats[key] = { batch, formatId, isPackagingArticle: Boolean(hm.packagingArticleId), quantity: 0 };
                   batchStats[key].quantity += Number(hm.quantity || 0);
                 }
                 
@@ -1078,7 +1078,7 @@ export const DataProvider = ({ children }) => {
                 for (const om of orderMovements) {
                   if (om.referenceId && om.referenceId.includes('|')) {
                     const batch = om.referenceId.split('|')[1];
-                    const key = `${batch}::${om.packagingFormatId || ''}`;
+                    const key = `${batch}::${om.packagingArticleId || om.packagingFormatId || ''}`;
                     if (batchStats[key]) {
                       batchStats[key].quantity -= Math.abs(Number(om.quantity || 0));
                     }
@@ -1095,7 +1095,8 @@ export const DataProvider = ({ children }) => {
                     quantity: -consumeQty,
                     type: 'ORDER',
                     referenceId: `${effectiveOrder.id}|${batchEntry.batch}`,
-                    packagingFormatId: batchEntry.formatId || null
+                    packagingArticleId: batchEntry.isPackagingArticle ? batchEntry.formatId : null,
+                    packagingFormatId: batchEntry.isPackagingArticle ? null : (batchEntry.formatId || null)
                   });
                   if (!movementId) return null;
                   quantityToFulfill -= consumeQty;

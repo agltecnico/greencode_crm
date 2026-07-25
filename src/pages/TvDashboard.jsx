@@ -5,7 +5,7 @@ import '../crops.css';
 
 export default function TvDashboard() {
   const [tvTab, setTvTab] = useState('tasks');
-  const { crops, cropTypes, seeds, advanceCropStatus, refreshData, orders, clients, products, productMovements, packagingFormats } = useData();
+  const { crops, cropTypes, seeds, articles, advanceCropStatus, refreshData, orders, clients, products, productMovements, packagingFormats } = useData();
 
   const translateStatus = (status) => {
     const statusMap = {
@@ -315,9 +315,15 @@ export default function TvDashboard() {
 
                   // 3. Tuppers que Sobran (Disponibles)
                   const sobran = envasados - enPedidos;
-                  const formatStocks = (packagingFormats || []).map(format => {
-                    const produced = movements.filter(m => m.type === 'HARVEST' && m.packagingFormatId === format.id).reduce((sum, movement) => sum + Number(movement.quantity || 0), 0);
-                    const delivered = movements.filter(m => m.type === 'ORDER' && m.packagingFormatId === format.id).reduce((sum, movement) => sum + Math.abs(Number(movement.quantity || 0)), 0);
+                  const assignedPackaging = (product.packagingArticleIds || [])
+                    .map(articleId => articles?.find(article => article.id === articleId))
+                    .filter(Boolean);
+                  const legacyPackaging = (packagingFormats || []).filter(format =>
+                    movements.some(movement => movement.packagingFormatId === format.id)
+                  );
+                  const formatStocks = [...assignedPackaging, ...legacyPackaging].map(format => {
+                    const produced = movements.filter(m => m.type === 'HARVEST' && (m.packagingArticleId === format.id || m.packagingFormatId === format.id)).reduce((sum, movement) => sum + Number(movement.quantity || 0), 0);
+                    const delivered = movements.filter(m => m.type === 'ORDER' && (m.packagingArticleId === format.id || m.packagingFormatId === format.id)).reduce((sum, movement) => sum + Math.abs(Number(movement.quantity || 0)), 0);
                     return { ...format, stock: produced - delivered };
                   }).filter(format => format.stock !== 0);
 

@@ -128,6 +128,16 @@ export default function Crops() {
     );
   };
 
+  const packagingArticlesForProduct = product =>
+    (product?.packagingArticleIds || [])
+      .map(articleId => articles?.find(article => article.id === articleId && article.type === 'ENVASE' && article.active !== false))
+      .filter(Boolean);
+
+  const articlePhysicalStock = articleId =>
+    (stockEntries || [])
+      .filter(entry => entry.articleId === articleId)
+      .reduce((sum, entry) => sum + Number(entry.quantity || 0), 0);
+
   const productHarvestAvailability = (product) => {
     const requiredVarietyIds = productVarietyIds(product);
     const readyCrops = readyCropsForProduct(product);
@@ -135,10 +145,11 @@ export default function Crops() {
     const minimumVarieties = Math.min(4, requiredVarietyIds.length);
     return {
       configured: requiredVarietyIds.length > 0,
+      packagingConfigured: packagingArticlesForProduct(product).length > 0,
       readyCrops,
       minimumVarieties,
       availableVarieties: availableVarietyIds.size,
-      canHarvest: requiredVarietyIds.length > 0 && availableVarietyIds.size >= minimumVarieties,
+      canHarvest: requiredVarietyIds.length > 0 && packagingArticlesForProduct(product).length > 0 && availableVarietyIds.size >= minimumVarieties,
       totalTrays: readyCrops.reduce((sum, crop) => sum + Number(crop.traysCount || crop.trays || 0), 0)
     };
   };
@@ -281,7 +292,7 @@ export default function Crops() {
     const selectedVarietyIds = new Set(cropIdsToHarvest.map(cropId => cropVarietyId(crops.find(crop => crop.id === cropId))));
     const minimumVarieties = Math.min(4, requiredVarietyIds.length);
     const packagingBreakdown = Object.entries(newHarvest.packagingQuantities || {})
-      .map(([formatId, quantity]) => ({ formatId, quantity: Number(quantity || 0) }))
+      .map(([articleId, quantity]) => ({ articleId, quantity: Number(quantity || 0) }))
       .filter(item => item.quantity > 0);
     const totalTuppers = packagingBreakdown.reduce((sum, item) => sum + item.quantity, 0);
     
@@ -809,11 +820,11 @@ export default function Crops() {
             const harvested = productMovements?.filter(m => m.productId === product.id && m.type === 'HARVEST').reduce((acc, curr) => acc + curr.quantity, 0) || 0;
             const sold = productMovements?.filter(m => m.productId === product.id && m.type === 'ORDER').reduce((acc, curr) => acc + Math.abs(curr.quantity), 0) || 0;
             const physicalStock = harvested - sold;
-            const formatStocks = (packagingFormats || []).map(format => {
-              const formatHarvested = productMovements?.filter(m => m.productId === product.id && m.type === 'HARVEST' && m.packagingFormatId === format.id).reduce((sum, movement) => sum + Number(movement.quantity || 0), 0) || 0;
-              const formatSold = productMovements?.filter(m => m.productId === product.id && m.type === 'ORDER' && m.packagingFormatId === format.id).reduce((sum, movement) => sum + Math.abs(Number(movement.quantity || 0)), 0) || 0;
-              return { ...format, stock: formatHarvested - formatSold };
-            }).filter(format => format.stock !== 0);
+            const formatStocks = packagingArticlesForProduct(product).map(article => {
+              const formatHarvested = productMovements?.filter(m => m.productId === product.id && m.type === 'HARVEST' && m.packagingArticleId === article.id).reduce((sum, movement) => sum + Number(movement.quantity || 0), 0) || 0;
+              const formatSold = productMovements?.filter(m => m.productId === product.id && m.type === 'ORDER' && m.packagingArticleId === article.id).reduce((sum, movement) => sum + Math.abs(Number(movement.quantity || 0)), 0) || 0;
+              return { ...article, stock: formatHarvested - formatSold };
+            }).filter(article => article.stock !== 0);
 
             const pendingOrders = orders?.filter(o => o.status === 'PENDING' || o.status === 'PREPARED') || [];
             const reserved = pendingOrders.reduce((acc, order) => {
@@ -1003,9 +1014,10 @@ export default function Crops() {
                     {Array.isArray(h.packagingBreakdown) && h.packagingBreakdown.length > 0 && (
                       <div style={{ display: 'flex', gap: '0.4rem', flexWrap: 'wrap', marginTop: '0.65rem' }}>
                         {h.packagingBreakdown.filter(item => Number(item.quantity) > 0).map(item => {
-                          const format = packagingFormats?.find(candidate => candidate.id === item.formatId);
+                          const format = articles?.find(candidate => candidate.id === item.articleId)
+                            || packagingFormats?.find(candidate => candidate.id === item.formatId);
                           return (
-                            <span key={item.formatId} className="badge badge-primary">
+                            <span key={item.articleId || item.formatId} className="badge badge-primary">
                               {format?.name || 'Formato'}: {item.quantity} uds.
                             </span>
                           );
@@ -1900,6 +1912,8 @@ export default function Crops() {
                 const availability = productHarvestAvailability(p);
                 const statusText = !availability.configured
                   ? 'Receta sin configurar'
+                  : !availability.packagingConfigured
+                    ? 'Envase sin asignar'
                   : availability.canHarvest
                     ? `${availability.availableVarieties} variedades · ${availability.totalTrays} bandejas listas`
                     : `${availability.availableVarieties}/${availability.minimumVarieties} variedades listas`;
@@ -1981,16 +1995,19 @@ export default function Crops() {
         <div>
           <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 'bold', color: '#475569', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '0.5rem' }}>3. Formatos y unidades producidas</label>
           <div style={{ background: '#f8fafc', border: '1px solid #cbd5e1', borderRadius: '0.75rem', padding: '1rem', display: 'grid', gap: '0.75rem' }}>
-            {(packagingFormats || []).filter(format => format.active !== false).map(format => (
+            {packagingArticlesForProduct(products?.find(product => product.id === newHarvest.productId)).map(format => {
+              const availableStock = articlePhysicalStock(format.id);
+              return (
               <div key={format.id} style={{ display: 'flex', alignItems: 'center', gap: '1rem', background: 'white', border: '1px solid #e2e8f0', borderRadius: '0.6rem', padding: '0.75rem' }}>
                 <span style={{ fontSize: '1.5rem' }}>📦</span>
                 <div style={{ flex: 1 }}>
                   <strong style={{ color: '#1e293b' }}>{format.name}</strong>
-                  <div style={{ color: '#64748b', fontSize: '0.75rem' }}>{Number(format.capacityMl)} ml por unidad</div>
+                  <div style={{ color: availableStock > 0 ? '#64748b' : '#dc2626', fontSize: '0.75rem' }}>Stock disponible: {availableStock} unidades</div>
                 </div>
                 <input
                   type="number"
                   min="0"
+                  max={Math.max(0, availableStock)}
                   className="premium-input"
                   style={{ width: '100px', padding: '0.7rem', textAlign: 'center', fontWeight: 900 }}
                   value={newHarvest.packagingQuantities?.[format.id] || 0}
@@ -2000,9 +2017,9 @@ export default function Crops() {
                   }))}
                 />
               </div>
-            ))}
-            {(packagingFormats || []).filter(format => format.active !== false).length === 0 && (
-              <div style={{ color: '#ef4444', fontWeight: 600 }}>No hay formatos de envase activos. Créalo primero en Administración → Productos.</div>
+            );})}
+            {packagingArticlesForProduct(products?.find(product => product.id === newHarvest.productId)).length === 0 && (
+              <div style={{ color: '#ef4444', fontWeight: 600 }}>Este producto no tiene envases asignados. Edítalo en Administración → Productos.</div>
             )}
             <div style={{ textAlign: 'right', color: '#334155', fontWeight: 800 }}>
               Total: {Object.values(newHarvest.packagingQuantities || {}).reduce((sum, value) => sum + Number(value || 0), 0)} unidades
