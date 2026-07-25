@@ -52,11 +52,33 @@ export default function EmployeeTasks({ onTaskAction }) {
   const today = new Date();
   today.setHours(0,0,0,0);
   
-  const datesToAnalyze = Array.from({length: timeFilter}).map((_, i) => {
-    const d = new Date(today);
-    d.setDate(today.getDate() + i);
-    return d;
-  });
+  const currentMonth = today.getMonth();
+  const currentYear = today.getFullYear();
+  const datesToAnalyze = (() => {
+    if (timeFilter !== 30) {
+      return Array.from({ length: timeFilter }).map((_, i) => {
+        const d = new Date(today);
+        d.setDate(today.getDate() + i);
+        return d;
+      });
+    }
+
+    const monthStart = new Date(currentYear, currentMonth, 1);
+    const monthEnd = new Date(currentYear, currentMonth + 1, 0);
+    const calendarStart = new Date(monthStart);
+    const leadingDays = (monthStart.getDay() + 6) % 7;
+    calendarStart.setDate(monthStart.getDate() - leadingDays);
+    const calendarEnd = new Date(monthEnd);
+    const trailingDays = (7 - calendarEnd.getDay()) % 7;
+    calendarEnd.setDate(monthEnd.getDate() + trailingDays);
+    const dayCount = Math.round((calendarEnd - calendarStart) / 86400000) + 1;
+
+    return Array.from({ length: dayCount }).map((_, i) => {
+      const d = new Date(calendarStart);
+      d.setDate(calendarStart.getDate() + i);
+      return d;
+    });
+  })();
 
   const allTasks = [];
 
@@ -221,7 +243,12 @@ export default function EmployeeTasks({ onTaskAction }) {
       }
     });
 
-    allTasks.push({ date: targetDate, isToday, items: tasksForDate });
+    allTasks.push({
+      date: targetDate,
+      isToday,
+      isOutsideMonth: timeFilter === 30 && targetDate.getMonth() !== currentMonth,
+      items: tasksForDate
+    });
   });
 
   const toggleTaskSelection = (task) => {
@@ -350,7 +377,7 @@ export default function EmployeeTasks({ onTaskAction }) {
             {[
               { v: 1, l: 'HOY' },
               { v: 7, l: '7 DÍAS' },
-              { v: 30, l: '30 DÍAS' }
+              { v: 30, l: 'MES' }
             ].map(f => (
               <button 
                 key={f.v}
@@ -389,6 +416,63 @@ export default function EmployeeTasks({ onTaskAction }) {
               {renderDetailedDay(dayGroup)}
             </div>
           ))
+        ) : timeFilter === 30 ? (
+          <div style={{ overflowX: 'auto', paddingBottom: '0.5rem' }}>
+            <div style={{ minWidth: '760px' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
+                <h3 style={{ margin: 0, fontSize: '1.25rem', fontWeight: 800, color: '#1e293b', textTransform: 'capitalize' }}>
+                  {today.toLocaleDateString('es-ES', { month: 'long', year: 'numeric' })}
+                </h3>
+                <span style={{ color: '#64748b', fontSize: '0.85rem' }}>Calendario mensual de tareas</span>
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, minmax(0, 1fr))', border: '1px solid #cbd5e1', borderRadius: '12px', overflow: 'hidden', background: '#cbd5e1', gap: '1px' }}>
+                {['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom'].map(day => (
+                  <div key={day} style={{ padding: '0.65rem', textAlign: 'center', background: '#f1f5f9', color: '#475569', fontWeight: 800, fontSize: '0.8rem', textTransform: 'uppercase' }}>
+                    {day}
+                  </div>
+                ))}
+                {allTasks.map((dayGroup, idx) => {
+                  const taskCount = dayGroup.items.length;
+                  return (
+                    <div
+                      key={idx}
+                      onClick={() => setSelectedDayTasks(dayGroup)}
+                      style={{
+                        minHeight: '108px',
+                        padding: '0.55rem',
+                        cursor: 'pointer',
+                        background: dayGroup.isToday ? '#ecfdf5' : dayGroup.isOutsideMonth ? '#f1f5f9' : 'white',
+                        boxShadow: dayGroup.isToday ? 'inset 0 0 0 2px #22c55e' : 'none',
+                        color: dayGroup.isOutsideMonth ? '#94a3b8' : '#1e293b',
+                        transition: 'background 0.15s ease'
+                      }}
+                      onMouseEnter={event => { event.currentTarget.style.background = dayGroup.isToday ? '#dcfce7' : '#f8fafc'; }}
+                      onMouseLeave={event => { event.currentTarget.style.background = dayGroup.isToday ? '#ecfdf5' : dayGroup.isOutsideMonth ? '#f1f5f9' : 'white'; }}
+                    >
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.4rem' }}>
+                        <span style={{ fontWeight: dayGroup.isToday ? 900 : 700, color: dayGroup.isToday ? '#15803d' : 'inherit' }}>
+                          {dayGroup.date.getDate()}
+                        </span>
+                        {dayGroup.isToday && <span style={{ fontSize: '0.65rem', fontWeight: 800, color: '#15803d', textTransform: 'uppercase' }}>Hoy</span>}
+                      </div>
+                      {taskCount > 0 ? (
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
+                          {dayGroup.items.slice(0, 3).map((task, taskIndex) => (
+                            <div key={task.id || taskIndex} title={`${task.title}: ${task.desc}`} style={{ background: dayGroup.isOutsideMonth ? '#e2e8f0' : '#f8fafc', borderRadius: '5px', padding: '0.25rem 0.35rem', fontSize: '0.7rem', color: dayGroup.isOutsideMonth ? '#64748b' : '#334155', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                              {task.icon} {task.title}
+                            </div>
+                          ))}
+                          {taskCount > 3 && <span style={{ fontSize: '0.68rem', fontWeight: 700, color: '#64748b' }}>+{taskCount - 3} tareas</span>}
+                        </div>
+                      ) : (
+                        <span style={{ fontSize: '0.7rem', color: dayGroup.isOutsideMonth ? '#cbd5e1' : '#94a3b8' }}>Sin tareas</span>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          </div>
         ) : (
           <div style={{ 
             display: 'grid', 
