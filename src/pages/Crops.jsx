@@ -1531,18 +1531,6 @@ export default function Crops() {
       });
     };
 
-    const scheduleFor = (cropType, harvestDay) => {
-      const offsets = getCropCycleOffsets(cropType);
-      const sowDay = weekDay(Number(harvestDay) - offsets.harvest);
-      return [
-        { icon: '🌱', label: 'Siembra', day: sowDay },
-        ...(offsets.soak > 0 ? [{ icon: '💧', label: 'Germinación', day: weekDay(sowDay + offsets.germinationStart) }] : []),
-        ...(offsets.darkness > 0 ? [{ icon: '🌑', label: 'Oscuridad', day: weekDay(sowDay + offsets.darknessStart) }] : []),
-        { icon: '☀️', label: 'Luz', day: weekDay(sowDay + offsets.lightStart) },
-        { icon: '✂️', label: 'Cosecha', day: Number(harvestDay) }
-      ];
-    };
-
     return (
       <div>
         <div style={{ background: 'linear-gradient(135deg, #f0fdf4, #ccfbf1)', border: '1px solid #99f6e4', padding: '2rem', borderRadius: '20px', marginBottom: '2rem' }}>
@@ -1636,37 +1624,85 @@ export default function Crops() {
         </form>
 
         <section>
-          <h3 style={{ color: '#0f172a', marginBottom: '1rem' }}>Rutinas creadas</h3>
+          <h3 style={{ color: '#0f172a', marginBottom: '0.35rem' }}>Calendario semanal de cosechas</h3>
+          <p style={{ color: '#64748b', margin: '0 0 1rem' }}>Estas son las cosechas que se repetirán cada semana.</p>
           {routineRows.length === 0 ? (
             <div className="premium-card" style={{ padding: '2rem', textAlign: 'center', color: '#64748b' }}>
               Todavía no hay rutinas. Selecciona un día y las variedades para crear la primera.
             </div>
           ) : (
-            <div style={{ display: 'grid', gap: '1rem' }}>
-              {routineRows.map(({ routine, cropType, varietyName }) => (
-                <article key={routine.id} className="premium-card" style={{ padding: '1.25rem', borderLeft: '6px solid #10b981' }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', gap: '1rem', flexWrap: 'wrap', alignItems: 'flex-start' }}>
-                    <div>
-                      <div style={{ color: '#059669', fontWeight: 900, textTransform: 'uppercase', fontSize: '0.8rem' }}>
-                        Cosecha · {plannerDayName(routine.targetDayOfWeek)}
+            <div style={{ overflowX: 'auto', paddingBottom: '0.5rem' }}>
+              <div style={{
+                display: 'grid',
+                gridTemplateColumns: 'repeat(7, minmax(140px, 1fr))',
+                minWidth: '1050px',
+                gap: '0.65rem',
+                alignItems: 'stretch'
+              }}>
+                {PLANNER_DAYS.map(day => {
+                  const dayRoutines = routineRows.filter(({ routine }) => Number(routine.targetDayOfWeek) === day.idx);
+                  const isToday = new Date().getDay() === day.idx;
+                  return (
+                    <div key={day.idx} style={{
+                      border: isToday ? '2px solid #10b981' : '1px solid #dbe4ee',
+                      borderRadius: '14px',
+                      background: '#f8fafc',
+                      minHeight: '220px',
+                      overflow: 'hidden'
+                    }}>
+                      <div style={{
+                        padding: '0.75rem 0.6rem',
+                        textAlign: 'center',
+                        fontWeight: 900,
+                        color: isToday ? 'white' : '#334155',
+                        background: isToday ? '#059669' : '#e2e8f0'
+                      }}>
+                        {day.name}
+                        {isToday && <small style={{ display: 'block', fontWeight: 700, opacity: 0.9 }}>Hoy</small>}
                       </div>
-                      <h4 style={{ margin: '0.25rem 0', color: '#0f172a', fontSize: '1.25rem' }}>{varietyName}</h4>
-                      <div style={{ color: '#64748b' }}>{routine.tuppersCount} bandeja{Number(routine.tuppersCount) === 1 ? '' : 's'} por semana</div>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.6rem', padding: '0.65rem' }}>
+                        {dayRoutines.length === 0 ? (
+                          <div style={{ color: '#94a3b8', textAlign: 'center', padding: '1.5rem 0.25rem', fontSize: '0.85rem' }}>
+                            Sin cosechas
+                          </div>
+                        ) : dayRoutines.map(({ routine, varietyName }) => (
+                          <article key={routine.id} style={{
+                            background: 'white',
+                            border: '1px solid #a7f3d0',
+                            borderLeft: '5px solid #10b981',
+                            borderRadius: '10px',
+                            padding: '0.7rem',
+                            boxShadow: '0 2px 5px rgba(15, 23, 42, 0.06)'
+                          }}>
+                            <div style={{ fontSize: '1rem', fontWeight: 900, color: '#0f172a', lineHeight: 1.2 }}>{varietyName}</div>
+                            <div style={{ color: '#047857', fontWeight: 800, fontSize: '0.82rem', marginTop: '0.35rem' }}>
+                              ✂️ {routine.tuppersCount} bandeja{Number(routine.tuppersCount) === 1 ? '' : 's'}
+                            </div>
+                            <div style={{ display: 'flex', gap: '0.35rem', marginTop: '0.65rem' }}>
+                              <button
+                                type="button"
+                                onClick={() => editPlannerRoutine(routine)}
+                                aria-label={`Editar ${varietyName}`}
+                                style={{ flex: 1, border: '1px solid #cbd5e1', background: '#f8fafc', color: '#334155', borderRadius: '7px', padding: '0.35rem', cursor: 'pointer', fontWeight: 700 }}
+                              >
+                                Editar
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => removePlannerRoutine(routine)}
+                                aria-label={`Eliminar ${varietyName}`}
+                                style={{ border: '1px solid #fecaca', background: '#fef2f2', color: '#dc2626', borderRadius: '7px', padding: '0.35rem 0.5rem', cursor: 'pointer', fontWeight: 800 }}
+                              >
+                                ×
+                              </button>
+                            </div>
+                          </article>
+                        ))}
+                      </div>
                     </div>
-                    <div style={{ display: 'flex', gap: '0.5rem' }}>
-                      <button type="button" className="btn" onClick={() => editPlannerRoutine(routine)}>Editar</button>
-                      <button type="button" className="btn" onClick={() => removePlannerRoutine(routine)} style={{ color: '#dc2626' }}>Eliminar</button>
-                    </div>
-                  </div>
-                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem', marginTop: '1rem' }}>
-                    {scheduleFor(cropType, routine.targetDayOfWeek).map((phase, index) => (
-                      <span key={`${phase.label}-${index}`} style={{ background: '#f1f5f9', color: '#334155', borderRadius: '999px', padding: '0.45rem 0.75rem', fontWeight: 700, fontSize: '0.85rem' }}>
-                        {phase.icon} {phase.label}: {plannerDayName(phase.day, true)}
-                      </span>
-                    ))}
-                  </div>
-                </article>
-              ))}
+                  );
+                })}
+              </div>
             </div>
           )}
         </section>
