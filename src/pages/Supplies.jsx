@@ -42,6 +42,7 @@ export default function Supplies() {
   const [showArticleModal, setShowArticleModal] = useState(false);
   const [showStockModal, setShowStockModal] = useState(false);
   const [showCropTypeModal, setShowCropTypeModal] = useState(false);
+  const [isSavingStockEntry, setIsSavingStockEntry] = useState(false);
 
   // Handlers
   const handleAddArticle = e => { 
@@ -60,22 +61,28 @@ export default function Supplies() {
   
   const handleAddStockEntry = async e => {
     e.preventDefault();
-    const result = await receivePurchaseDeliveryNote({
-      providerId: newStockEntry.providerId,
-      number: newStockEntry.deliveryNote,
-      date: newStockEntry.purchaseDate,
-      notes: '',
-      lines: [{
-        articleId: newStockEntry.articleId,
-        supplierBatch: newStockEntry.batchNumber,
-        quantity: Number(newStockEntry.quantity),
-        totalCost: Number(newStockEntry.price)
-      }]
-    });
-    if (!result) return;
-    setNewStockEntry({...newStockEntry, deliveryNote: '', batchNumber: '', providerId: '', articleId: '', quantity: 1, price: 0});
-    setShowStockModal(false);
-    await Swal.fire('Entrada registrada', 'El lote, el stock y el coste de la referencia se han actualizado.', 'success');
+    if (isSavingStockEntry) return;
+    setIsSavingStockEntry(true);
+    try {
+      const result = await receivePurchaseDeliveryNote({
+        providerId: newStockEntry.providerId,
+        number: newStockEntry.deliveryNote,
+        date: newStockEntry.purchaseDate,
+        notes: '',
+        lines: [{
+          articleId: newStockEntry.articleId,
+          supplierBatch: newStockEntry.batchNumber,
+          quantity: Number(newStockEntry.quantity),
+          totalCost: Number(newStockEntry.price)
+        }]
+      });
+      if (!result) return;
+      setNewStockEntry({...newStockEntry, deliveryNote: '', batchNumber: '', providerId: '', articleId: '', quantity: 1, price: 0});
+      setShowStockModal(false);
+      await Swal.fire('Entrada registrada', 'El lote, el stock y el coste de la referencia se han actualizado.', 'success');
+    } finally {
+      setIsSavingStockEntry(false);
+    }
   };
 
   const runAdminDelete = async (message, action) => {
@@ -1070,7 +1077,9 @@ export default function Supplies() {
               
               <div style={{ gridColumn: 'span 2', display: 'flex', justifyContent: 'flex-end', gap: '0.75rem', marginTop: '1rem' }}>
                 <button type="button" className="btn btn-secondary" onClick={() => setShowStockModal(false)}>Cancelar</button>
-                <button type="submit" className="btn btn-primary">Guardar Entrada</button>
+                <button type="submit" className="btn btn-primary" disabled={isSavingStockEntry}>
+                  {isSavingStockEntry ? 'Guardando...' : 'Guardar Entrada'}
+                </button>
               </div>
             </form>
           </div>
