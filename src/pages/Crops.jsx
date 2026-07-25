@@ -1108,7 +1108,6 @@ export default function Crops() {
   };
 
   const renderPlanificador = () => {
-    console.log("harvestTargets state:", harvestTargets);
     const tableDays = [
       { idx: 1, name: 'Lunes', short: 'Lun' },
       { idx: 2, name: 'Martes', short: 'Mar' },
@@ -1118,6 +1117,17 @@ export default function Crops() {
       { idx: 6, name: 'Sábado', short: 'Sáb' },
       { idx: 0, name: 'Domingo', short: 'Dom' }
     ];
+    const plannerRows = (seedVarieties || [])
+      .filter(variety => variety.active !== false)
+      .flatMap(variety => {
+        const relatedCropTypes = (cropTypes || []).filter(cropType => cropType.varietyId === variety.id);
+        return relatedCropTypes.length
+          ? relatedCropTypes.map(cropType => ({ variety, cropType }))
+          : [{ variety, cropType: null }];
+      });
+    const legacyRows = (cropTypes || [])
+      .filter(cropType => !cropType.varietyId || !seedVarieties?.some(variety => variety.id === cropType.varietyId))
+      .map(cropType => ({ variety: { id: `legacy-${cropType.id}`, name: cropType.name }, cropType }));
 
     return (
       <div>
@@ -1139,12 +1149,30 @@ export default function Crops() {
               </tr>
             </thead>
             <tbody>
-              {cropTypes?.map(cType => {
+              {[...plannerRows, ...legacyRows].map(({ variety, cropType: cType }) => {
+                if (!cType) {
+                  return (
+                    <tr key={variety.id} style={{ borderBottom: '1px solid #f1f5f9', background: '#fffbeb' }}>
+                      <td style={{ padding: '1rem', fontWeight: 700, color: '#1e293b' }}>{variety.name}</td>
+                      <td colSpan={7} style={{ padding: '1rem', textAlign: 'center' }}>
+                        <span style={{ color: '#92400e', fontWeight: 700, marginRight: '1rem' }}>
+                          Falta la ficha de cultivo para definir consumos y duración del ciclo.
+                        </span>
+                        <button className="btn btn-primary" onClick={() => setActiveTab('stock')}>
+                          Crear ficha de cultivo
+                        </button>
+                      </td>
+                    </tr>
+                  );
+                }
                 const cropEvents = getCycleEventsForCrop(cType, harvestTargets);
 
                 return (
                   <tr key={cType.id} style={{ borderBottom: '1px solid #f1f5f9' }}>
-                    <td style={{ padding: '1rem', fontWeight: 700, color: '#1e293b' }}>{cType.name}</td>
+                    <td style={{ padding: '1rem', color: '#1e293b' }}>
+                      <div style={{ fontWeight: 800 }}>{variety.name}</div>
+                      <div style={{ fontSize: '0.75rem', color: '#64748b', marginTop: '0.2rem' }}>Ficha: {cType.name}</div>
+                    </td>
                     {tableDays.map(d => {
                       const ht = harvestTargets?.find(t => t.productId == cType.id && t.targetDayOfWeek == d.idx);
                       const eventsToday = cropEvents.filter(e => e.dayOfWeek === d.idx);
