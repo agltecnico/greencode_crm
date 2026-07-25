@@ -10,13 +10,13 @@ const emptyForm = () => ({
   shelfLifeDays: 10,
   isMix: false,
   recipeVarieties: [],
+  packagingArticleIds: [],
   nutritionalInfo: { ...emptyNutrition }
 });
 
 export default function Products() {
   const {
     products, seedVarieties, articles,
-    packagingFormats, addPackagingFormat, updatePackagingFormat, deletePackagingFormat,
     addProduct, updateProduct, deleteProduct
   } = useData();
   const { isAdminMode, requireAdmin } = useAdminMode();
@@ -24,7 +24,7 @@ export default function Products() {
   const [editingId, setEditingId] = useState(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [formData, setFormData] = useState(emptyForm);
-  const [formatForm, setFormatForm] = useState({ id: null, name: '', capacityMl: '' });
+  const packagingArticles = articles?.filter(article => article.type === 'ENVASE' && article.active !== false) || [];
 
   const recipeFor = (product) => {
     if (Array.isArray(product.recipeVarieties) && product.recipeVarieties.length) return product.recipeVarieties;
@@ -48,6 +48,7 @@ export default function Products() {
       price: Number(formData.price),
       shelfLifeDays: Number(formData.shelfLifeDays) || 10,
       recipeVarieties: recipe,
+      packagingArticleIds: formData.packagingArticleIds,
       nutritionalInfo: formData.nutritionalInfo
     };
     if (editingId) await updateProduct(editingId, payload);
@@ -63,6 +64,7 @@ export default function Products() {
       shelfLifeDays: product.shelfLifeDays || 10,
       isMix: recipeVarieties.length > 1,
       recipeVarieties,
+      packagingArticleIds: Array.isArray(product.packagingArticleIds) ? product.packagingArticleIds : [],
       nutritionalInfo: product.nutritionalInfo || { ...emptyNutrition }
     });
     setEditingId(product.id);
@@ -84,6 +86,15 @@ export default function Products() {
     });
   };
 
+  const togglePackagingArticle = articleId => {
+    setFormData(prev => ({
+      ...prev,
+      packagingArticleIds: prev.packagingArticleIds.includes(articleId)
+        ? prev.packagingArticleIds.filter(id => id !== articleId)
+        : [...prev.packagingArticleIds, articleId]
+    }));
+  };
+
   const removeProduct = async (id) => {
     if (!(await requireAdmin())) return;
     const answer = await Swal.fire({
@@ -102,32 +113,6 @@ export default function Products() {
     product.name?.toLowerCase().includes(searchTerm.toLowerCase())
   ) || [];
 
-  const savePackagingFormat = async event => {
-    event.preventDefault();
-    const payload = {
-      name: formatForm.name.trim(),
-      capacityMl: Number(formatForm.capacityMl),
-      active: true
-    };
-    if (formatForm.id) await updatePackagingFormat(formatForm.id, payload);
-    else await addPackagingFormat(payload);
-    setFormatForm({ id: null, name: '', capacityMl: '' });
-  };
-
-  const removePackagingFormat = async format => {
-    if (!(await requireAdmin())) return;
-    const answer = await Swal.fire({
-      title: 'Eliminar formato de envase',
-      text: 'Solo se puede eliminar si todavía no aparece en ninguna cosecha.',
-      icon: 'warning',
-      showCancelButton: true,
-      confirmButtonText: 'Sí, eliminar',
-      cancelButtonText: 'Cancelar',
-      confirmButtonColor: '#dc2626'
-    });
-    if (answer.isConfirmed) await deletePackagingFormat(format.id);
-  };
-
   return (
     <div className="admin-container">
       <div className="admin-header">
@@ -145,39 +130,6 @@ export default function Products() {
       <div className="admin-toolbar">
         <div className="admin-search">
           <input type="text" placeholder="Buscar producto..." value={searchTerm} onChange={e => setSearchTerm(e.target.value)} />
-        </div>
-      </div>
-
-      <div className="premium-card mb-6">
-        <div className="flex justify-between items-start gap-4" style={{ marginBottom: '1rem' }}>
-          <div>
-            <h3 className="font-bold text-lg">Formatos de envase</h3>
-            <p className="text-muted text-sm">Tipos de táper que se pueden seleccionar al registrar una cosecha.</p>
-          </div>
-        </div>
-        <form onSubmit={savePackagingFormat} className="grid grid-cols-1 md:grid-cols-3 gap-4" style={{ alignItems: 'end' }}>
-          <div>
-            <label className="form-label">Nombre</label>
-            <input required className="premium-input w-full" placeholder="Ej. Táper 500 ml" value={formatForm.name} onChange={event => setFormatForm({ ...formatForm, name: event.target.value })} />
-          </div>
-          <div>
-            <label className="form-label">Capacidad (ml)</label>
-            <input required min="1" type="number" className="premium-input w-full" value={formatForm.capacityMl} onChange={event => setFormatForm({ ...formatForm, capacityMl: event.target.value })} />
-          </div>
-          <div className="flex gap-2">
-            <button className="btn btn-primary" type="submit">{formatForm.id ? 'Guardar cambios' : '+ Añadir formato'}</button>
-            {formatForm.id && <button className="btn btn-secondary" type="button" onClick={() => setFormatForm({ id: null, name: '', capacityMl: '' })}>Cancelar</button>}
-          </div>
-        </form>
-        <div className="flex flex-wrap gap-2 mt-4">
-          {(packagingFormats || []).map(format => (
-            <div key={format.id} className="badge" style={{ display: 'inline-flex', alignItems: 'center', gap: '0.5rem', padding: '0.55rem 0.7rem', background: '#f1f5f9', color: '#334155' }}>
-              <strong>{format.name}</strong>
-              <span>{Number(format.capacityMl)} ml</span>
-              <button type="button" className="btn btn-secondary" style={{ padding: '0.2rem 0.4rem', fontSize: '0.7rem' }} onClick={() => setFormatForm({ id: format.id, name: format.name, capacityMl: format.capacityMl })}>Editar</button>
-              {isAdminMode && <button type="button" className="btn btn-danger" style={{ padding: '0.2rem 0.4rem', fontSize: '0.7rem' }} onClick={() => removePackagingFormat(format)}>Eliminar</button>}
-            </div>
-          ))}
         </div>
       </div>
 
@@ -227,9 +179,22 @@ export default function Products() {
               {!seedVarieties?.length && <p className="text-muted text-sm mt-2">Primero crea una variedad en Cultivo → Variedades.</p>}
             </div>
 
+            <div className="form-group mt-4">
+              <label className="form-label">Envases permitidos para la venta</label>
+              <div className="grid grid-cols-2 gap-2">
+                {packagingArticles.map(article => (
+                  <label key={article.id} className="premium-card" style={{ padding: '0.75rem', cursor: 'pointer' }}>
+                    <input type="checkbox" checked={formData.packagingArticleIds.includes(article.id)} onChange={() => togglePackagingArticle(article.id)} />{' '}
+                    {article.name}
+                  </label>
+                ))}
+              </div>
+              {!packagingArticles.length && <p className="text-muted text-sm mt-2">Primero crea un artículo de tipo Envase en Producción → Stock.</p>}
+            </div>
+
             <div className="flex gap-2 justify-end mt-4">
               <button type="button" className="btn btn-secondary" onClick={cancelForm}>Cancelar</button>
-              <button type="submit" className="btn btn-primary" disabled={!formData.recipeVarieties.length}>Guardar producto</button>
+              <button type="submit" className="btn btn-primary" disabled={!formData.recipeVarieties.length || !formData.packagingArticleIds.length}>Guardar producto</button>
             </div>
           </form>
         </div>
@@ -251,6 +216,13 @@ export default function Products() {
                 </div>
               </div>
               <p className="text-sm text-muted">Caducidad: {product.shelfLifeDays || 10} días</p>
+              <div className="flex flex-wrap gap-2 mt-3">
+                {(product.packagingArticleIds || []).map(articleId => {
+                  const article = articles?.find(item => item.id === articleId);
+                  return article ? <span key={articleId} className="badge badge-primary">📦 {article.name}</span> : null;
+                })}
+                {!(product.packagingArticleIds || []).length && <span className="badge badge-warning">Envase pendiente de asignar</span>}
+              </div>
               <div className="flex flex-wrap gap-2 mt-3">
                 {recipe.map(item => {
                   const variety = seedVarieties?.find(v => v.id === item.varietyId);
