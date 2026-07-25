@@ -463,6 +463,21 @@ export const DataProvider = ({ children }) => {
       return data;
     };
 
+    const updatePurchaseDeliveryNote = async ({ id, number, date, lines }) => {
+      const { data, error } = await persistOrReload(
+        () => supabase.rpc('update_purchase_delivery_note', {
+          p_note_id: id,
+          p_number: String(number || '').trim(),
+          p_date: date,
+          p_lines: lines
+        }),
+        'actualizar el albarán de entrada'
+      );
+      if (error) return null;
+      await refreshData({ force: true });
+      return data;
+    };
+
     const deletePurchaseDeliveryNote = async (id) => {
       const result = await persistOrReload(
         () => supabase.rpc('delete_unused_purchase_delivery_note', { p_note_id: id }),
@@ -1393,7 +1408,7 @@ export const DataProvider = ({ children }) => {
         seedVarieties, addSeedVariety, updateSeedVariety, deleteSeedVariety,
         articles, stockEntries, stockLots, purchaseDeliveryNotes, purchaseDeliveryNoteLines,
         addArticle, updateArticle, deleteArticle, addStockEntry, updateStockEntry, deleteStockEntry,
-        receivePurchaseDeliveryNote, deletePurchaseDeliveryNote,
+        receivePurchaseDeliveryNote, updatePurchaseDeliveryNote, deletePurchaseDeliveryNote,
         cropTypes, addCropType, updateCropType, deleteCropType,
         seeds, addSeed, updateSeed, deleteSeed,
         seedInventory, addSeedInventory, updateSeedInventory, deleteSeedInventory,
