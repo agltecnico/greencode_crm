@@ -23,6 +23,14 @@ export default function TvDashboard() {
   };
 
   const activeCropsList = crops?.filter(c => c.status !== 'HARVESTED' && c.status !== 'DISCARDED') || [];
+  const cropStatusTone = {
+    SOAKING: 'blue',
+    SOWED: 'green',
+    GERMINATING: 'green',
+    DARKNESS: 'violet',
+    LIGHT: 'amber',
+    GROWING: 'green'
+  };
 
   useEffect(() => {
     // Auto-refresh data every 30 seconds for TV Mode
@@ -137,32 +145,36 @@ export default function TvDashboard() {
           📦 STOCK NEVERA
         </button>
 
-      </div>\n\n        {tvTab === 'tasks' && (
+      </div>
+
+        {tvTab === 'tasks' && (
           <EmployeeTasks />
         )}
         
         {tvTab === 'greenhouse' && (
           <div style={{ animation: 'fadeIn 0.4s ease' }}>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: '1rem', marginTop: '2rem' }}>
+            <div className="tv-panel-heading">
+              <div>
+                <span className="tv-eyebrow">PRODUCCIÓN EN TIEMPO REAL</span>
+                <h2>Cultivos activos</h2>
+              </div>
+              <span className="tv-summary-badge">{activeCropsList.length} lotes activos</span>
+            </div>
+            <div className="tv-info-grid">
               {activeCropsList.map(crop => {
                 const cType = cropTypes?.find(c => c.id === crop.cropTypeId) || seeds?.find(s => s.id === crop.seedId);
                 const daysAlive = Math.floor((new Date() - new Date(crop.datePlanted)) / (1000 * 60 * 60 * 24));
                 
                 return (
-                  <div key={crop.id} className={`status-card ${crop.status}`} style={{ background: '#1e293b', borderColor: '#334155', padding: '1rem' }}>
-                    <div className="status-header" style={{ marginBottom: '0.75rem' }}>
-                      <div>
-                        <h4 className="status-title" style={{ color: '#f8fafc', fontSize: '1rem', minHeight: '24px', margin: 0 }}>{cType?.name || 'Variedad Desconocida'}</h4>
-                        <span className="status-batch" style={{ background: '#0f172a', color: '#94a3b8', fontSize: '0.75rem', padding: '2px 8px', display: 'inline-block', marginTop: '4px' }}>LOTE: {crop.batchNumber}</span>
-                      </div>
+                  <div key={crop.id} className="tv-info-card" data-tone={cropStatusTone[crop.status] || 'slate'}>
+                    <div className="tv-card-topline">
+                      <span className={`tv-label ${cropStatusTone[crop.status] || 'slate'}`}>{translateStatus(crop.status)}</span>
+                      <span className="tv-label neutral">Día {daysAlive}</span>
                     </div>
-                    
-                    <div className="status-footer" style={{ borderTopColor: '#334155', marginTop: '0.75rem', paddingTop: '0.75rem', borderTop: '1px solid #334155' }}>
-                      <div>
-                        <p style={{ margin: '0 0 2px 0', fontSize: '0.65rem', fontWeight: 'bold', color: '#64748b', textTransform: 'uppercase' }}>Estado</p>
-                        <p className="status-current" style={{ fontSize: '1.2rem', margin: 0 }}>{translateStatus(crop.status)}</p>
-                        <p className="status-days" style={{ fontSize: '0.8rem', color: '#cbd5e1', marginTop: '2px', marginBottom: 0 }}>Día {daysAlive}</p>
-                      </div>
+                    <h3>{cType?.name || 'Variedad desconocida'}</h3>
+                    <div className="tv-label-row">
+                      <span className="tv-label neutral">Lote {crop.batchNumber || 'sin lote'}</span>
+                      <span className="tv-label green">{crop.traysCount || 0} bandejas</span>
                     </div>
                   </div>
                 );
@@ -177,23 +189,58 @@ export default function TvDashboard() {
         </div>
       )}
 
+      {tvTab === 'climate' && (
+        <div style={{ animation: 'fadeIn 0.4s ease' }}>
+          <div className="tv-panel-heading">
+            <div>
+              <span className="tv-eyebrow">CONDICIONES DEL CULTIVO</span>
+              <h2>Clima actual</h2>
+            </div>
+            <span className="tv-summary-badge muted">Sin sensor conectado</span>
+          </div>
+          <div className="tv-climate-grid">
+            <div className="tv-metric-card" data-tone="amber">
+              <span className="tv-metric-icon">🌡️</span>
+              <span className="tv-metric-label">Temperatura</span>
+              <strong>-- °C</strong>
+              <span className="tv-label amber">Pendiente de lectura</span>
+            </div>
+            <div className="tv-metric-card" data-tone="blue">
+              <span className="tv-metric-icon">💧</span>
+              <span className="tv-metric-label">Humedad</span>
+              <strong>-- %</strong>
+              <span className="tv-label blue">Pendiente de lectura</span>
+            </div>
+            <div className="tv-metric-card" data-tone="green">
+              <span className="tv-metric-icon">🌿</span>
+              <span className="tv-metric-label">Estado ambiental</span>
+              <strong>Sin datos</strong>
+              <span className="tv-label neutral">Conecta un sensor climático</span>
+            </div>
+          </div>
+        </div>
+      )}
+
       {tvTab === 'orders' && (
         <div style={{ animation: 'fadeIn 0.4s ease' }}>
-          <div className="tasks-header" style={{ marginBottom: '3rem' }}>
-            <h2>Panel Logístico de Pedidos</h2>
-            <p style={{ color: '#94a3b8', fontSize: '1.25rem' }}>Estado en tiempo real de los envíos de hoy.</p>
+          <div className="tv-panel-heading">
+            <div>
+              <span className="tv-eyebrow">LOGÍSTICA EN TIEMPO REAL</span>
+              <h2>Estado de pedidos</h2>
+            </div>
+            <span className="tv-summary-badge">{orders?.filter(order => ['PENDING', 'PREPARED', 'IN_TRANSIT'].includes(order.status)).length || 0} pedidos activos</span>
           </div>
           
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '2rem' }}>
-            <div style={{ background: '#1e293b', borderRadius: '24px', padding: '2rem', border: '2px solid #334155' }}>
-              <h3 style={{ color: '#fbbf24', fontSize: '1.8rem', textAlign: 'center', marginBottom: '2rem' }}>🟡 PENDIENTES</h3>
+          <div className="tv-order-grid">
+            <div className="tv-order-column">
+              <h3><span className="tv-label amber">Pendientes</span></h3>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
                 {orders?.filter(o => o.status === 'PENDING').map(o => {
                   const client = clients?.find(c => c.id === o.clientId);
                   return (
-                    <div key={o.id} style={{ background: '#0f172a', padding: '1.5rem', borderRadius: '16px', borderLeft: '6px solid #fbbf24' }}>
+                    <div key={o.id} className="tv-info-card compact" data-tone="amber">
                       <h4 style={{ color: 'white', fontSize: '1.3rem', margin: '0 0 0.5rem 0' }}>{client?.name || 'Desconocido'}</h4>
-                      <p style={{ color: '#94a3b8', margin: 0 }}>{o.items?.length || 0} productos</p>
+                      <div className="tv-label-row"><span className="tv-label neutral">{o.items?.length || 0} productos</span><span className="tv-label amber">Por preparar</span></div>
                     </div>
                   );
                 })}
@@ -201,15 +248,15 @@ export default function TvDashboard() {
               </div>
             </div>
 
-            <div style={{ background: '#1e293b', borderRadius: '24px', padding: '2rem', border: '2px solid #334155' }}>
-              <h3 style={{ color: '#38bdf8', fontSize: '1.8rem', textAlign: 'center', marginBottom: '2rem' }}>🔵 PREPARADOS</h3>
+            <div className="tv-order-column">
+              <h3><span className="tv-label blue">Preparados</span></h3>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
                 {orders?.filter(o => o.status === 'PREPARED').map(o => {
                   const client = clients?.find(c => c.id === o.clientId);
                   return (
-                    <div key={o.id} style={{ background: '#0f172a', padding: '1.5rem', borderRadius: '16px', borderLeft: '6px solid #38bdf8' }}>
+                    <div key={o.id} className="tv-info-card compact" data-tone="blue">
                       <h4 style={{ color: 'white', fontSize: '1.3rem', margin: '0 0 0.5rem 0' }}>{client?.name || 'Desconocido'}</h4>
-                      <p style={{ color: '#94a3b8', margin: 0 }}>Listo para la furgoneta</p>
+                      <div className="tv-label-row"><span className="tv-label blue">Listo</span><span className="tv-label neutral">Para furgoneta</span></div>
                     </div>
                   );
                 })}
@@ -217,15 +264,15 @@ export default function TvDashboard() {
               </div>
             </div>
 
-            <div style={{ background: '#1e293b', borderRadius: '24px', padding: '2rem', border: '2px solid #334155' }}>
-              <h3 style={{ color: '#a855f7', fontSize: '1.8rem', textAlign: 'center', marginBottom: '2rem' }}>🟣 EN REPARTO</h3>
+            <div className="tv-order-column">
+              <h3><span className="tv-label violet">En reparto</span></h3>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
                 {orders?.filter(o => o.status === 'IN_TRANSIT').map(o => {
                   const client = clients?.find(c => c.id === o.clientId);
                   return (
-                    <div key={o.id} style={{ background: '#0f172a', padding: '1.5rem', borderRadius: '16px', borderLeft: '6px solid #a855f7' }}>
+                    <div key={o.id} className="tv-info-card compact" data-tone="violet">
                       <h4 style={{ color: 'white', fontSize: '1.3rem', margin: '0 0 0.5rem 0' }}>{client?.name || 'Desconocido'}</h4>
-                      <p style={{ color: '#94a3b8', margin: 0 }}>En camino hacia el cliente</p>
+                      <div className="tv-label-row"><span className="tv-label violet">En ruta</span><span className="tv-label neutral">Hacia el cliente</span></div>
                     </div>
                   );
                 })}
@@ -239,8 +286,14 @@ export default function TvDashboard() {
     
         {tvTab === 'stock' && (
           <div style={{ animation: 'fadeIn 0.4s ease', padding: '0 2rem' }}>
-            <h2 style={{ color: '#fff', fontSize: '2.5rem', textAlign: 'center', marginBottom: '2rem' }}>📦 CONTROL DE DISPONIBILIDAD</h2>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '1.5rem' }}>
+            <div className="tv-panel-heading">
+              <div>
+                <span className="tv-eyebrow">PRODUCTO TERMINADO</span>
+                <h2>Control de disponibilidad</h2>
+              </div>
+              <span className="tv-summary-badge muted">Stock de nevera</span>
+            </div>
+            <div className="tv-info-grid stock">
               {(() => {
                 if (!products || !productMovements) return <p style={{color:'white'}}>Cargando datos...</p>;
                 
@@ -266,31 +319,15 @@ export default function TvDashboard() {
                   if (envasados === 0 && enPedidos === 0) return null;
 
                   return (
-                    <div key={product.id} style={{ 
-                      background: '#1e293b', 
-                      border: `3px solid ${sobran > 0 ? '#10b981' : sobran < 0 ? '#ef4444' : '#334155'}`, 
-                      borderRadius: '16px', 
-                      padding: '1.5rem',
-                      display: 'flex',
-                      flexDirection: 'column',
-                      gap: '1rem'
-                    }}>
-                      <h3 style={{ color: '#fff', fontSize: '1.8rem', margin: 0, textAlign: 'center', borderBottom: '1px solid #334155', paddingBottom: '0.5rem' }}>{product.name}</h3>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                        <div style={{ textAlign: 'center' }}>
-                          <span style={{ color: '#94a3b8', fontSize: '1rem', display: 'block', textTransform: 'uppercase', fontWeight: 'bold' }}>Envasados</span>
-                          <span style={{ color: '#fff', fontSize: '2.5rem', fontWeight: '900' }}>{envasados}</span>
-                        </div>
-                        <div style={{ fontSize: '2rem', color: '#64748b' }}>-</div>
-                        <div style={{ textAlign: 'center' }}>
-                          <span style={{ color: '#fb923c', fontSize: '1rem', display: 'block', textTransform: 'uppercase', fontWeight: 'bold' }}>En Pedido</span>
-                          <span style={{ color: '#fb923c', fontSize: '2.5rem', fontWeight: '900' }}>{enPedidos}</span>
-                        </div>
-                        <div style={{ fontSize: '2rem', color: '#64748b' }}>=</div>
-                        <div style={{ textAlign: 'center', background: sobran > 0 ? 'rgba(16, 185, 129, 0.2)' : sobran < 0 ? 'rgba(239, 68, 68, 0.2)' : 'rgba(51, 65, 85, 0.5)', padding: '0.5rem 1rem', borderRadius: '12px' }}>
-                          <span style={{ color: sobran > 0 ? '#10b981' : sobran < 0 ? '#ef4444' : '#94a3b8', fontSize: '1rem', display: 'block', textTransform: 'uppercase', fontWeight: 'bold' }}>Sobran</span>
-                          <span style={{ color: sobran > 0 ? '#10b981' : sobran < 0 ? '#ef4444' : '#94a3b8', fontSize: '3rem', fontWeight: '900' }}>{sobran}</span>
-                        </div>
+                    <div key={product.id} className="tv-info-card stock-card" data-tone={sobran > 0 ? 'green' : sobran < 0 ? 'red' : 'slate'}>
+                      <div className="tv-card-topline">
+                        <span className={`tv-label ${sobran > 0 ? 'green' : sobran < 0 ? 'red' : 'neutral'}`}>{sobran > 0 ? 'Disponible' : sobran < 0 ? 'Falta stock' : 'Justo'}</span>
+                      </div>
+                      <h3>{product.name}</h3>
+                      <div className="tv-stock-metrics">
+                        <div><span>Envasados</span><strong>{envasados}</strong></div>
+                        <div><span>En pedidos</span><strong>{enPedidos}</strong></div>
+                        <div className={sobran >= 0 ? 'positive' : 'negative'}><span>Disponibles</span><strong>{sobran}</strong></div>
                       </div>
                     </div>
                   );
