@@ -9,7 +9,8 @@ export default function Supplies() {
     providers,
     seedVarieties, addSeedVariety, updateSeedVariety, deleteSeedVariety,
     articles, addArticle, updateArticle, deleteArticle,
-    stockEntries, stockLots, purchaseDeliveryNotes, receivePurchaseDeliveryNote, deletePurchaseDeliveryNote,
+    stockEntries, stockLots, purchaseDeliveryNotes, purchaseDeliveryNoteLines,
+    receivePurchaseDeliveryNote, updatePurchaseDeliveryNote, deletePurchaseDeliveryNote,
     deleteStockEntry,
     cropTypes, addCropType, updateCropType, deleteCropType
   } = useData();
@@ -44,6 +45,67 @@ export default function Supplies() {
   const [showStockModal, setShowStockModal] = useState(false);
   const [showCropTypeModal, setShowCropTypeModal] = useState(false);
   const [isSavingStockEntry, setIsSavingStockEntry] = useState(false);
+  const [editingPurchaseNoteId, setEditingPurchaseNoteId] = useState(null);
+
+  const isWeightPurchase = article => article?.type === 'SEMILLA' || article?.unit === 'g';
+  const purchasePriceLabel = article => {
+    if (isWeightPurchase(article)) return 'Precio por kilo (€/kg)';
+    if (article?.unit === 'l' || article?.type === 'SUSTRATO') return 'Precio por litro (€/l)';
+    return 'Precio por unidad (€/ud)';
+  };
+  const purchasePriceFromLine = (article, line) =>
+    Number(line?.unitCost || 0) * (isWeightPurchase(article) ? 1000 : 1);
+  const purchaseTotalCost = (article, quantity, purchasePrice) =>
+    Number(quantity || 0) * Number(purchasePrice || 0) / (isWeightPurchase(article) ? 1000 : 1);
+
+  const resetPurchaseModal = () => {
+    setEditingPurchaseNoteId(null);
+    setNewStockEntry({
+      purchaseDate: new Date().toISOString().split('T')[0],
+      deliveryNote: '',
+      batchNumber: '',
+      articleId: '',
+      providerId: '',
+      quantity: 1,
+      price: 0
+    });
+    setPurchaseLines([]);
+  };
+
+  const openNewPurchaseNote = () => {
+    resetPurchaseModal();
+    setShowStockModal(true);
+  };
+
+  const openEditPurchaseNote = noteId => {
+    const note = purchaseDeliveryNotes?.find(item => item.id === noteId);
+    if (!note) return;
+    const lines = (purchaseDeliveryNoteLines || [])
+      .filter(line => line.deliveryNoteId === noteId)
+      .map(line => {
+        const article = articles?.find(item => item.id === line.articleId);
+        return {
+          id: line.id,
+          articleId: line.articleId,
+          supplierBatch: line.supplierBatch,
+          quantity: Number(line.quantity),
+          totalCost: Number(line.totalCost),
+          purchaseUnitPrice: purchasePriceFromLine(article, line)
+        };
+      });
+    setEditingPurchaseNoteId(noteId);
+    setNewStockEntry({
+      purchaseDate: note.date,
+      deliveryNote: note.number,
+      batchNumber: '',
+      articleId: '',
+      providerId: note.providerId,
+      quantity: 1,
+      price: 0
+    });
+    setPurchaseLines(lines);
+    setShowStockModal(true);
+  };
 
   // Handlers
   const handleAddArticle = e => { 
@@ -69,25 +131,51 @@ export default function Supplies() {
         articleId: newStockEntry.articleId,
         supplierBatch: newStockEntry.batchNumber,
         quantity: Number(newStockEntry.quantity),
-        totalCost: Number(newStockEntry.price)
+        totalCost: purchaseTotalCost(
+          articles?.find(item => item.id === newStockEntry.articleId),
+          newStockEntry.quantity,
+          newStockEntry.price
+        ),
+        purchaseUnitPrice: Number(newStockEntry.price)
       } : null;
       const lines = [...purchaseLines, ...(pendingLine ? [pendingLine] : [])];
       if (lines.length === 0) {
         await Swal.fire('Faltan artículos', 'Añade al menos un artículo al albarán.', 'warning');
         return;
       }
-      const result = await receivePurchaseDeliveryNote({
-        providerId: newStockEntry.providerId,
-        number: newStockEntry.deliveryNote,
-        date: newStockEntry.purchaseDate,
-        notes: '',
-        lines
+      const normalizedLines = lines.map(line => {
+        const article = articles?.find(item => item.id === line.articleId);
+        return {
+          id: line.id,
+          articleId: line.articleId,
+          supplierBatch: line.supplierBatch,
+          quantity: Number(line.quantity),
+          totalCost: purchaseTotalCost(article, line.quantity, line.purchaseUnitPrice)
+        };
       });
+      const result = editingPurchaseNoteId
+        ? await updatePurchaseDeliveryNote({
+            id: editingPurchaseNoteId,
+            number: newStockEntry.deliveryNote,
+            date: newStockEntry.purchaseDate,
+            lines: normalizedLines
+          })
+        : await receivePurchaseDeliveryNote({
+            providerId: newStockEntry.providerId,
+            number: newStockEntry.deliveryNote,
+            date: newStockEntry.purchaseDate,
+            notes: '',
+            lines: normalizedLines
+          });
       if (!result) return;
-      setNewStockEntry({...newStockEntry, deliveryNote: '', batchNumber: '', providerId: '', articleId: '', quantity: 1, price: 0});
-      setPurchaseLines([]);
+      const wasEditing = Boolean(editingPurchaseNoteId);
+      resetPurchaseModal();
       setShowStockModal(false);
-      await Swal.fire('Entrada registrada', 'El lote, el stock y el coste de la referencia se han actualizado.', 'success');
+      await Swal.fire(
+        wasEditing ? 'Albarán actualizado' : 'Entrada registrada',
+        'El albarán, el lote, el stock restante y el coste de la referencia se han recalculado.',
+        'success'
+      );
     } finally {
       setIsSavingStockEntry(false);
     }
@@ -111,7 +199,12 @@ export default function Supplies() {
       articleId: newStockEntry.articleId,
       supplierBatch: newStockEntry.batchNumber,
       quantity: Number(newStockEntry.quantity),
-      totalCost: Number(newStockEntry.price)
+      totalCost: purchaseTotalCost(
+        articles?.find(item => item.id === newStockEntry.articleId),
+        newStockEntry.quantity,
+        newStockEntry.price
+      ),
+      purchaseUnitPrice: Number(newStockEntry.price)
     }]);
     setNewStockEntry(previous => ({ ...previous, articleId: '', batchNumber: '', quantity: 1, price: 0 }));
   };
@@ -593,7 +686,7 @@ export default function Supplies() {
           <div style={{ animation: 'fadeIn 0.3s ease' }}>
             <div className="flex justify-between items-center mb-4">
                <h3 className="font-bold text-lg">Registro de Albaranes de Entrada</h3>
-               <button className="btn btn-primary shadow-sm" onClick={() => setShowStockModal(true)}>+ Nuevo Registro</button>
+               <button className="btn btn-primary shadow-sm" onClick={openNewPurchaseNote}>+ Nuevo Registro</button>
             </div>
             {isAdminMode && purchaseDeliveryNotes.length > 0 && (
               <div className="card" style={{ marginBottom: '1rem', border: '1px solid #fecaca', background: '#fff7f7' }}>
@@ -626,7 +719,7 @@ export default function Supplies() {
                     <th>Factura/Albarán</th>
                     <th>Lote</th>
                     <th>Cantidad</th>
-                    <th>Coste Total</th>
+                    <th>Precio de Compra</th>
                     <th>Acciones</th>
                   </tr>
                 </thead>
@@ -641,9 +734,23 @@ export default function Supplies() {
                         <td className="text-muted font-mono">{entry.deliveryNote || '-'}</td>
                         <td className="font-mono text-indigo-600">{entry.batchNumber || '-'}</td>
                         <td>{entry.quantity} {art ? getUnitLabel(art.type) : ''}</td>
-                        <td className="font-bold text-red-600">{entry.price ? `${entry.price.toFixed(2)} €` : '-'}</td>
+                        <td className="font-bold text-red-600">
+                          {Number(entry.unitCost || 0) > 0 ? (
+                            <>
+                              {purchasePriceFromLine(art, { unitCost: entry.unitCost }).toFixed(2)} {isWeightPurchase(art) ? '€/kg' : art?.unit === 'l' || art?.type === 'SUSTRATO' ? '€/l' : '€/ud'}
+                              <small style={{ display: 'block', color: '#64748b', fontWeight: 500 }}>{Number(entry.price || 0).toFixed(2)} € total</small>
+                            </>
+                          ) : '-'}
+                        </td>
                         <td>
-                          {isAdminMode && <button className="btn btn-danger" style={{ padding: '0.3rem 0.6rem', fontSize: '0.8rem' }} onClick={() => runAdminDelete('Se borrará esta entrada de prueba.', () => deleteStockEntry(entry.id))}>Borrar</button>}
+                          <div style={{ display: 'flex', gap: '0.4rem', flexWrap: 'wrap' }}>
+                            {entry.purchaseDeliveryNoteId && (
+                              <button className="btn btn-secondary" style={{ padding: '0.3rem 0.6rem', fontSize: '0.8rem' }} onClick={() => openEditPurchaseNote(entry.purchaseDeliveryNoteId)}>
+                                Editar albarán
+                              </button>
+                            )}
+                            {isAdminMode && <button className="btn btn-danger" style={{ padding: '0.3rem 0.6rem', fontSize: '0.8rem' }} onClick={() => runAdminDelete('Se borrará esta entrada de prueba.', () => deleteStockEntry(entry.id))}>Borrar</button>}
+                          </div>
                         </td>
                       </tr>
                     )
@@ -1058,12 +1165,12 @@ export default function Supplies() {
 
       {showStockModal && (
         <div style={modalOverlayStyle}>
-          <div style={modalCardStyle}>
-            <h3 className="font-bold mb-4 text-xl">Registrar Albarán de Entrada / Gasto</h3>
+          <div style={{ ...modalCardStyle, maxWidth: editingPurchaseNoteId ? '1050px' : '760px' }}>
+            <h3 className="font-bold mb-4 text-xl">{editingPurchaseNoteId ? 'Editar Albarán de Entrada' : 'Registrar Albarán de Entrada / Gasto'}</h3>
             <form onSubmit={handleAddStockEntry} style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '1rem', alignItems: 'start' }}>
               <div>
                 <label className="form-label">Proveedor / Acreedor</label>
-                <select required className="form-control" value={newStockEntry.providerId} onChange={e => {
+                <select required disabled={Boolean(editingPurchaseNoteId)} className="form-control" value={newStockEntry.providerId} onChange={e => {
                   setNewStockEntry({...newStockEntry, providerId: e.target.value, articleId: '', batchNumber: ''});
                   setPurchaseLines([]);
                 }}>
@@ -1075,6 +1182,8 @@ export default function Supplies() {
                 <label className="form-label">Fecha Factura/Albarán</label>
                 <input required type="date" className="form-control" value={newStockEntry.purchaseDate} onChange={e => setNewStockEntry({...newStockEntry, purchaseDate: e.target.value})} />
               </div>
+              {!editingPurchaseNoteId && (
+                <>
               <div style={{ gridColumn: 'span 2' }}>
                 <label className="form-label">Artículo (Semilla, Luz...)</label>
                 <select required={purchaseLines.length === 0} className="form-control" value={newStockEntry.articleId} onChange={e => setNewStockEntry({...newStockEntry, articleId: e.target.value, batchNumber: ''})}>
@@ -1095,8 +1204,13 @@ export default function Supplies() {
                 <input required={Boolean(newStockEntry.articleId)} disabled={!newStockEntry.articleId} type="number" min="0.01" step="0.01" className="form-control" value={newStockEntry.quantity} onChange={e => setNewStockEntry({...newStockEntry, quantity: Number(e.target.value)})} />
               </div>
               <div>
-                <label className="form-label">Coste Total (€)</label>
+                <label className="form-label">{purchasePriceLabel(articles?.find(item => item.id === newStockEntry.articleId))}</label>
                 <input required={Boolean(newStockEntry.articleId)} disabled={!newStockEntry.articleId} type="number" step="0.01" min="0" className="form-control" value={newStockEntry.price} onChange={e => setNewStockEntry({...newStockEntry, price: Number(e.target.value)})} />
+                {newStockEntry.articleId && (
+                  <small className="text-muted">
+                    Total calculado: {purchaseTotalCost(articles?.find(item => item.id === newStockEntry.articleId), newStockEntry.quantity, newStockEntry.price).toFixed(2)} €
+                  </small>
+                )}
               </div>
 
               <div style={{ gridColumn: 'span 2', display: 'flex', justifyContent: 'flex-end' }}>
@@ -1104,6 +1218,8 @@ export default function Supplies() {
                   + Añadir artículo al albarán
                 </button>
               </div>
+                </>
+              )}
 
               {purchaseLines.length > 0 && (
                 <div style={{ gridColumn: 'span 2', border: '1px solid #cbd5e1', borderRadius: '0.75rem', overflow: 'hidden' }}>
@@ -1112,20 +1228,65 @@ export default function Supplies() {
                   </div>
                   {purchaseLines.map((line, index) => {
                     const article = articles?.find(item => item.id === line.articleId);
+                    const calculatedTotal = purchaseTotalCost(article, line.quantity, line.purchaseUnitPrice);
                     return (
-                      <div key={line.id} style={{ display: 'grid', gridTemplateColumns: '1fr auto auto auto', gap: '1rem', alignItems: 'center', padding: '0.75rem 1rem', borderTop: '1px solid #e2e8f0' }}>
+                      <div key={line.id} style={{ display: 'grid', gridTemplateColumns: editingPurchaseNoteId ? '1.2fr 1fr 0.8fr 1fr auto' : '1fr auto auto auto', gap: '0.75rem', alignItems: 'end', padding: '0.75rem 1rem', borderTop: '1px solid #e2e8f0' }}>
                         <div>
                           <strong>{article?.name || 'Artículo'}</strong>
-                          <div className="text-xs text-slate-500">{line.supplierBatch ? `Lote ${line.supplierBatch}` : 'Sin lote'}</div>
+                          {!editingPurchaseNoteId && <div className="text-xs text-slate-500">{line.supplierBatch ? `Lote ${line.supplierBatch}` : 'Sin lote'}</div>}
                         </div>
-                        <span>{line.quantity} {article?.unit || getUnitLabel(article?.type)}</span>
-                        <strong>{Number(line.totalCost).toFixed(2)} €</strong>
-                        <button type="button" className="btn btn-danger" onClick={() => setPurchaseLines(previous => previous.filter((_, itemIndex) => itemIndex !== index))}>Quitar</button>
+                        {editingPurchaseNoteId ? (
+                          <>
+                            <label>
+                              <small className="form-label">Lote</small>
+                              <input
+                                required
+                                className="form-control"
+                                value={line.supplierBatch}
+                                onChange={event => setPurchaseLines(previous => previous.map((item, itemIndex) => itemIndex === index ? { ...item, supplierBatch: event.target.value } : item))}
+                              />
+                            </label>
+                            <label>
+                              <small className="form-label">Cantidad ({article?.unit || getUnitLabel(article?.type)})</small>
+                              <input
+                                required
+                                type="number"
+                                min="0.01"
+                                step="0.01"
+                                className="form-control"
+                                value={line.quantity}
+                                onChange={event => setPurchaseLines(previous => previous.map((item, itemIndex) => itemIndex === index ? { ...item, quantity: Number(event.target.value) } : item))}
+                              />
+                            </label>
+                            <label>
+                              <small className="form-label">{purchasePriceLabel(article)}</small>
+                              <input
+                                required
+                                type="number"
+                                min="0"
+                                step="0.01"
+                                className="form-control"
+                                value={line.purchaseUnitPrice}
+                                onChange={event => setPurchaseLines(previous => previous.map((item, itemIndex) => itemIndex === index ? { ...item, purchaseUnitPrice: Number(event.target.value) } : item))}
+                              />
+                            </label>
+                            <strong style={{ paddingBottom: '0.65rem', whiteSpace: 'nowrap' }}>{calculatedTotal.toFixed(2)} €</strong>
+                          </>
+                        ) : (
+                          <>
+                            <span>{line.quantity} {article?.unit || getUnitLabel(article?.type)}</span>
+                            <strong>{calculatedTotal.toFixed(2)} €</strong>
+                            <button type="button" className="btn btn-danger" onClick={() => setPurchaseLines(previous => previous.filter((_, itemIndex) => itemIndex !== index))}>Quitar</button>
+                          </>
+                        )}
                       </div>
                     );
                   })}
                   <div style={{ padding: '0.75rem 1rem', borderTop: '1px solid #cbd5e1', textAlign: 'right', fontWeight: 'bold' }}>
-                    Total: {purchaseLines.reduce((sum, line) => sum + Number(line.totalCost || 0), 0).toFixed(2)} €
+                    Total: {purchaseLines.reduce((sum, line) => {
+                      const article = articles?.find(item => item.id === line.articleId);
+                      return sum + purchaseTotalCost(article, line.quantity, line.purchaseUnitPrice);
+                    }, 0).toFixed(2)} €
                   </div>
                 </div>
               )}
@@ -1133,10 +1294,10 @@ export default function Supplies() {
               <div style={{ gridColumn: 'span 2', display: 'flex', justifyContent: 'flex-end', gap: '0.75rem', marginTop: '1rem' }}>
                 <button type="button" className="btn btn-secondary" onClick={() => {
                   setShowStockModal(false);
-                  setPurchaseLines([]);
+                  resetPurchaseModal();
                 }}>Cancelar</button>
                 <button type="submit" className="btn btn-primary" disabled={isSavingStockEntry}>
-                  {isSavingStockEntry ? 'Guardando...' : 'Guardar Albarán Completo'}
+                  {isSavingStockEntry ? 'Guardando...' : editingPurchaseNoteId ? 'Guardar Cambios' : 'Guardar Albarán Completo'}
                 </button>
               </div>
             </form>
