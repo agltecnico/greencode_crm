@@ -155,6 +155,7 @@ export default function Crops() {
   const [newCrop, setNewCrop] = useState({ cropTypeId: '', traysCount: 1, stockLotId: '' });
   const [plannerHarvestDay, setPlannerHarvestDay] = useState('');
   const [plannerSelections, setPlannerSelections] = useState({});
+  const [plannerView, setPlannerView] = useState('harvest');
   const [newHarvest, setNewHarvest] = useState({ productId: '', tuppersCount: 1, selectedCropUsages: {} });
 
   useEffect(() => {
@@ -1457,6 +1458,15 @@ export default function Crops() {
         const dayB = PLANNER_DAYS.findIndex(day => day.idx === Number(b.routine.targetDayOfWeek));
         return dayA - dayB || a.varietyName.localeCompare(b.varietyName, 'es');
       });
+    const calendarRows = routineRows.map(row => {
+      const harvestDay = Number(row.routine.targetDayOfWeek);
+      const sowDay = weekDay(harvestDay - getCropCycleOffsets(row.cropType).harvest);
+      return {
+        ...row,
+        calendarDay: plannerView === 'harvest' ? harvestDay : sowDay,
+        harvestDay
+      };
+    });
 
     const togglePlannerVariety = (cropTypeId, checked) => {
       setPlannerSelections(previous => {
@@ -1525,13 +1535,55 @@ export default function Crops() {
         <div style={{ background: 'linear-gradient(135deg, #f0fdf4, #ccfbf1)', border: '1px solid #99f6e4', padding: '2rem', borderRadius: '20px', marginBottom: '2rem' }}>
           <h2 style={{ margin: '0 0 0.5rem', fontSize: '1.8rem', fontWeight: 900, color: '#065f46' }}>Planificador de Cosechas</h2>
           <p style={{ margin: 0, color: '#047857', fontSize: '1.05rem', fontWeight: 500 }}>
-            Pulsa sobre un día para añadir, quitar o modificar las cosechas semanales. El sistema calculará automáticamente la siembra y las fases.
+            Define las cosechas semanales y consulta automáticamente cuándo corresponde sembrar cada variedad.
           </p>
         </div>
 
+        <div style={{ display: 'inline-flex', gap: '0.35rem', padding: '0.3rem', background: '#e2e8f0', borderRadius: '12px', marginBottom: '1.25rem' }}>
+          <button
+            type="button"
+            onClick={() => setPlannerView('harvest')}
+            style={{
+              border: 0,
+              borderRadius: '9px',
+              padding: '0.65rem 1rem',
+              cursor: 'pointer',
+              fontWeight: 800,
+              color: plannerView === 'harvest' ? 'white' : '#475569',
+              background: plannerView === 'harvest' ? '#059669' : 'transparent'
+            }}
+          >
+            ✂️ Cosechas
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              closePlannerDay();
+              setPlannerView('sowing');
+            }}
+            style={{
+              border: 0,
+              borderRadius: '9px',
+              padding: '0.65rem 1rem',
+              cursor: 'pointer',
+              fontWeight: 800,
+              color: plannerView === 'sowing' ? 'white' : '#475569',
+              background: plannerView === 'sowing' ? '#2563eb' : 'transparent'
+            }}
+          >
+            🌱 Siembras
+          </button>
+        </div>
+
         <section>
-          <h3 style={{ color: '#0f172a', marginBottom: '0.35rem' }}>Calendario semanal de cosechas</h3>
-          <p style={{ color: '#64748b', margin: '0 0 1rem' }}>Estas son las cosechas que se repetirán cada semana.</p>
+          <h3 style={{ color: '#0f172a', marginBottom: '0.35rem' }}>
+            Calendario semanal de {plannerView === 'harvest' ? 'cosechas' : 'siembras'}
+          </h3>
+          <p style={{ color: '#64748b', margin: '0 0 1rem' }}>
+            {plannerView === 'harvest'
+              ? 'Pulsa un día para modificar sus cosechas semanales.'
+              : 'Vista automática calculada desde las cosechas y la duración de cada ficha de cultivo.'}
+          </p>
           <div style={{ overflowX: 'auto', paddingBottom: '0.5rem' }}>
               <div style={{
                 display: 'grid',
@@ -1541,7 +1593,7 @@ export default function Crops() {
                 alignItems: 'stretch'
               }}>
                 {PLANNER_DAYS.map(day => {
-                  const dayRoutines = routineRows.filter(({ routine }) => Number(routine.targetDayOfWeek) === day.idx);
+                  const dayRoutines = calendarRows.filter(row => row.calendarDay === day.idx);
                   const isToday = new Date().getDay() === day.idx;
                   return (
                     <div key={day.idx} style={{
@@ -1551,10 +1603,10 @@ export default function Crops() {
                       minHeight: '150px',
                       overflow: 'hidden'
                     }}>
-                      <button type="button" onClick={() => openPlannerDay(day.idx)} style={{
+                      <button type="button" disabled={plannerView !== 'harvest'} onClick={() => plannerView === 'harvest' && openPlannerDay(day.idx)} style={{
                         width: '100%',
                         border: 0,
-                        cursor: 'pointer',
+                        cursor: plannerView === 'harvest' ? 'pointer' : 'default',
                         padding: '0.6rem 0.4rem',
                         textAlign: 'center',
                         fontWeight: 900,
@@ -1562,25 +1614,32 @@ export default function Crops() {
                         background: isToday ? '#059669' : '#e2e8f0'
                       }}>
                         {day.name}
-                        <small style={{ display: 'block', fontWeight: 700, opacity: 0.8 }}>{isToday ? 'Hoy · ' : ''}Editar</small>
+                        <small style={{ display: 'block', fontWeight: 700, opacity: 0.8 }}>
+                          {isToday ? 'Hoy' : plannerView === 'harvest' ? 'Editar' : 'Calculado'}
+                        </small>
                       </button>
-                      <div onClick={() => openPlannerDay(day.idx)} style={{ display: 'flex', flexDirection: 'column', gap: '0.3rem', padding: '0.4rem', cursor: 'pointer' }}>
+                      <div onClick={() => plannerView === 'harvest' && openPlannerDay(day.idx)} style={{ display: 'flex', flexDirection: 'column', gap: '0.3rem', padding: '0.4rem', cursor: plannerView === 'harvest' ? 'pointer' : 'default' }}>
                         {dayRoutines.length === 0 ? (
                           <div style={{ color: '#94a3b8', textAlign: 'center', padding: '1rem 0.2rem', fontSize: '0.78rem' }}>
-                            + Añadir
+                            {plannerView === 'harvest' ? '+ Añadir' : 'Sin siembras'}
                           </div>
-                        ) : dayRoutines.map(({ routine, varietyName }) => (
+                        ) : dayRoutines.map(({ routine, varietyName, harvestDay }) => (
                           <article key={routine.id} style={{
                             background: 'white',
-                            border: '1px solid #a7f3d0',
-                            borderLeft: '3px solid #10b981',
+                            border: `1px solid ${plannerView === 'harvest' ? '#a7f3d0' : '#bfdbfe'}`,
+                            borderLeft: `3px solid ${plannerView === 'harvest' ? '#10b981' : '#3b82f6'}`,
                             borderRadius: '7px',
                             padding: '0.38rem 0.45rem'
                           }}>
                             <div style={{ fontSize: '0.78rem', fontWeight: 900, color: '#0f172a', lineHeight: 1.15 }}>{varietyName}</div>
-                            <div style={{ color: '#047857', fontWeight: 800, fontSize: '0.72rem', marginTop: '0.15rem' }}>
+                            <div style={{ color: plannerView === 'harvest' ? '#047857' : '#1d4ed8', fontWeight: 800, fontSize: '0.72rem', marginTop: '0.15rem' }}>
                               {routine.tuppersCount} bandeja{Number(routine.tuppersCount) === 1 ? '' : 's'}
                             </div>
+                            {plannerView === 'sowing' && (
+                              <div style={{ color: '#64748b', fontSize: '0.65rem', marginTop: '0.1rem' }}>
+                                Cosecha: {plannerDayName(harvestDay, true)}
+                              </div>
+                            )}
                           </article>
                         ))}
                       </div>
