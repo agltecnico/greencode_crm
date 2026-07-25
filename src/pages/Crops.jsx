@@ -62,7 +62,7 @@ export default function Crops() {
   const { requireAdmin } = useAdminMode();
   const { 
     crops, sowCrop, updateCrop, advanceCropStatus, setCropPhase, discardCrop, deleteCrop,
-    stockEntries, stockLots, articles, seedVarieties,
+    stockEntries, stockLots, articles, seedVarieties, providers,
     cropTypes,
     harvestTargets, addHarvestTarget, updateHarvestTarget, deleteHarvestTarget,
     harvests, addHarvest,
@@ -149,14 +149,27 @@ export default function Crops() {
 
   // Computed properties for seed availability
   const selectedCropType = cropTypes?.find(c => c.id === newCrop.cropTypeId);
-  const totalAvailableSeed = stockLots?.filter(l => l.articleId === selectedCropType?.seedId).reduce((acc, curr) => acc + Number(curr.remainingQuantity || 0), 0) || 0;
+  const selectedVarietyId = selectedCropType?.varietyId
+    || articles?.find(article => article.id === selectedCropType?.seedId)?.varietyId;
+  const matchingSeedArticleIds = articles
+    ?.filter(article => article.type === 'SEMILLA' && article.varietyId === selectedVarietyId && article.active !== false)
+    .map(article => article.id) || [];
+  const totalAvailableSeed = stockLots
+    ?.filter(lot => matchingSeedArticleIds.includes(lot.articleId))
+    .reduce((acc, curr) => acc + Number(curr.remainingQuantity || 0), 0) || 0;
 
   const availableBatches = useMemo(() => {
-    if (!selectedCropType?.seedId) return [];
+    if (!selectedVarietyId) return [];
     return (stockLots || [])
-      .filter(l => l.articleId === selectedCropType.seedId && Number(l.remainingQuantity || 0) > 0)
+      .filter(lot => {
+        const article = articles?.find(item => item.id === lot.articleId);
+        return article?.type === 'SEMILLA'
+          && article.varietyId === selectedVarietyId
+          && article.active !== false
+          && Number(lot.remainingQuantity || 0) > 0;
+      })
       .sort((a, b) => String(a.receivedAt || a.createdAt || '').localeCompare(String(b.receivedAt || b.createdAt || '')));
-  }, [selectedCropType, stockLots]);
+  }, [selectedVarietyId, stockLots, articles]);
 
   const oldestBatch = availableBatches.length > 0 ? availableBatches[0].id : '';
 
@@ -178,7 +191,8 @@ export default function Crops() {
           return;
         }
 
-        const seedArticle = articles?.find(a => a.id === selectedCropType.seedId);
+        const selectedLot = stockLots?.find(lot => lot.id === newCrop.stockLotId);
+        const seedArticle = articles?.find(a => a.id === selectedLot?.articleId);
         if (seedArticle && seedArticle.minStock > 0 && remainingSeed <= seedArticle.minStock) {
           alert(`¡Atención! Con esta siembra el stock de la semilla "${seedArticle.name}" bajará o ya está por debajo del límite de seguridad (${seedArticle.minStock}g). Recuerda pedir más a tu proveedor.`);
         }
@@ -1430,7 +1444,12 @@ export default function Crops() {
                           <select className="premium-input" style={{ width: '100%', padding: '0.75rem', borderRadius: '0.5rem', border: '1px solid #86efac', background: 'white', fontSize: '0.875rem', fontWeight: 'bold' }} required value={newCrop.stockLotId || ''} onChange={e => setNewCrop({...newCrop, stockLotId: e.target.value})}>
                             <option value="">-- Sin stock de lotes --</option>
                             {availableBatches.map(b => (
-                              <option key={b.id} value={b.id}>{b.supplierBatch} ({Number(b.remainingQuantity).toFixed(2)} g disponibles)</option>
+                              <option key={b.id} value={b.id}>
+                                {b.supplierBatch} · {articles?.find(a => a.id === b.articleId)?.name || 'Semilla'}
+                                {' · '}{providers?.find(p => p.id === b.providerId)?.name || 'Sin proveedor'}
+                                {' · '}{Number(b.remainingQuantity).toFixed(2)} g
+                                {' · '}{Number(b.unitCost || 0).toFixed(4)} €/g
+                              </option>
                             ))}
                           </select>
                           
