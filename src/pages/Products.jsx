@@ -14,12 +14,17 @@ const emptyForm = () => ({
 });
 
 export default function Products() {
-  const { products, seedVarieties, articles, addProduct, updateProduct, deleteProduct } = useData();
+  const {
+    products, seedVarieties, articles,
+    packagingFormats, addPackagingFormat, updatePackagingFormat, deletePackagingFormat,
+    addProduct, updateProduct, deleteProduct
+  } = useData();
   const { isAdminMode, requireAdmin } = useAdminMode();
   const [isAdding, setIsAdding] = useState(false);
   const [editingId, setEditingId] = useState(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [formData, setFormData] = useState(emptyForm);
+  const [formatForm, setFormatForm] = useState({ id: null, name: '', capacityMl: '' });
 
   const recipeFor = (product) => {
     if (Array.isArray(product.recipeVarieties) && product.recipeVarieties.length) return product.recipeVarieties;
@@ -97,6 +102,32 @@ export default function Products() {
     product.name?.toLowerCase().includes(searchTerm.toLowerCase())
   ) || [];
 
+  const savePackagingFormat = async event => {
+    event.preventDefault();
+    const payload = {
+      name: formatForm.name.trim(),
+      capacityMl: Number(formatForm.capacityMl),
+      active: true
+    };
+    if (formatForm.id) await updatePackagingFormat(formatForm.id, payload);
+    else await addPackagingFormat(payload);
+    setFormatForm({ id: null, name: '', capacityMl: '' });
+  };
+
+  const removePackagingFormat = async format => {
+    if (!(await requireAdmin())) return;
+    const answer = await Swal.fire({
+      title: 'Eliminar formato de envase',
+      text: 'Solo se puede eliminar si todavía no aparece en ninguna cosecha.',
+      icon: 'warning',
+      showCancelButton: true,
+      confirmButtonText: 'Sí, eliminar',
+      cancelButtonText: 'Cancelar',
+      confirmButtonColor: '#dc2626'
+    });
+    if (answer.isConfirmed) await deletePackagingFormat(format.id);
+  };
+
   return (
     <div className="admin-container">
       <div className="admin-header">
@@ -114,6 +145,39 @@ export default function Products() {
       <div className="admin-toolbar">
         <div className="admin-search">
           <input type="text" placeholder="Buscar producto..." value={searchTerm} onChange={e => setSearchTerm(e.target.value)} />
+        </div>
+      </div>
+
+      <div className="premium-card mb-6">
+        <div className="flex justify-between items-start gap-4" style={{ marginBottom: '1rem' }}>
+          <div>
+            <h3 className="font-bold text-lg">Formatos de envase</h3>
+            <p className="text-muted text-sm">Tipos de táper que se pueden seleccionar al registrar una cosecha.</p>
+          </div>
+        </div>
+        <form onSubmit={savePackagingFormat} className="grid grid-cols-1 md:grid-cols-3 gap-4" style={{ alignItems: 'end' }}>
+          <div>
+            <label className="form-label">Nombre</label>
+            <input required className="premium-input w-full" placeholder="Ej. Táper 500 ml" value={formatForm.name} onChange={event => setFormatForm({ ...formatForm, name: event.target.value })} />
+          </div>
+          <div>
+            <label className="form-label">Capacidad (ml)</label>
+            <input required min="1" type="number" className="premium-input w-full" value={formatForm.capacityMl} onChange={event => setFormatForm({ ...formatForm, capacityMl: event.target.value })} />
+          </div>
+          <div className="flex gap-2">
+            <button className="btn btn-primary" type="submit">{formatForm.id ? 'Guardar cambios' : '+ Añadir formato'}</button>
+            {formatForm.id && <button className="btn btn-secondary" type="button" onClick={() => setFormatForm({ id: null, name: '', capacityMl: '' })}>Cancelar</button>}
+          </div>
+        </form>
+        <div className="flex flex-wrap gap-2 mt-4">
+          {(packagingFormats || []).map(format => (
+            <div key={format.id} className="badge" style={{ display: 'inline-flex', alignItems: 'center', gap: '0.5rem', padding: '0.55rem 0.7rem', background: '#f1f5f9', color: '#334155' }}>
+              <strong>{format.name}</strong>
+              <span>{Number(format.capacityMl)} ml</span>
+              <button type="button" className="btn btn-secondary" style={{ padding: '0.2rem 0.4rem', fontSize: '0.7rem' }} onClick={() => setFormatForm({ id: format.id, name: format.name, capacityMl: format.capacityMl })}>Editar</button>
+              {isAdminMode && <button type="button" className="btn btn-danger" style={{ padding: '0.2rem 0.4rem', fontSize: '0.7rem' }} onClick={() => removePackagingFormat(format)}>Eliminar</button>}
+            </div>
+          ))}
         </div>
       </div>
 

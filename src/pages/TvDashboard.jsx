@@ -5,7 +5,7 @@ import '../crops.css';
 
 export default function TvDashboard() {
   const [tvTab, setTvTab] = useState('tasks');
-  const { crops, cropTypes, seeds, advanceCropStatus, refreshData, orders, clients, products, productMovements } = useData();
+  const { crops, cropTypes, seeds, advanceCropStatus, refreshData, orders, clients, products, productMovements, packagingFormats } = useData();
 
   const translateStatus = (status) => {
     const statusMap = {
@@ -315,6 +315,11 @@ export default function TvDashboard() {
 
                   // 3. Tuppers que Sobran (Disponibles)
                   const sobran = envasados - enPedidos;
+                  const formatStocks = (packagingFormats || []).map(format => {
+                    const produced = movements.filter(m => m.type === 'HARVEST' && m.packagingFormatId === format.id).reduce((sum, movement) => sum + Number(movement.quantity || 0), 0);
+                    const delivered = movements.filter(m => m.type === 'ORDER' && m.packagingFormatId === format.id).reduce((sum, movement) => sum + Math.abs(Number(movement.quantity || 0)), 0);
+                    return { ...format, stock: produced - delivered };
+                  }).filter(format => format.stock !== 0);
 
                   if (envasados === 0 && enPedidos === 0) return null;
 
@@ -324,6 +329,11 @@ export default function TvDashboard() {
                         <span className={`tv-label ${sobran > 0 ? 'green' : sobran < 0 ? 'red' : 'neutral'}`}>{sobran > 0 ? 'Disponible' : sobran < 0 ? 'Falta stock' : 'Justo'}</span>
                       </div>
                       <h3>{product.name}</h3>
+                      {formatStocks.length > 0 && (
+                        <div className="tv-label-row">
+                          {formatStocks.map(format => <span key={format.id} className="tv-label neutral">{format.name}: {format.stock}</span>)}
+                        </div>
+                      )}
                       <div className="tv-stock-metrics">
                         <div><span>Envasados</span><strong>{envasados}</strong></div>
                         <div><span>En pedidos</span><strong>{enPedidos}</strong></div>
