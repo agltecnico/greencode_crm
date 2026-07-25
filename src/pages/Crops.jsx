@@ -1467,67 +1467,56 @@ export default function Crops() {
       });
     };
 
-    const createSelectedRoutines = async event => {
-      event.preventDefault();
-      if (plannerHarvestDay === '') {
-        Swal.fire('Falta el día', 'Selecciona el día de la semana en el que quieres cosechar.', 'warning');
-        return;
-      }
-      if (selectedCropTypeIds.length === 0) {
-        Swal.fire('Faltan variedades', 'Selecciona al menos una variedad para crear la rutina.', 'warning');
-        return;
-      }
-
-      let createdCount = 0;
-      for (const cropTypeId of selectedCropTypeIds) {
-        const createdId = await addHarvestTarget({
-          productId: cropTypeId,
-          targetDayOfWeek: Number(plannerHarvestDay),
-          tuppersCount: Number(plannerSelections[cropTypeId]) || 1
+    const openPlannerDay = dayIndex => {
+      const daySelections = {};
+      (harvestTargets || [])
+        .filter(target => Number(target.targetDayOfWeek) === Number(dayIndex))
+        .forEach(target => {
+          daySelections[target.productId] = Number(target.tuppersCount) || 1;
         });
-        if (createdId) createdCount += 1;
-      }
-
-      if (createdCount > 0) {
-        setPlannerSelections({});
-        Swal.fire({
-          title: 'Rutinas creadas',
-          text: `${createdCount} rutina${createdCount === 1 ? '' : 's'} de cosecha guardada${createdCount === 1 ? '' : 's'} correctamente.`,
-          icon: 'success',
-          confirmButtonColor: '#059669'
-        });
-      }
+      setPlannerSelections(daySelections);
+      setPlannerHarvestDay(String(dayIndex));
     };
 
-    const editPlannerRoutine = routine => {
-      Swal.fire({
-        title: 'Editar cantidad',
-        text: `Bandejas que quieres cosechar cada ${plannerDayName(routine.targetDayOfWeek).toLowerCase()}`,
-        input: 'number',
-        inputValue: routine.tuppersCount,
-        inputAttributes: { min: 1, step: 1 },
-        showCancelButton: true,
-        confirmButtonText: 'Guardar',
-        cancelButtonText: 'Cancelar',
-        confirmButtonColor: '#059669'
-      }).then(result => {
-        if (result.isConfirmed && Number(result.value) > 0) {
-          updateHarvestTarget(routine.id, { tuppersCount: Number(result.value) });
+    const closePlannerDay = () => {
+      setPlannerHarvestDay('');
+      setPlannerSelections({});
+    };
+
+    const savePlannerDay = async () => {
+      const dayIndex = Number(plannerHarvestDay);
+      const existingTargets = (harvestTargets || []).filter(target =>
+        Number(target.targetDayOfWeek) === dayIndex
+      );
+
+      for (const target of existingTargets) {
+        if (!Object.prototype.hasOwnProperty.call(plannerSelections, target.productId)) {
+          await deleteHarvestTarget(target.id);
         }
-      });
-    };
+      }
 
-    const removePlannerRoutine = routine => {
+      for (const cropTypeId of selectedCropTypeIds) {
+        const quantity = Math.max(1, Number(plannerSelections[cropTypeId]) || 1);
+        const existing = existingTargets.find(target => target.productId == cropTypeId);
+        if (!existing) {
+          await addHarvestTarget({
+            productId: cropTypeId,
+            targetDayOfWeek: dayIndex,
+            tuppersCount: quantity
+          });
+        } else if (Number(existing.tuppersCount) !== quantity) {
+          await updateHarvestTarget(existing.id, { tuppersCount: quantity });
+        }
+      }
+
+      closePlannerDay();
       Swal.fire({
-        title: '¿Eliminar esta rutina?',
-        text: 'Dejarán de generarse sus tareas semanales.',
-        icon: 'warning',
-        showCancelButton: true,
-        confirmButtonText: 'Sí, eliminar',
-        cancelButtonText: 'Cancelar',
-        confirmButtonColor: '#dc2626'
-      }).then(result => {
-        if (result.isConfirmed) deleteHarvestTarget(routine.id);
+        title: 'Día actualizado',
+        text: `La planificación del ${plannerDayName(dayIndex).toLowerCase()} se ha guardado.`,
+        icon: 'success',
+        confirmButtonColor: '#059669',
+        timer: 1600,
+        showConfirmButton: false
       });
     };
 
@@ -1536,107 +1525,19 @@ export default function Crops() {
         <div style={{ background: 'linear-gradient(135deg, #f0fdf4, #ccfbf1)', border: '1px solid #99f6e4', padding: '2rem', borderRadius: '20px', marginBottom: '2rem' }}>
           <h2 style={{ margin: '0 0 0.5rem', fontSize: '1.8rem', fontWeight: 900, color: '#065f46' }}>Planificador de Cosechas</h2>
           <p style={{ margin: 0, color: '#047857', fontSize: '1.05rem', fontWeight: 500 }}>
-            Elige un día de cosecha y las variedades. El sistema calculará automáticamente cuándo sembrar y cuándo cambiar cada fase.
+            Pulsa sobre un día para añadir, quitar o modificar las cosechas semanales. El sistema calculará automáticamente la siembra y las fases.
           </p>
         </div>
-
-        <form onSubmit={createSelectedRoutines} className="premium-card" style={{ padding: '1.5rem', marginBottom: '2rem' }}>
-          <h3 style={{ margin: '0 0 1.25rem', color: '#0f172a' }}>Crear nueva rutina</h3>
-          <label style={{ display: 'block', fontWeight: 800, color: '#334155', marginBottom: '0.5rem' }}>
-            ¿Qué día quieres cosechar?
-          </label>
-          <select
-            className="premium-input"
-            value={plannerHarvestDay}
-            onChange={event => {
-              setPlannerHarvestDay(event.target.value);
-              setPlannerSelections({});
-            }}
-            style={{ width: '100%', maxWidth: '420px', marginBottom: '1.5rem' }}
-          >
-            <option value="">Selecciona un día</option>
-            {PLANNER_DAYS.map(day => <option key={day.idx} value={day.idx}>{day.name}</option>)}
-          </select>
-
-          {plannerHarvestDay !== '' && (
-            <>
-              <div style={{ fontWeight: 800, color: '#334155', marginBottom: '0.75rem' }}>
-                ¿Qué variedades quieres cosechar el {plannerDayName(plannerHarvestDay).toLowerCase()}?
-              </div>
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: '0.75rem', marginBottom: '1.25rem' }}>
-                {selectableVarieties.map(({ cropType, name }) => {
-                  const alreadyExists = harvestTargets?.some(target =>
-                    target.productId == cropType.id && Number(target.targetDayOfWeek) === Number(plannerHarvestDay)
-                  );
-                  const checked = Object.prototype.hasOwnProperty.call(plannerSelections, cropType.id);
-                  return (
-                    <div key={cropType.id} style={{
-                      border: checked ? '2px solid #10b981' : '1px solid #cbd5e1',
-                      background: alreadyExists ? '#f8fafc' : checked ? '#ecfdf5' : 'white',
-                      borderRadius: '12px',
-                      padding: '0.9rem',
-                      opacity: alreadyExists ? 0.65 : 1
-                    }}>
-                      <label style={{ display: 'flex', gap: '0.75rem', alignItems: 'center', cursor: alreadyExists ? 'default' : 'pointer' }}>
-                        <input
-                          type="checkbox"
-                          checked={checked}
-                          disabled={alreadyExists}
-                          onChange={event => togglePlannerVariety(cropType.id, event.target.checked)}
-                          style={{ width: '20px', height: '20px', accentColor: '#059669' }}
-                        />
-                        <span style={{ flex: 1 }}>
-                          <strong style={{ display: 'block', color: '#0f172a' }}>{name}</strong>
-                          <small style={{ color: '#64748b' }}>{alreadyExists ? 'Rutina ya creada para este día' : `Ciclo: ${getCropCycleOffsets(cropType).harvest} días`}</small>
-                        </span>
-                      </label>
-                      {checked && (
-                        <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginTop: '0.75rem', color: '#475569', fontWeight: 700 }}>
-                          Bandejas:
-                          <input
-                            type="number"
-                            min="1"
-                            step="1"
-                            className="premium-input"
-                            value={plannerSelections[cropType.id]}
-                            onChange={event => setPlannerSelections(previous => ({
-                              ...previous,
-                              [cropType.id]: Math.max(1, Number(event.target.value) || 1)
-                            }))}
-                            style={{ width: '90px', padding: '0.45rem' }}
-                          />
-                        </label>
-                      )}
-                    </div>
-                  );
-                })}
-              </div>
-              {missingCropTypeCount > 0 && (
-                <p style={{ color: '#92400e', background: '#fffbeb', padding: '0.75rem', borderRadius: '10px' }}>
-                  {missingCropTypeCount} variedad{missingCropTypeCount === 1 ? '' : 'es'} no aparece{missingCropTypeCount === 1 ? '' : 'n'} porque todavía no tiene{missingCropTypeCount === 1 ? '' : 'n'} ficha de cultivo.
-                </p>
-              )}
-              <button type="submit" className="btn btn-primary" disabled={selectedCropTypeIds.length === 0}>
-                Crear rutina{selectedCropTypeIds.length > 1 ? 's' : ''}
-              </button>
-            </>
-          )}
-        </form>
 
         <section>
           <h3 style={{ color: '#0f172a', marginBottom: '0.35rem' }}>Calendario semanal de cosechas</h3>
           <p style={{ color: '#64748b', margin: '0 0 1rem' }}>Estas son las cosechas que se repetirán cada semana.</p>
-          {routineRows.length === 0 ? (
-            <div className="premium-card" style={{ padding: '2rem', textAlign: 'center', color: '#64748b' }}>
-              Todavía no hay rutinas. Selecciona un día y las variedades para crear la primera.
-            </div>
-          ) : (
-            <div style={{ overflowX: 'auto', paddingBottom: '0.5rem' }}>
+          <div style={{ overflowX: 'auto', paddingBottom: '0.5rem' }}>
               <div style={{
                 display: 'grid',
-                gridTemplateColumns: 'repeat(7, minmax(140px, 1fr))',
-                minWidth: '1050px',
-                gap: '0.65rem',
+                gridTemplateColumns: 'repeat(7, minmax(125px, 1fr))',
+                minWidth: '920px',
+                gap: '0.45rem',
                 alignItems: 'stretch'
               }}>
                 {PLANNER_DAYS.map(day => {
@@ -1645,56 +1546,40 @@ export default function Crops() {
                   return (
                     <div key={day.idx} style={{
                       border: isToday ? '2px solid #10b981' : '1px solid #dbe4ee',
-                      borderRadius: '14px',
+                      borderRadius: '12px',
                       background: '#f8fafc',
-                      minHeight: '220px',
+                      minHeight: '150px',
                       overflow: 'hidden'
                     }}>
-                      <div style={{
-                        padding: '0.75rem 0.6rem',
+                      <button type="button" onClick={() => openPlannerDay(day.idx)} style={{
+                        width: '100%',
+                        border: 0,
+                        cursor: 'pointer',
+                        padding: '0.6rem 0.4rem',
                         textAlign: 'center',
                         fontWeight: 900,
                         color: isToday ? 'white' : '#334155',
                         background: isToday ? '#059669' : '#e2e8f0'
                       }}>
                         {day.name}
-                        {isToday && <small style={{ display: 'block', fontWeight: 700, opacity: 0.9 }}>Hoy</small>}
-                      </div>
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.6rem', padding: '0.65rem' }}>
+                        <small style={{ display: 'block', fontWeight: 700, opacity: 0.8 }}>{isToday ? 'Hoy · ' : ''}Editar</small>
+                      </button>
+                      <div onClick={() => openPlannerDay(day.idx)} style={{ display: 'flex', flexDirection: 'column', gap: '0.3rem', padding: '0.4rem', cursor: 'pointer' }}>
                         {dayRoutines.length === 0 ? (
-                          <div style={{ color: '#94a3b8', textAlign: 'center', padding: '1.5rem 0.25rem', fontSize: '0.85rem' }}>
-                            Sin cosechas
+                          <div style={{ color: '#94a3b8', textAlign: 'center', padding: '1rem 0.2rem', fontSize: '0.78rem' }}>
+                            + Añadir
                           </div>
                         ) : dayRoutines.map(({ routine, varietyName }) => (
                           <article key={routine.id} style={{
                             background: 'white',
                             border: '1px solid #a7f3d0',
-                            borderLeft: '5px solid #10b981',
-                            borderRadius: '10px',
-                            padding: '0.7rem',
-                            boxShadow: '0 2px 5px rgba(15, 23, 42, 0.06)'
+                            borderLeft: '3px solid #10b981',
+                            borderRadius: '7px',
+                            padding: '0.38rem 0.45rem'
                           }}>
-                            <div style={{ fontSize: '1rem', fontWeight: 900, color: '#0f172a', lineHeight: 1.2 }}>{varietyName}</div>
-                            <div style={{ color: '#047857', fontWeight: 800, fontSize: '0.82rem', marginTop: '0.35rem' }}>
-                              ✂️ {routine.tuppersCount} bandeja{Number(routine.tuppersCount) === 1 ? '' : 's'}
-                            </div>
-                            <div style={{ display: 'flex', gap: '0.35rem', marginTop: '0.65rem' }}>
-                              <button
-                                type="button"
-                                onClick={() => editPlannerRoutine(routine)}
-                                aria-label={`Editar ${varietyName}`}
-                                style={{ flex: 1, border: '1px solid #cbd5e1', background: '#f8fafc', color: '#334155', borderRadius: '7px', padding: '0.35rem', cursor: 'pointer', fontWeight: 700 }}
-                              >
-                                Editar
-                              </button>
-                              <button
-                                type="button"
-                                onClick={() => removePlannerRoutine(routine)}
-                                aria-label={`Eliminar ${varietyName}`}
-                                style={{ border: '1px solid #fecaca', background: '#fef2f2', color: '#dc2626', borderRadius: '7px', padding: '0.35rem 0.5rem', cursor: 'pointer', fontWeight: 800 }}
-                              >
-                                ×
-                              </button>
+                            <div style={{ fontSize: '0.78rem', fontWeight: 900, color: '#0f172a', lineHeight: 1.15 }}>{varietyName}</div>
+                            <div style={{ color: '#047857', fontWeight: 800, fontSize: '0.72rem', marginTop: '0.15rem' }}>
+                              {routine.tuppersCount} bandeja{Number(routine.tuppersCount) === 1 ? '' : 's'}
                             </div>
                           </article>
                         ))}
@@ -1704,8 +1589,73 @@ export default function Crops() {
                 })}
               </div>
             </div>
-          )}
         </section>
+
+        {plannerHarvestDay !== '' && (
+          <div style={modalOverlayStyle} onClick={closePlannerDay}>
+            <div style={{ ...modalCardStyle, maxWidth: '760px', padding: 0, overflow: 'hidden' }} onClick={event => event.stopPropagation()}>
+              <div style={{ background: 'linear-gradient(135deg, #10b981, #059669)', color: 'white', padding: '1.25rem 1.5rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <div>
+                  <h3 style={{ margin: 0, fontSize: '1.35rem' }}>Cosechas del {plannerDayName(plannerHarvestDay).toLowerCase()}</h3>
+                  <p style={{ margin: '0.25rem 0 0', color: '#d1fae5' }}>Selecciona las variedades y el número de bandejas.</p>
+                </div>
+                <button type="button" onClick={closePlannerDay} style={{ border: 0, background: 'rgba(255,255,255,0.18)', color: 'white', borderRadius: '8px', width: '36px', height: '36px', cursor: 'pointer', fontSize: '1.35rem' }}>×</button>
+              </div>
+
+              <div style={{ padding: '1.25rem', maxHeight: '62vh', overflowY: 'auto' }}>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '0.55rem' }}>
+                  {selectableVarieties.map(({ cropType, name }) => {
+                    const checked = Object.prototype.hasOwnProperty.call(plannerSelections, cropType.id);
+                    return (
+                      <div key={cropType.id} style={{
+                        border: checked ? '2px solid #10b981' : '1px solid #dbe4ee',
+                        background: checked ? '#ecfdf5' : 'white',
+                        borderRadius: '10px',
+                        padding: '0.65rem'
+                      }}>
+                        <label style={{ display: 'flex', gap: '0.6rem', alignItems: 'center', cursor: 'pointer' }}>
+                          <input
+                            type="checkbox"
+                            checked={checked}
+                            onChange={event => togglePlannerVariety(cropType.id, event.target.checked)}
+                            style={{ width: '19px', height: '19px', accentColor: '#059669' }}
+                          />
+                          <strong style={{ flex: 1, color: '#0f172a', fontSize: '0.9rem' }}>{name}</strong>
+                          {checked && (
+                            <input
+                              type="number"
+                              min="1"
+                              step="1"
+                              aria-label={`Bandejas de ${name}`}
+                              value={plannerSelections[cropType.id]}
+                              onClick={event => event.stopPropagation()}
+                              onChange={event => setPlannerSelections(previous => ({
+                                ...previous,
+                                [cropType.id]: Math.max(1, Number(event.target.value) || 1)
+                              }))}
+                              className="premium-input"
+                              style={{ width: '68px', padding: '0.35rem' }}
+                            />
+                          )}
+                        </label>
+                      </div>
+                    );
+                  })}
+                </div>
+                {missingCropTypeCount > 0 && (
+                  <p style={{ color: '#92400e', background: '#fffbeb', padding: '0.65rem', borderRadius: '8px', fontSize: '0.82rem', marginBottom: 0 }}>
+                    {missingCropTypeCount} variedad{missingCropTypeCount === 1 ? '' : 'es'} no aparece{missingCropTypeCount === 1 ? '' : 'n'} porque no tiene{missingCropTypeCount === 1 ? '' : 'n'} ficha de cultivo.
+                  </p>
+                )}
+              </div>
+
+              <div style={{ borderTop: '1px solid #e2e8f0', padding: '1rem 1.25rem', display: 'flex', justifyContent: 'flex-end', gap: '0.75rem', background: '#f8fafc' }}>
+                <button type="button" className="btn" onClick={closePlannerDay}>Cancelar</button>
+                <button type="button" className="btn btn-primary" onClick={savePlannerDay}>Guardar día</button>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     );
   };
