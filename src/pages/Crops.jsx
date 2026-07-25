@@ -4,6 +4,7 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useData } from '../context/DataContext';
 import { generateLabelPDF } from '../utils/labelPdf.js';
 import EmployeeTasks from '../components/EmployeeTasks';
+import TraceabilityExplorer from '../components/TraceabilityExplorer';
 import Supplies from './Supplies';
 import '../crops.css';
 import React from 'react';
@@ -1393,6 +1394,14 @@ export default function Crops() {
           </div>
           <div className="hub-card-icon" style={{ fontSize: '4rem', background: '#eff6ff', width: '80px', height: '80px', display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: '50%' }}>📅</div>
         </button>
+
+        <button onClick={() => setActiveTab('trazabilidad')} className="hub-card" style={{ border: 'none', width: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '1.5rem 1rem', background: 'linear-gradient(135deg, #ecfdf5, #f0fdfa)', borderRadius: '24px', boxShadow: '0 10px 25px -5px rgba(5,150,105,0.12)', transition: 'all 0.3s ease', cursor: 'pointer' }}>
+          <div className="hub-card-text" style={{ textAlign: 'center', marginBottom: '1.5rem' }}>
+            <h2 style={{ fontSize: '1.75rem', fontWeight: '800', color: '#065f46', margin: '0 0 0.5rem 0' }}>Trazabilidad</h2>
+            <p style={{ fontSize: '1rem', color: '#047857', margin: 0 }}>Del proveedor al cliente</p>
+          </div>
+          <div className="hub-card-icon" style={{ fontSize: '4rem', background: '#d1fae5', width: '80px', height: '80px', display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: '50%' }}>🔎</div>
+        </button>
       </div>
       </div>
     </div>
@@ -1789,6 +1798,7 @@ export default function Crops() {
         {activeTab === 'lotes' && renderLotes()}
         {activeTab === 'cosechas' && renderCosechas()}
         {activeTab === 'planificador' && renderHarvestPlanner()}
+        {activeTab === 'trazabilidad' && <TraceabilityExplorer />}
         {activeTab === 'historial' && renderHistorial()}
         {activeTab === 'pedidos' && renderPedidos()}
         {activeTab === 'stock' && <Supplies />}

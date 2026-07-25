@@ -1057,6 +1057,33 @@ export const DataProvider = ({ children }) => {
         // Comprobar si ya restamos el stock de este pedido para no duplicar
         const existingMovements = productMovements.filter(m => m.type === 'ORDER' && (m.referenceId === id || m.referenceId.startsWith(id + '|')));
           if (existingMovements.length === 0) {
+            const requestedByProduct = effectiveOrder.items.reduce((totals, item) => {
+              if (item.productId && Number(item.quantity) > 0) {
+                totals[item.productId] = (totals[item.productId] || 0) + Number(item.quantity);
+              }
+              return totals;
+            }, {});
+
+            for (const [productId, requestedQuantity] of Object.entries(requestedByProduct)) {
+              const harvestedQuantity = productMovements
+                .filter(m => m.type === 'HARVEST' && m.productId === productId)
+                .reduce((sum, movement) => sum + Number(movement.quantity || 0), 0);
+              const deliveredQuantity = productMovements
+                .filter(m => m.type === 'ORDER' && m.productId === productId)
+                .reduce((sum, movement) => sum + Math.abs(Number(movement.quantity || 0)), 0);
+              const traceableAvailable = harvestedQuantity - deliveredQuantity;
+
+              if (traceableAvailable < requestedQuantity) {
+                const productName = products.find(product => product.id === productId)?.name || 'el producto';
+                await Swal.fire({
+                  title: 'Stock trazable insuficiente',
+                  text: `No se puede entregar ${productName}. Hay ${traceableAvailable} unidades con lote de cosecha y el pedido necesita ${requestedQuantity}. Registra primero la cosecha para conservar la trazabilidad sanitaria.`,
+                  icon: 'warning'
+                });
+                return null;
+              }
+            }
+
             for (const item of effectiveOrder.items) {
               if (item.productId && item.quantity > 0) {
                 let quantityToFulfill = item.quantity;
@@ -1102,15 +1129,7 @@ export const DataProvider = ({ children }) => {
                   quantityToFulfill -= consumeQty;
                 }
                 
-                if (quantityToFulfill > 0) {
-                  const movementId = await addProductMovement({
-                    productId: item.productId,
-                    quantity: -quantityToFulfill,
-                    type: 'ORDER',
-                    referenceId: effectiveOrder.id
-                  });
-                  if (!movementId) return null;
-                }
+                if (quantityToFulfill > 0) return null;
               }
             }
           }
