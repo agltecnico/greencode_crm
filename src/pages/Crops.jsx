@@ -55,6 +55,18 @@ const getCropCycleOffsets = (cropType) => {
 };
 
 const weekDay = (value) => ((Number(value) % 7) + 7) % 7;
+const PLANNER_DAYS = [
+  { idx: 1, name: 'Lunes', short: 'Lun' },
+  { idx: 2, name: 'Martes', short: 'Mar' },
+  { idx: 3, name: 'Miércoles', short: 'Mié' },
+  { idx: 4, name: 'Jueves', short: 'Jue' },
+  { idx: 5, name: 'Viernes', short: 'Vie' },
+  { idx: 6, name: 'Sábado', short: 'Sáb' },
+  { idx: 0, name: 'Domingo', short: 'Dom' }
+];
+
+const plannerDayName = (dayIndex, short = false) =>
+  PLANNER_DAYS.find(day => day.idx === Number(dayIndex))?.[short ? 'short' : 'name'] || '';
 
 class ErrorBoundary extends React.Component {
   constructor(props) {
@@ -141,7 +153,8 @@ export default function Crops() {
   const [showPhaseChangeModal, setShowPhaseChangeModal] = useState(null);
   const [pendingPhase, setPendingPhase] = useState(null);
   const [newCrop, setNewCrop] = useState({ cropTypeId: '', traysCount: 1, stockLotId: '' });
-  const [newTarget, setNewTarget] = useState({ targetDayOfWeek: 1, productId: '', tuppersCount: 1 });
+  const [plannerHarvestDay, setPlannerHarvestDay] = useState('');
+  const [plannerSelections, setPlannerSelections] = useState({});
   const [newHarvest, setNewHarvest] = useState({ productId: '', tuppersCount: 1, selectedCropUsages: {} });
 
   useEffect(() => {
@@ -225,8 +238,6 @@ export default function Crops() {
     }
   };
 
-  const handleAddHarvestTarget = e => { e.preventDefault(); addHarvestTarget(newTarget); };
-  
   const handleRegisterHarvest = async (e) => {
     e.preventDefault();
     const cropIdsToHarvest = Object.keys(newHarvest.selectedCropUsages).filter(id => newHarvest.selectedCropUsages[id] > 0);
@@ -1420,6 +1431,249 @@ export default function Crops() {
     );
   };
 
+  const renderHarvestPlanner = () => {
+    const selectableVarieties = (cropTypes || [])
+      .map(cropType => {
+        const variety = seedVarieties?.find(item => item.id === cropType.varietyId);
+        return { cropType, variety, name: variety?.name || cropType.name };
+      })
+      .filter(item => item.variety?.active !== false)
+      .sort((a, b) => a.name.localeCompare(b.name, 'es'));
+
+    const missingCropTypeCount = (seedVarieties || []).filter(variety =>
+      variety.active !== false && !(cropTypes || []).some(cropType => cropType.varietyId === variety.id)
+    ).length;
+    const selectedCropTypeIds = Object.keys(plannerSelections);
+    const routineRows = (harvestTargets || [])
+      .map(routine => {
+        const cropType = cropTypes?.find(item => item.id == routine.productId);
+        if (!cropType) return null;
+        const variety = seedVarieties?.find(item => item.id === cropType.varietyId);
+        return { routine, cropType, varietyName: variety?.name || cropType.name };
+      })
+      .filter(Boolean)
+      .sort((a, b) => {
+        const dayA = PLANNER_DAYS.findIndex(day => day.idx === Number(a.routine.targetDayOfWeek));
+        const dayB = PLANNER_DAYS.findIndex(day => day.idx === Number(b.routine.targetDayOfWeek));
+        return dayA - dayB || a.varietyName.localeCompare(b.varietyName, 'es');
+      });
+
+    const togglePlannerVariety = (cropTypeId, checked) => {
+      setPlannerSelections(previous => {
+        const next = { ...previous };
+        if (checked) next[cropTypeId] = 1;
+        else delete next[cropTypeId];
+        return next;
+      });
+    };
+
+    const createSelectedRoutines = async event => {
+      event.preventDefault();
+      if (plannerHarvestDay === '') {
+        Swal.fire('Falta el día', 'Selecciona el día de la semana en el que quieres cosechar.', 'warning');
+        return;
+      }
+      if (selectedCropTypeIds.length === 0) {
+        Swal.fire('Faltan variedades', 'Selecciona al menos una variedad para crear la rutina.', 'warning');
+        return;
+      }
+
+      let createdCount = 0;
+      for (const cropTypeId of selectedCropTypeIds) {
+        const createdId = await addHarvestTarget({
+          productId: cropTypeId,
+          targetDayOfWeek: Number(plannerHarvestDay),
+          tuppersCount: Number(plannerSelections[cropTypeId]) || 1
+        });
+        if (createdId) createdCount += 1;
+      }
+
+      if (createdCount > 0) {
+        setPlannerSelections({});
+        Swal.fire({
+          title: 'Rutinas creadas',
+          text: `${createdCount} rutina${createdCount === 1 ? '' : 's'} de cosecha guardada${createdCount === 1 ? '' : 's'} correctamente.`,
+          icon: 'success',
+          confirmButtonColor: '#059669'
+        });
+      }
+    };
+
+    const editPlannerRoutine = routine => {
+      Swal.fire({
+        title: 'Editar cantidad',
+        text: `Bandejas que quieres cosechar cada ${plannerDayName(routine.targetDayOfWeek).toLowerCase()}`,
+        input: 'number',
+        inputValue: routine.tuppersCount,
+        inputAttributes: { min: 1, step: 1 },
+        showCancelButton: true,
+        confirmButtonText: 'Guardar',
+        cancelButtonText: 'Cancelar',
+        confirmButtonColor: '#059669'
+      }).then(result => {
+        if (result.isConfirmed && Number(result.value) > 0) {
+          updateHarvestTarget(routine.id, { tuppersCount: Number(result.value) });
+        }
+      });
+    };
+
+    const removePlannerRoutine = routine => {
+      Swal.fire({
+        title: '¿Eliminar esta rutina?',
+        text: 'Dejarán de generarse sus tareas semanales.',
+        icon: 'warning',
+        showCancelButton: true,
+        confirmButtonText: 'Sí, eliminar',
+        cancelButtonText: 'Cancelar',
+        confirmButtonColor: '#dc2626'
+      }).then(result => {
+        if (result.isConfirmed) deleteHarvestTarget(routine.id);
+      });
+    };
+
+    const scheduleFor = (cropType, harvestDay) => {
+      const offsets = getCropCycleOffsets(cropType);
+      const sowDay = weekDay(Number(harvestDay) - offsets.harvest);
+      return [
+        { icon: '🌱', label: 'Siembra', day: sowDay },
+        ...(offsets.soak > 0 ? [{ icon: '💧', label: 'Germinación', day: weekDay(sowDay + offsets.germinationStart) }] : []),
+        ...(offsets.darkness > 0 ? [{ icon: '🌑', label: 'Oscuridad', day: weekDay(sowDay + offsets.darknessStart) }] : []),
+        { icon: '☀️', label: 'Luz', day: weekDay(sowDay + offsets.lightStart) },
+        { icon: '✂️', label: 'Cosecha', day: Number(harvestDay) }
+      ];
+    };
+
+    return (
+      <div>
+        <div style={{ background: 'linear-gradient(135deg, #f0fdf4, #ccfbf1)', border: '1px solid #99f6e4', padding: '2rem', borderRadius: '20px', marginBottom: '2rem' }}>
+          <h2 style={{ margin: '0 0 0.5rem', fontSize: '1.8rem', fontWeight: 900, color: '#065f46' }}>Planificador de Cosechas</h2>
+          <p style={{ margin: 0, color: '#047857', fontSize: '1.05rem', fontWeight: 500 }}>
+            Elige un día de cosecha y las variedades. El sistema calculará automáticamente cuándo sembrar y cuándo cambiar cada fase.
+          </p>
+        </div>
+
+        <form onSubmit={createSelectedRoutines} className="premium-card" style={{ padding: '1.5rem', marginBottom: '2rem' }}>
+          <h3 style={{ margin: '0 0 1.25rem', color: '#0f172a' }}>Crear nueva rutina</h3>
+          <label style={{ display: 'block', fontWeight: 800, color: '#334155', marginBottom: '0.5rem' }}>
+            ¿Qué día quieres cosechar?
+          </label>
+          <select
+            className="premium-input"
+            value={plannerHarvestDay}
+            onChange={event => {
+              setPlannerHarvestDay(event.target.value);
+              setPlannerSelections({});
+            }}
+            style={{ width: '100%', maxWidth: '420px', marginBottom: '1.5rem' }}
+          >
+            <option value="">Selecciona un día</option>
+            {PLANNER_DAYS.map(day => <option key={day.idx} value={day.idx}>{day.name}</option>)}
+          </select>
+
+          {plannerHarvestDay !== '' && (
+            <>
+              <div style={{ fontWeight: 800, color: '#334155', marginBottom: '0.75rem' }}>
+                ¿Qué variedades quieres cosechar el {plannerDayName(plannerHarvestDay).toLowerCase()}?
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: '0.75rem', marginBottom: '1.25rem' }}>
+                {selectableVarieties.map(({ cropType, name }) => {
+                  const alreadyExists = harvestTargets?.some(target =>
+                    target.productId == cropType.id && Number(target.targetDayOfWeek) === Number(plannerHarvestDay)
+                  );
+                  const checked = Object.prototype.hasOwnProperty.call(plannerSelections, cropType.id);
+                  return (
+                    <div key={cropType.id} style={{
+                      border: checked ? '2px solid #10b981' : '1px solid #cbd5e1',
+                      background: alreadyExists ? '#f8fafc' : checked ? '#ecfdf5' : 'white',
+                      borderRadius: '12px',
+                      padding: '0.9rem',
+                      opacity: alreadyExists ? 0.65 : 1
+                    }}>
+                      <label style={{ display: 'flex', gap: '0.75rem', alignItems: 'center', cursor: alreadyExists ? 'default' : 'pointer' }}>
+                        <input
+                          type="checkbox"
+                          checked={checked}
+                          disabled={alreadyExists}
+                          onChange={event => togglePlannerVariety(cropType.id, event.target.checked)}
+                          style={{ width: '20px', height: '20px', accentColor: '#059669' }}
+                        />
+                        <span style={{ flex: 1 }}>
+                          <strong style={{ display: 'block', color: '#0f172a' }}>{name}</strong>
+                          <small style={{ color: '#64748b' }}>{alreadyExists ? 'Rutina ya creada para este día' : `Ciclo: ${getCropCycleOffsets(cropType).harvest} días`}</small>
+                        </span>
+                      </label>
+                      {checked && (
+                        <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginTop: '0.75rem', color: '#475569', fontWeight: 700 }}>
+                          Bandejas:
+                          <input
+                            type="number"
+                            min="1"
+                            step="1"
+                            className="premium-input"
+                            value={plannerSelections[cropType.id]}
+                            onChange={event => setPlannerSelections(previous => ({
+                              ...previous,
+                              [cropType.id]: Math.max(1, Number(event.target.value) || 1)
+                            }))}
+                            style={{ width: '90px', padding: '0.45rem' }}
+                          />
+                        </label>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+              {missingCropTypeCount > 0 && (
+                <p style={{ color: '#92400e', background: '#fffbeb', padding: '0.75rem', borderRadius: '10px' }}>
+                  {missingCropTypeCount} variedad{missingCropTypeCount === 1 ? '' : 'es'} no aparece{missingCropTypeCount === 1 ? '' : 'n'} porque todavía no tiene{missingCropTypeCount === 1 ? '' : 'n'} ficha de cultivo.
+                </p>
+              )}
+              <button type="submit" className="btn btn-primary" disabled={selectedCropTypeIds.length === 0}>
+                Crear rutina{selectedCropTypeIds.length > 1 ? 's' : ''}
+              </button>
+            </>
+          )}
+        </form>
+
+        <section>
+          <h3 style={{ color: '#0f172a', marginBottom: '1rem' }}>Rutinas creadas</h3>
+          {routineRows.length === 0 ? (
+            <div className="premium-card" style={{ padding: '2rem', textAlign: 'center', color: '#64748b' }}>
+              Todavía no hay rutinas. Selecciona un día y las variedades para crear la primera.
+            </div>
+          ) : (
+            <div style={{ display: 'grid', gap: '1rem' }}>
+              {routineRows.map(({ routine, cropType, varietyName }) => (
+                <article key={routine.id} className="premium-card" style={{ padding: '1.25rem', borderLeft: '6px solid #10b981' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', gap: '1rem', flexWrap: 'wrap', alignItems: 'flex-start' }}>
+                    <div>
+                      <div style={{ color: '#059669', fontWeight: 900, textTransform: 'uppercase', fontSize: '0.8rem' }}>
+                        Cosecha · {plannerDayName(routine.targetDayOfWeek)}
+                      </div>
+                      <h4 style={{ margin: '0.25rem 0', color: '#0f172a', fontSize: '1.25rem' }}>{varietyName}</h4>
+                      <div style={{ color: '#64748b' }}>{routine.tuppersCount} bandeja{Number(routine.tuppersCount) === 1 ? '' : 's'} por semana</div>
+                    </div>
+                    <div style={{ display: 'flex', gap: '0.5rem' }}>
+                      <button type="button" className="btn" onClick={() => editPlannerRoutine(routine)}>Editar</button>
+                      <button type="button" className="btn" onClick={() => removePlannerRoutine(routine)} style={{ color: '#dc2626' }}>Eliminar</button>
+                    </div>
+                  </div>
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem', marginTop: '1rem' }}>
+                    {scheduleFor(cropType, routine.targetDayOfWeek).map((phase, index) => (
+                      <span key={`${phase.label}-${index}`} style={{ background: '#f1f5f9', color: '#334155', borderRadius: '999px', padding: '0.45rem 0.75rem', fontWeight: 700, fontSize: '0.85rem' }}>
+                        {phase.icon} {phase.label}: {plannerDayName(phase.day, true)}
+                      </span>
+                    ))}
+                  </div>
+                </article>
+              ))}
+            </div>
+          )}
+        </section>
+      </div>
+    );
+  };
+
   return (
     <ErrorBoundary>
       <div className="crops-module" style={{ paddingBottom: '5rem', maxWidth: '1400px', margin: '0 auto', paddingTop: '1rem' }}>
@@ -1452,7 +1706,7 @@ export default function Crops() {
         )}
         {activeTab === 'lotes' && renderLotes()}
         {activeTab === 'cosechas' && renderCosechas()}
-        {activeTab === 'planificador' && renderPlanificador()}
+        {activeTab === 'planificador' && renderHarvestPlanner()}
         {activeTab === 'historial' && renderHistorial()}
         {activeTab === 'pedidos' && renderPedidos()}
         {activeTab === 'stock' && <Supplies />}
