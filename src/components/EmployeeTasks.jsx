@@ -3,6 +3,12 @@ import { useState } from 'react';
 import { useData } from '../context/DataContext';
 import '../crops.css';
 
+const CULTIVATION_TASK_ICONS = {
+  GERMINACIÓN: '🌿',
+  OSCURIDAD: '🌑',
+  LUZ: '☀️'
+};
+
 export default function EmployeeTasks({ onTaskAction }) {
   const navigate = useNavigate();
   const { 
@@ -121,7 +127,7 @@ export default function EmployeeTasks({ onTaskAction }) {
           type: 'move',
           title: `Mover a ${phaseStr}`,
           desc: `${crop.traysCount} bandejas de ${varietyName} (Lote: ${crop.batchNumber})`,
-          icon: '🔄',
+          icon: CULTIVATION_TASK_ICONS[phaseStr] || '🌿',
           className: 'move',
           cropId: crop.id
         });
@@ -187,7 +193,7 @@ export default function EmployeeTasks({ onTaskAction }) {
 
       if(germWd == targetDayOfWeek && !checkPlanted(germOffset)) {
         if (soakHrs > 0) {
-           // tasksForDate.push({ type: 'germ', title: `A Germinación: ${cType.name}`, desc: `Desde remojo (Rutina)`, icon: '🌱', className: 'germ', cropTypeId: cType.id });
+           // tasksForDate.push({ type: 'germ', title: `A Germinación: ${cType.name}`, desc: `Desde remojo (Rutina)`, icon: '🌿', className: 'germ', cropTypeId: cType.id });
         }
       }
 
