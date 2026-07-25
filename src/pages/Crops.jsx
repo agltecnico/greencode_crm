@@ -1532,21 +1532,18 @@ export default function Crops() {
 
     return (
       <div>
-        <div style={{ background: 'linear-gradient(135deg, #f0fdf4, #ccfbf1)', border: '1px solid #99f6e4', padding: '2rem', borderRadius: '20px', marginBottom: '2rem' }}>
-          <h2 style={{ margin: '0 0 0.5rem', fontSize: '1.8rem', fontWeight: 900, color: '#065f46' }}>Planificador de Cosechas</h2>
-          <p style={{ margin: 0, color: '#047857', fontSize: '1.05rem', fontWeight: 500 }}>
-            Define las cosechas semanales y consulta automáticamente cuándo corresponde sembrar cada variedad.
-          </p>
-        </div>
-
-        <div style={{ display: 'inline-flex', gap: '0.35rem', padding: '0.3rem', background: '#e2e8f0', borderRadius: '12px', marginBottom: '1.25rem' }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.75rem', flexWrap: 'wrap', marginBottom: '0.65rem' }}>
+          <h2 style={{ margin: 0, fontSize: '1.55rem', fontWeight: 900, color: plannerView === 'harvest' ? '#065f46' : '#1e40af' }}>
+            Planificador de {plannerView === 'harvest' ? 'Cosechas' : 'Siembras'}
+          </h2>
+          <div style={{ display: 'inline-flex', gap: '0.25rem', padding: '0.22rem', background: '#e2e8f0', borderRadius: '10px' }}>
           <button
             type="button"
             onClick={() => setPlannerView('harvest')}
             style={{
               border: 0,
-              borderRadius: '9px',
-              padding: '0.65rem 1rem',
+              borderRadius: '8px',
+              padding: '0.48rem 0.8rem',
               cursor: 'pointer',
               fontWeight: 800,
               color: plannerView === 'harvest' ? 'white' : '#475569',
@@ -1563,8 +1560,8 @@ export default function Crops() {
             }}
             style={{
               border: 0,
-              borderRadius: '9px',
-              padding: '0.65rem 1rem',
+              borderRadius: '8px',
+              padding: '0.48rem 0.8rem',
               cursor: 'pointer',
               fontWeight: 800,
               color: plannerView === 'sowing' ? 'white' : '#475569',
@@ -1573,17 +1570,10 @@ export default function Crops() {
           >
             🌱 Siembras
           </button>
+          </div>
         </div>
 
         <section>
-          <h3 style={{ color: '#0f172a', marginBottom: '0.35rem' }}>
-            Calendario semanal de {plannerView === 'harvest' ? 'cosechas' : 'siembras'}
-          </h3>
-          <p style={{ color: '#64748b', margin: '0 0 1rem' }}>
-            {plannerView === 'harvest'
-              ? 'Pulsa un día para modificar sus cosechas semanales.'
-              : 'Vista automática calculada desde las cosechas y la duración de cada ficha de cultivo.'}
-          </p>
           <div style={{ overflowX: 'auto', paddingBottom: '0.5rem' }}>
               <div style={{
                 display: 'grid',
@@ -1600,25 +1590,23 @@ export default function Crops() {
                       border: isToday ? '2px solid #10b981' : '1px solid #dbe4ee',
                       borderRadius: '12px',
                       background: '#f8fafc',
-                      minHeight: '150px',
+                      minHeight: '105px',
                       overflow: 'hidden'
                     }}>
                       <button type="button" disabled={plannerView !== 'harvest'} onClick={() => plannerView === 'harvest' && openPlannerDay(day.idx)} style={{
                         width: '100%',
                         border: 0,
                         cursor: plannerView === 'harvest' ? 'pointer' : 'default',
-                        padding: '0.6rem 0.4rem',
+                        padding: '0.45rem 0.35rem',
                         textAlign: 'center',
                         fontWeight: 900,
                         color: isToday ? 'white' : '#334155',
                         background: isToday ? '#059669' : '#e2e8f0'
                       }}>
                         {day.name}
-                        <small style={{ display: 'block', fontWeight: 700, opacity: 0.8 }}>
-                          {isToday ? 'Hoy' : plannerView === 'harvest' ? 'Editar' : 'Calculado'}
-                        </small>
+                        {isToday && <small style={{ marginLeft: '0.3rem', fontWeight: 700, opacity: 0.8 }}>· Hoy</small>}
                       </button>
-                      <div onClick={() => plannerView === 'harvest' && openPlannerDay(day.idx)} style={{ display: 'flex', flexDirection: 'column', gap: '0.3rem', padding: '0.4rem', cursor: plannerView === 'harvest' ? 'pointer' : 'default' }}>
+                      <div onClick={() => plannerView === 'harvest' && openPlannerDay(day.idx)} style={{ display: 'flex', flexDirection: 'column', gap: '0.22rem', padding: '0.3rem', cursor: plannerView === 'harvest' ? 'pointer' : 'default' }}>
                         {dayRoutines.length === 0 ? (
                           <div style={{ color: '#94a3b8', textAlign: 'center', padding: '1rem 0.2rem', fontSize: '0.78rem' }}>
                             {plannerView === 'harvest' ? '+ Añadir' : 'Sin siembras'}
@@ -1628,18 +1616,18 @@ export default function Crops() {
                             background: 'white',
                             border: `1px solid ${plannerView === 'harvest' ? '#a7f3d0' : '#bfdbfe'}`,
                             borderLeft: `3px solid ${plannerView === 'harvest' ? '#10b981' : '#3b82f6'}`,
-                            borderRadius: '7px',
-                            padding: '0.38rem 0.45rem'
+                            borderRadius: '6px',
+                            padding: '0.3rem 0.38rem',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'space-between',
+                            gap: '0.3rem'
                           }}>
-                            <div style={{ fontSize: '0.78rem', fontWeight: 900, color: '#0f172a', lineHeight: 1.15 }}>{varietyName}</div>
-                            <div style={{ color: plannerView === 'harvest' ? '#047857' : '#1d4ed8', fontWeight: 800, fontSize: '0.72rem', marginTop: '0.15rem' }}>
-                              {routine.tuppersCount} bandeja{Number(routine.tuppersCount) === 1 ? '' : 's'}
+                            <div title={varietyName} style={{ fontSize: '0.72rem', fontWeight: 900, color: '#0f172a', lineHeight: 1.1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{varietyName}</div>
+                            <div style={{ color: plannerView === 'harvest' ? '#047857' : '#1d4ed8', fontWeight: 900, fontSize: '0.68rem', whiteSpace: 'nowrap' }}>
+                              {routine.tuppersCount} bdj.
+                              {plannerView === 'sowing' && <span title={`Cosecha: ${plannerDayName(harvestDay)}`} style={{ color: '#64748b', marginLeft: '0.22rem' }}>· C:{plannerDayName(harvestDay, true)}</span>}
                             </div>
-                            {plannerView === 'sowing' && (
-                              <div style={{ color: '#64748b', fontSize: '0.65rem', marginTop: '0.1rem' }}>
-                                Cosecha: {plannerDayName(harvestDay, true)}
-                              </div>
-                            )}
                           </article>
                         ))}
                       </div>
@@ -1729,7 +1717,7 @@ export default function Crops() {
       )}
       
       {activeTab !== 'menu' && (
-        <button onClick={() => setActiveTab('menu')} style={{ background: 'transparent', border: '1px solid var(--crop-border)', color: 'var(--crop-text-main)', padding: '0.5rem 1rem', borderRadius: '8px', fontWeight: 'bold', cursor: 'pointer', marginBottom: '2rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+        <button onClick={() => setActiveTab('menu')} style={{ background: 'transparent', border: '1px solid var(--crop-border)', color: 'var(--crop-text-main)', padding: '0.5rem 1rem', borderRadius: '8px', fontWeight: 'bold', cursor: 'pointer', marginBottom: activeTab === 'planificador' ? '0.65rem' : '2rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
           <span>🔙</span> Volver al Menú Cultivo
         </button>
       )}
