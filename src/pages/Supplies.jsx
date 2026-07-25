@@ -35,7 +35,7 @@ export default function Supplies() {
   const [newStockEntry, setNewStockEntry] = useState({ purchaseDate: new Date().toISOString().split('T')[0], deliveryNote: '', batchNumber: '', articleId: '', providerId: '', quantity: 1, price: 0 });
   
   const [newType, setNewType] = useState({
-    name: '', seedId: '', seedGrams: 0, substrateId: '', substrateLiters: 0, containerId: '', expectedYieldGrams: 0, providerId: ''
+    name: '', varietyId: '', seedGrams: 0, substrateId: '', substrateLiters: 0, containerId: '', expectedYieldGrams: 0
   });
 
   // Modal States
@@ -95,13 +95,12 @@ export default function Supplies() {
   const handleAddCropType = e => {
     e.preventDefault();
     const payload = { ...newType };
-    payload.varietyId = articles?.find(article => article.id === payload.seedId)?.varietyId || null;
-    if (payload.providerId === '') payload.providerId = null;
+    payload.providerId = null;
+    payload.seedId = null;
     if (payload.substrateId === '') payload.substrateId = null;
     if (payload.containerId === '') payload.containerId = null;
-    if (payload.seedId === '') payload.seedId = null;
     addCropType(payload);
-    setNewType({ name: '', seedId: '', seedGrams: 0, substrateId: '', substrateLiters: 0, containerId: '', expectedYieldGrams: 0, providerId: '', soakingHours: 0, germinationDays: 0, darknessDays: 0, lightDays: 0 });
+    setNewType({ name: '', varietyId: '', seedGrams: 0, substrateId: '', substrateLiters: 0, containerId: '', expectedYieldGrams: 0, soakingHours: 0, germinationDays: 0, darknessDays: 0, lightDays: 0 });
     setShowCropTypeModal(false);
   };
 
@@ -184,7 +183,6 @@ export default function Supplies() {
     return totalPrice / totalQty;
   };
 
-  const seeds = articles?.filter(a => a.type === 'SEMILLA') || [];
   const substrates = articles?.filter(a => a.type === 'SUSTRATO') || [];
   const containers = articles?.filter(a => a.type === 'ENVASE' || a.type === 'BANDEJA' || a.type === 'SUMINISTROS') || [];
   const selectedArticleType = newStockEntry.articleId ? articles?.find(a => a.id === newStockEntry.articleId)?.type : null;
@@ -192,9 +190,13 @@ export default function Supplies() {
 
   const getLiveCosts = (formData) => {
     if (!formData) return { totalTray: 0, perKg: 0 };
-    const sCost = getAverageUnitCost(formData.seedId, formData.providerId) * Number(formData.seedGrams || 0);
-    const subCost = getAverageUnitCost(formData.substrateId, formData.providerId) * Number(formData.substrateLiters || 0);
-    const cCost = getAverageUnitCost(formData.containerId, formData.providerId) * 1;
+    const varietyArticles = articles?.filter(article => article.type === 'SEMILLA' && article.varietyId === formData.varietyId) || [];
+    const varietyCost = varietyArticles.length
+      ? varietyArticles.reduce((sum, article) => sum + getAverageUnitCost(article.id), 0) / varietyArticles.length
+      : 0;
+    const sCost = varietyCost * Number(formData.seedGrams || 0);
+    const subCost = getAverageUnitCost(formData.substrateId) * Number(formData.substrateLiters || 0);
+    const cCost = getAverageUnitCost(formData.containerId) * 1;
     const totalTray = sCost + subCost + cCost;
     const expKg = Number(formData.expectedYieldGrams || 0) / 1000;
     const perKg = expKg > 0 ? totalTray / expKg : 0;
@@ -782,7 +784,7 @@ export default function Supplies() {
               <thead>
                 <tr>
                   <th>Tipo de Cultivo</th>
-                  <th>Proveedor (Semilla)</th>
+                  <th>Variedad Agronómica</th>
                   <th>Receta (Semilla + Sustrato + Envase)</th>
                   <th>Coste Directo (Bandeja)</th>
                   <th>Rendimiento</th>
@@ -792,9 +794,13 @@ export default function Supplies() {
               </thead>
               <tbody>
                 {paginatedTypes.map(c => {
-                  const seedCost = getAverageUnitCost(c.seedId, c.providerId) * Number(c.seedGrams || 0);
-                  const subCost = getAverageUnitCost(c.substrateId, c.providerId) * Number(c.substrateLiters || 0);
-                  const contCost = getAverageUnitCost(c.containerId, c.providerId) * 1;
+                  const varietyArticles = articles?.filter(article => article.type === 'SEMILLA' && article.varietyId === c.varietyId) || [];
+                  const varietyUnitCost = varietyArticles.length
+                    ? varietyArticles.reduce((sum, article) => sum + getAverageUnitCost(article.id), 0) / varietyArticles.length
+                    : 0;
+                  const seedCost = varietyUnitCost * Number(c.seedGrams || 0);
+                  const subCost = getAverageUnitCost(c.substrateId) * Number(c.substrateLiters || 0);
+                  const contCost = getAverageUnitCost(c.containerId) * 1;
                   
                   const totalCost = seedCost + subCost + contCost;
                   const expectedKg = Number(c.expectedYieldGrams || 0) / 1000;
@@ -809,17 +815,10 @@ export default function Supplies() {
                             <input type="text" className="form-control" value={editedCropType.name} onChange={e => setEditedCropType({...editedCropType, name: e.target.value})} />
                           </div>
                           <div>
-                            <label className="form-label text-sm">Proveedor Predilecto</label>
-                            <select className="form-control" value={editedCropType.providerId || ''} onChange={e => setEditedCropType({...editedCropType, providerId: e.target.value})}>
-                              <option value="">Cualquiera</option>
-                              {providers?.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
-                            </select>
-                          </div>
-                          <div>
-                            <label className="form-label text-sm">Semilla</label>
-                            <select className="form-control" value={editedCropType.seedId || ''} onChange={e => setEditedCropType({...editedCropType, seedId: e.target.value})}>
+                            <label className="form-label text-sm">Variedad Agronómica</label>
+                            <select className="form-control" value={editedCropType.varietyId || ''} onChange={e => setEditedCropType({...editedCropType, varietyId: e.target.value})}>
                               <option value="">Selecciona...</option>
-                              {seeds.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+                              {seedVarieties?.filter(v => v.active !== false || v.id === editedCropType.varietyId).map(v => <option key={v.id} value={v.id}>{v.name}</option>)}
                             </select>
                           </div>
                           <div>
@@ -881,11 +880,10 @@ export default function Supplies() {
                           <div className="flex gap-2">
                               <button className="btn btn-primary" onClick={() => { 
                                 const payload = { ...editedCropType };
-                                if (payload.providerId === '') payload.providerId = null;
+                                payload.providerId = null;
                                 if (payload.substrateId === '') payload.substrateId = null;
                                 if (payload.containerId === '') payload.containerId = null;
-                                if (payload.seedId === '') payload.seedId = null;
-                                payload.varietyId = articles?.find(article => article.id === payload.seedId)?.varietyId || null;
+                                payload.seedId = null;
                                 updateCropType(c.id, payload); 
                                 setEditingCropTypeId(null); 
                               }}>Guardar Ficha</button>
@@ -897,7 +895,7 @@ export default function Supplies() {
                   ) : (
                     <tr key={c.id}>
                       <td className="font-bold text-slate-800">{c.name}</td>
-                      <td className="text-muted">{providers?.find(p => p.id === c.providerId)?.name || 'Cualquiera'}</td>
+                      <td className="text-muted">{seedVarieties?.find(v => v.id === c.varietyId)?.name || 'Sin variedad'}</td>
                       <td className="text-sm text-slate-500">
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem' }}>
                           <span>🌱 {c.seedGrams}g ({seedCost.toFixed(2)}€)</span>
@@ -1089,23 +1087,16 @@ export default function Supplies() {
                 <input required type="text" className="form-control" value={newType.name} onChange={e => setNewType({...newType, name: e.target.value})} />
               </div>
 
-              <div style={{ gridColumn: 'span 2' }}>
-                <label className="form-label">Proveedor Predilecto (Opcional - Si quieres el coste específico de uno)</label>
-                <select className="form-control" value={newType.providerId} onChange={e => setNewType({...newType, providerId: e.target.value})}>
-                  <option value="">Indiferente / Cualquier Proveedor</option>
-                  {providers?.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
-                </select>
-              </div>
-
               {/* Seed Section */}
               <div className="card" style={{ background: '#f8fafc', border: '1px solid #e2e8f0', boxShadow: 'none', padding: '1.25rem' }}>
-                <h4 className="font-semibold text-slate-700 mb-3">🌱 Semilla a utilizar</h4>
+                <h4 className="font-semibold text-slate-700 mb-3">🌱 Variedad a cultivar</h4>
                 <div style={{ marginBottom: '1rem' }}>
-                  <label className="form-label">Seleccionar Semilla</label>
-                  <select required className="form-control" value={newType.seedId} onChange={e => setNewType({...newType, seedId: e.target.value})}>
+                  <label className="form-label">Variedad agronómica</label>
+                  <select required className="form-control" value={newType.varietyId} onChange={e => setNewType({...newType, varietyId: e.target.value})}>
                     <option value="">Selecciona...</option>
-                    {seeds.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+                    {seedVarieties?.filter(v => v.active !== false).map(v => <option key={v.id} value={v.id}>{v.name}</option>)}
                   </select>
+                  <p className="text-xs text-slate-500 mt-1">El proveedor y el lote concreto se seleccionarán al registrar la siembra.</p>
                 </div>
                 <div>
                   <label className="form-label">Gramos por Bandeja</label>
