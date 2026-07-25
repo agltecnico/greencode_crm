@@ -91,6 +91,7 @@ export const DataProvider = ({ children }) => {
   const [harvestTargets, setHarvestTargets] = useState([]);
   const [harvests, setHarvests] = useState([]);
   const [productMovements, setProductMovements] = useState([]);
+  const [packagingFormats, setPackagingFormats] = useState([]);
   const [dailyLogs, setDailyLogs] = useState([]);
 
   const refreshInFlightRef = useRef(null);
@@ -126,6 +127,7 @@ export const DataProvider = ({ children }) => {
           supabase.from('harvests').select('*').order('harvestDate', { ascending: true }),
           supabase.from('daily_logs').select('*').order('date', { ascending: true }),
           supabase.from('product_movements').select('*').order('createdAt', { ascending: true }),
+          supabase.from('packaging_formats').select('*').order('capacityMl', { ascending: true }),
         ]);
 
         const failedQuery = results.find(result => result.error);
@@ -151,7 +153,8 @@ export const DataProvider = ({ children }) => {
           { data: harvestTargetsData },
           { data: harvestsData },
           { data: dailyLogsData },
-          { data: productMovementsData }
+          { data: productMovementsData },
+          { data: packagingFormatsData }
         ] = results;
 
         if (clientsData) setClients(clientsData);
@@ -216,6 +219,7 @@ export const DataProvider = ({ children }) => {
         if (harvestsData) setHarvests(harvestsData);
         if (dailyLogsData) setDailyLogs(dailyLogsData);
         if (productMovementsData) setProductMovements(productMovementsData);
+        if (packagingFormatsData) setPackagingFormats(packagingFormatsData);
 
         if (profileData && profileData.length > 0) {
           setCompanyProfile(profileData[0]);
@@ -833,6 +837,54 @@ export const DataProvider = ({ children }) => {
     if (data) setHarvests(prev => prev.map(i => i.id === tempId ? data[0] : i));
     return data?.[0]?.id || tempId;
   };
+
+  const registerHarvest = async ({ productId, batchNumber, harvestDate, selectedCropUsages, packagingBreakdown }) => {
+    const { data, error } = await persistOrReload(
+      () => supabase.rpc('register_harvest', {
+        p_product_id: productId,
+        p_batch_number: batchNumber,
+        p_harvest_date: harvestDate,
+        p_selected_crop_usages: selectedCropUsages,
+        p_packaging_breakdown: packagingBreakdown
+      }),
+      'registrar la cosecha completa'
+    );
+    if (error) return null;
+    await refreshData({ force: true });
+    return data;
+  };
+
+  const addPackagingFormat = async (item) => {
+    const newItem = { ...item, id: createId(), active: true };
+    const { data, error } = await persistOrReload(
+      () => supabase.from('packaging_formats').insert([newItem]).select(),
+      'crear el formato de envase'
+    );
+    if (error) return null;
+    if (data?.[0]) setPackagingFormats(prev => [...prev, data[0]].sort((a, b) => Number(a.capacityMl) - Number(b.capacityMl)));
+    return data?.[0]?.id || null;
+  };
+
+  const updatePackagingFormat = async (id, fields) => {
+    const { error } = await persistOrReload(
+      () => supabase.from('packaging_formats').update(fields).eq('id', id),
+      'actualizar el formato de envase'
+    );
+    if (error) return false;
+    setPackagingFormats(prev => prev.map(item => item.id === id ? { ...item, ...fields } : item));
+    return true;
+  };
+
+  const deletePackagingFormat = async (id) => {
+    const { error } = await persistOrReload(
+      () => supabase.from('packaging_formats').delete().eq('id', id),
+      'eliminar el formato de envase'
+    );
+    if (error) return false;
+    setPackagingFormats(prev => prev.filter(item => item.id !== id));
+    return true;
+  };
+
     const addProductMovement = async (item) => {
     const tempId = createId();
     const newItem = { ...item, id: tempId, createdAt: new Date().toISOString() };
@@ -1016,30 +1068,34 @@ export const DataProvider = ({ children }) => {
                 const batchStats = {};
                 for (const hm of harvestMovements) {
                   const batch = hm.referenceId;
-                  if (!batchStats[batch]) batchStats[batch] = 0;
-                  batchStats[batch] += hm.quantity;
+                  const formatId = hm.packagingFormatId || '';
+                  const key = `${batch}::${formatId}`;
+                  if (!batchStats[key]) batchStats[key] = { batch, formatId, quantity: 0 };
+                  batchStats[key].quantity += Number(hm.quantity || 0);
                 }
                 
                 const orderMovements = productMovements.filter(m => m.type === 'ORDER' && m.productId === item.productId);
                 for (const om of orderMovements) {
                   if (om.referenceId && om.referenceId.includes('|')) {
                     const batch = om.referenceId.split('|')[1];
-                    if (batchStats[batch] !== undefined) {
-                      batchStats[batch] -= Math.abs(om.quantity);
+                    const key = `${batch}::${om.packagingFormatId || ''}`;
+                    if (batchStats[key]) {
+                      batchStats[key].quantity -= Math.abs(Number(om.quantity || 0));
                     }
                   }
                 }
                 
-                const availableBatches = Object.entries(batchStats).filter(([, q]) => q > 0);
+                const availableBatches = Object.values(batchStats).filter(entry => entry.quantity > 0);
                 
-                for (const [batch, availableQty] of availableBatches) {
+                for (const batchEntry of availableBatches) {
                   if (quantityToFulfill <= 0) break;
-                  const consumeQty = Math.min(availableQty, quantityToFulfill);
+                  const consumeQty = Math.min(batchEntry.quantity, quantityToFulfill);
                   const movementId = await addProductMovement({
                     productId: item.productId,
                     quantity: -consumeQty,
                     type: 'ORDER',
-                    referenceId: `${effectiveOrder.id}|${batch}`
+                    referenceId: `${effectiveOrder.id}|${batchEntry.batch}`,
+                    packagingFormatId: batchEntry.formatId || null
                   });
                   if (!movementId) return null;
                   quantityToFulfill -= consumeQty;
@@ -1416,11 +1472,12 @@ export const DataProvider = ({ children }) => {
         substrateInventory, addSubstrateInventory, deleteSubstrateInventory,
         crops, addCrop, sowCrop, updateCrop, deleteCrop, advanceCropStatus, reverseCropStatus, setCropPhase, discardCrop,
         harvestTargets, addHarvestTarget, updateHarvestTarget, deleteHarvestTarget,
-      harvests, addHarvest, updateHarvest, deleteHarvest,
+      harvests, addHarvest, registerHarvest, updateHarvest, deleteHarvest,
       dailyLogs, addDailyLog, updateDailyLog, deleteDailyLog,
 
       clients, addClient, updateClient, deleteClient,
       productMovements, addProductMovement,
+      packagingFormats, addPackagingFormat, updatePackagingFormat, deletePackagingFormat,
         products, addProduct, updateProduct, deleteProduct,
       orders, addOrder, updateOrderList, deleteOrder, markOrderAsDelivered, saveSignedDeliveryNote,
       deliveryNotes, updateDeliveryNote, deleteDeliveryNote,
