@@ -22,6 +22,21 @@ const calendarDaysSince = (dateValue, now = new Date()) => {
   return Math.max(0, Math.round((currentDay - plantedDay) / 86_400_000));
 };
 
+const formatSowingDateTime = (dateValue) => {
+  if (!dateValue) return 'Sin fecha';
+  const date = new Date(dateValue);
+  if (Number.isNaN(date.getTime())) return 'Fecha no válida';
+  return new Intl.DateTimeFormat('es-ES', {
+    timeZone: 'Europe/Madrid',
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false
+  }).format(date);
+};
+
 class ErrorBoundary extends React.Component {
   constructor(props) {
     super(props);
@@ -379,7 +394,7 @@ export default function Crops() {
                 <tr style={{ backgroundColor: '#f8fafc', borderBottom: '2px solid #e2e8f0', color: '#475569', textAlign: 'left', fontSize: '0.85rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
                   <th style={{ padding: '1.25rem 1.5rem', fontWeight: '700' }}>Lote / Siembra</th>
                   <th style={{ padding: '1.25rem 1.5rem', fontWeight: '700' }}>Ficha de Cultivo</th>
-                  <th style={{ padding: '1.25rem 1.5rem', fontWeight: '700' }}>Fecha Siembra</th>
+                  <th style={{ padding: '1.25rem 1.5rem', fontWeight: '700' }}>Inicio de Siembra</th>
                   <th style={{ padding: '1.25rem 1.5rem', fontWeight: '700', textAlign: 'center' }}>Bandejas</th>
                   <th style={{ padding: '1.25rem 1.5rem', fontWeight: '700', textAlign: 'right' }}>Estado Final</th>
                 </tr>
@@ -387,7 +402,7 @@ export default function Crops() {
               <tbody>
                 {paginatedHistory.map(crop => {
                   const cType = cropTypes?.find(c => c.id === crop.seedId || c.id === crop.cropTypeId);
-                  const plantedDate = new Date(crop.datePlanted || crop.plantedAt).toLocaleDateString('es-ES', { year: 'numeric', month: 'short', day: 'numeric' });
+                  const plantedDate = formatSowingDateTime(crop.datePlanted || crop.plantedAt);
                   
                   return (
                     <tr key={crop.id} style={{ borderBottom: '1px solid #f1f5f9', transition: 'background 0.2s', cursor: 'default' }} onMouseOver={e => e.currentTarget.style.backgroundColor = '#f8fafc'} onMouseOut={e => e.currentTarget.style.backgroundColor = 'transparent'}>
@@ -621,6 +636,7 @@ export default function Crops() {
                                 <div>
                                   <div style={{ fontWeight: 'bold', color: '#1e293b', fontSize: '0.85rem' }}>{cType?.name || 'Desconocido'}</div>
                                   <div style={{ fontSize: '0.7rem', color: '#64748b', fontFamily: 'monospace', marginTop: '-2px' }}>{crop.batchNumber || 'N/A'}</div>
+                                  <div style={{ fontSize: '0.68rem', color: '#475569', marginTop: '2px' }}>Inicio: {formatSowingDateTime(crop.datePlanted || crop.plantedAt)}</div>
                                 </div>
                               </div>
                             </td>
@@ -863,6 +879,9 @@ export default function Crops() {
                     </div>
                     <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                       <strong>Días de crecimiento:</strong> <span>{daysAlive} días</span>
+                    </div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', borderTop: '1px dashed #bbf7d0', paddingTop: '0.25rem' }}>
+                      <strong>Inicio:</strong> <span>{formatSowingDateTime(crop.datePlanted || crop.plantedAt)}</span>
                     </div>
                   </div>
                   
