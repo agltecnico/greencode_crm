@@ -403,8 +403,34 @@ export default function Supplies() {
                         </select>
                       </td>
                       <td>
-                        <input type="text" className="form-control" style={{ marginBottom: editedArticle.type === 'SEMILLA' ? '0.5rem' : '0' }} value={editedArticle.name} onChange={e => setEditedArticle({...editedArticle, name: e.target.value})} />
-                        
+                        <div style={{ display: 'grid', gap: '0.5rem', minWidth: '260px' }}>
+                          <input type="text" className="form-control" value={editedArticle.name} onChange={e => setEditedArticle({...editedArticle, name: e.target.value})} placeholder="Nombre del artículo" />
+                          {['SEMILLA', 'SUSTRATO', 'ENVASE', 'OTRO'].includes(editedArticle.type) && (
+                            <>
+                              {editedArticle.type === 'SEMILLA' && (
+                                <select className="form-control" value={editedArticle.varietyId || ''} onChange={e => setEditedArticle({...editedArticle, varietyId: e.target.value})}>
+                                  <option value="">Selecciona variedad...</option>
+                                  {seedVarieties?.filter(v => v.active !== false || v.id === editedArticle.varietyId).map(variety => (
+                                    <option key={variety.id} value={variety.id}>{variety.name}</option>
+                                  ))}
+                                </select>
+                              )}
+                              <select className="form-control" value={editedArticle.providerId || ''} onChange={e => setEditedArticle({...editedArticle, providerId: e.target.value})}>
+                                <option value="">Selecciona proveedor...</option>
+                                {providers?.map(provider => <option key={provider.id} value={provider.id}>{provider.name}</option>)}
+                              </select>
+                              <div style={{ display: 'grid', gridTemplateColumns: '1fr 110px', gap: '0.5rem' }}>
+                                <input type="text" className="form-control" value={editedArticle.supplierReference || ''} onChange={e => setEditedArticle({...editedArticle, supplierReference: e.target.value})} placeholder="Referencia proveedor" />
+                                <select className="form-control" value={editedArticle.unit || 'ud'} onChange={e => setEditedArticle({...editedArticle, unit: e.target.value})}>
+                                  <option value="g">Gramos</option>
+                                  <option value="kg">Kilogramos</option>
+                                  <option value="l">Litros</option>
+                                  <option value="ud">Unidades</option>
+                                </select>
+                              </div>
+                            </>
+                          )}
+                        </div>
                       </td>
                       <td>
                         {['SEMILLA', 'SUSTRATO', 'ENVASE', 'OTRO'].includes(editedArticle.type) ? (
@@ -415,7 +441,23 @@ export default function Supplies() {
                       </td>
                       <td>
                         <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'flex-end' }}>
-                          <button className="btn btn-primary" style={{ padding: '0.3rem 0.6rem', fontSize: '0.8rem' }} onClick={() => { updateArticle(a.id, editedArticle); setEditingArticleId(null); }}>Guardar</button>
+                          <button className="btn btn-primary" style={{ padding: '0.3rem 0.6rem', fontSize: '0.8rem' }} onClick={async () => {
+                            const managed = ['SEMILLA', 'SUSTRATO', 'ENVASE', 'OTRO'].includes(editedArticle.type);
+                            if (managed && !editedArticle.providerId) {
+                              await Swal.fire('Falta el proveedor', 'Selecciona el proveedor de esta referencia antes de guardar.', 'warning');
+                              return;
+                            }
+                            if (editedArticle.type === 'SEMILLA' && !editedArticle.varietyId) {
+                              await Swal.fire('Falta la variedad', 'Selecciona la variedad agronómica de esta semilla.', 'warning');
+                              return;
+                            }
+                            const result = await updateArticle(a.id, {
+                              ...editedArticle,
+                              providerId: managed ? editedArticle.providerId : null,
+                              varietyId: editedArticle.type === 'SEMILLA' ? editedArticle.varietyId : null
+                            });
+                            if (!result?.error) setEditingArticleId(null);
+                          }}>Guardar</button>
                           <button className="btn btn-secondary" style={{ padding: '0.3rem 0.6rem', fontSize: '0.8rem', background: 'transparent' }} onClick={() => setEditingArticleId(null)}>Cancelar</button>
                         </div>
                       </td>
