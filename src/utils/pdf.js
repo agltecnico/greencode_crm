@@ -1,7 +1,7 @@
 import { jsPDF } from 'jspdf';
 import autoTable from 'jspdf-autotable';
 
-const getLogoBase64 = async () => {
+export const getLogoBase64 = async () => {
   try {
     const cachedJpeg = localStorage.getItem('crm_company_logo_jpeg_v3');
     if (cachedJpeg) return cachedJpeg;
