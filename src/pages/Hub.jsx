@@ -29,8 +29,8 @@ export default function Hub() {
           <button className="hub-card crops-card" onClick={() => navigate('/crops')}>
             <div className="hub-card-icon">🌱</div>
             <div className="hub-card-text">
-              <h2>Cultivo</h2>
-              <p>Bandejas, Tareas y Planificador</p>
+              <h2>Producción</h2>
+              <p>Stock, Cultivos, Cosecha y Planificador</p>
             </div>
           </button>
 

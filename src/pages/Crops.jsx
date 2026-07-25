@@ -526,8 +526,8 @@ export default function Crops() {
       <div style={{ animation: 'fadeIn 0.3s ease' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem', flexWrap: 'wrap', gap: '1rem' }}>
           <div>
-            <h2 style={{ fontSize: '1.875rem', fontWeight: '900', color: '#1e293b', margin: '0 0 0.25rem 0', letterSpacing: '-0.025em' }}>Gestión de Siembra</h2>
-            <p style={{ color: '#64748b', fontSize: '1.125rem', margin: 0 }}>Supervisa y planta nuevas bandejas</p>
+            <h2 style={{ fontSize: '1.875rem', fontWeight: '900', color: '#1e293b', margin: '0 0 0.25rem 0', letterSpacing: '-0.025em' }}>Gestión de Cultivos</h2>
+            <p style={{ color: '#64748b', fontSize: '1.125rem', margin: 0 }}>Bandejas activas y seguimiento</p>
           </div>
           <button onClick={() => setIsSowModalOpen(true)} className="btn" style={{ background: 'linear-gradient(135deg, #10b981, #059669)', color: 'white', border: 'none', padding: '0.875rem 1.5rem', borderRadius: '12px', fontWeight: 'bold', cursor: 'pointer', fontSize: '1rem', display: 'flex', alignItems: 'center', gap: '0.5rem', boxShadow: '0 10px 15px -3px rgba(16, 185, 129, 0.3)', transition: 'transform 0.2s ease' }} onMouseOver={e=>e.currentTarget.style.transform='translateY(-2px)'} onMouseOut={e=>e.currentTarget.style.transform='none'}>
             <span style={{ fontSize: '1.2rem' }}>⊕</span> Registrar Siembra
@@ -612,7 +612,7 @@ export default function Crops() {
             onClick={() => setSowTab('historico')}
             style={{ padding: '0.625rem 1.5rem', borderRadius: '0.5rem', fontWeight: 'bold', fontSize: '0.875rem', transition: 'all 0.2s', cursor: 'pointer', border: 'none', backgroundColor: sowTab === 'historico' ? 'white' : 'transparent', color: sowTab === 'historico' ? '#1e293b' : '#64748b', boxShadow: sowTab === 'historico' ? '0 1px 3px rgba(0,0,0,0.1)' : 'none' }}
           >
-            📖 Histórico de Siembras
+            📖 Histórico de Cultivos
           </button>
         </div>
 
@@ -1300,7 +1300,7 @@ export default function Crops() {
     <div className="hub-container" style={{ padding: '2rem', animation: 'fadeIn 0.4s ease' }}>
       <div className="hub-content" style={{ maxWidth: '1400px', margin: '0 auto', width: '100%' }}>
         <div className="hub-header" style={{ marginBottom: '4rem', textAlign: 'center', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-          <h1 style={{ fontSize: '3rem', margin: '0 0 0.5rem 0', color: '#0f172a', fontWeight: '900', letterSpacing: '-0.05em' }}>Control de Cultivo</h1>
+          <h1 style={{ fontSize: '3rem', margin: '0 0 0.5rem 0', color: '#0f172a', fontWeight: '900', letterSpacing: '-0.05em' }}>Control de Producción</h1>
           <p style={{ color: '#64748b', fontSize: '1.25rem', margin: 0 }}>Selecciona tu zona de trabajo para gestionar el invernadero</p>
         </div>
         
@@ -1323,8 +1323,8 @@ export default function Crops() {
 
         <button onClick={() => setActiveTab('lotes')} className="hub-card tv-card" style={{ border: 'none', width: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '1.5rem 1rem', background: 'white', borderRadius: '24px', boxShadow: '0 10px 25px -5px rgba(0,0,0,0.05), 0 8px 10px -6px rgba(0,0,0,0.01)', transition: 'all 0.3s ease', cursor: 'pointer' }}>
           <div className="hub-card-text" style={{ textAlign: 'center', marginBottom: '1.5rem' }}>
-            <h2 style={{ fontSize: '1.75rem', fontWeight: '800', color: '#1e293b', margin: '0 0 0.5rem 0' }}>Siembra</h2>
-            <p style={{ fontSize: '1rem', color: '#64748b', margin: 0 }}>Bandejas en curso</p>
+            <h2 style={{ fontSize: '1.75rem', fontWeight: '800', color: '#1e293b', margin: '0 0 0.5rem 0' }}>Cultivos</h2>
+            <p style={{ fontSize: '1rem', color: '#64748b', margin: 0 }}>Bandejas activas y seguimiento</p>
           </div>
           <div className="hub-card-icon" style={{ fontSize: '4rem', background: '#f0fdf4', width: '80px', height: '80px', display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: '50%' }}>🪴</div>
         </button>
@@ -1718,7 +1718,7 @@ export default function Crops() {
       
       {activeTab !== 'menu' && (
         <button onClick={() => setActiveTab('menu')} style={{ background: 'transparent', border: '1px solid var(--crop-border)', color: 'var(--crop-text-main)', padding: '0.5rem 1rem', borderRadius: '8px', fontWeight: 'bold', cursor: 'pointer', marginBottom: activeTab === 'planificador' ? '0.65rem' : '2rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-          <span>🔙</span> Volver al Menú Cultivo
+          <span>🔙</span> Volver al Menú Producción
         </button>
       )}
 
