@@ -13,6 +13,15 @@ import { useAdminMode } from '../context/AdminModeContext';
 const createHarvestBatchNumber = () =>
   `L-${Date.now().toString(36).toUpperCase()}-${crypto.randomUUID().slice(0, 4).toUpperCase()}`;
 
+const calendarDaysSince = (dateValue, now = new Date()) => {
+  if (!dateValue) return 0;
+  const planted = new Date(dateValue);
+  if (Number.isNaN(planted.getTime())) return 0;
+  const plantedDay = new Date(planted.getFullYear(), planted.getMonth(), planted.getDate());
+  const currentDay = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  return Math.max(0, Math.round((currentDay - plantedDay) / 86_400_000));
+};
+
 class ErrorBoundary extends React.Component {
   constructor(props) {
     super(props);
@@ -590,7 +599,7 @@ export default function Crops() {
                       })
                       .map(crop => {
                         const cType = cropTypes?.find(c => c.id === crop.seedId || c.id === crop.cropTypeId);
-                        const daysAlive = Math.floor((new Date() - new Date(crop.datePlanted || crop.plantedAt)) / (1000 * 60 * 60 * 24));
+                        const daysAlive = calendarDaysSince(crop.datePlanted || crop.plantedAt);
                         const expectedDays = cType ? ((Number(cType.germinationDays || 0) + Number(cType.darknessDays || 0) + Number(cType.lightDays || 0)) || 14) : 14;
                         const progressPercentage = Math.min(100, Math.max(0, (daysAlive / expectedDays) * 100));
                         
@@ -839,7 +848,7 @@ export default function Crops() {
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: '1.5rem' }}>
             {(crops?.filter(c => c.status === 'READY' && (c.traysCount > 0 || c.trays > 0)) || []).map(crop => {
               const cType = cropTypes?.find(c => c.id === crop.seedId || c.id === crop.cropTypeId);
-              const daysAlive = Math.floor((new Date() - new Date(crop.datePlanted || crop.plantedAt)) / (1000 * 60 * 60 * 24));
+              const daysAlive = calendarDaysSince(crop.datePlanted || crop.plantedAt);
               
               return (
                 <div key={crop.id} style={{ padding: '1.25rem', borderRadius: '12px', border: '1px solid #bbf7d0', backgroundColor: '#f0fdf4', position: 'relative', display: 'flex', flexDirection: 'column', gap: '1rem', transition: 'transform 0.2s, box-shadow 0.2s' }} onMouseEnter={e => { e.currentTarget.style.transform = 'translateY(-2px)'; e.currentTarget.style.boxShadow = '0 10px 15px -3px rgba(34, 197, 94, 0.2)'; }} onMouseLeave={e => { e.currentTarget.style.transform = 'none'; e.currentTarget.style.boxShadow = 'none'; }}>

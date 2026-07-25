@@ -11,6 +11,32 @@ const createId = () => crypto.randomUUID();
 const BACKGROUND_REFRESH_MS = 60_000;
 const ACTIVE_REFRESH_THROTTLE_MS = 10_000;
 
+const calendarDaysSince = (dateValue, now = new Date()) => {
+  if (!dateValue) return 0;
+  const planted = new Date(dateValue);
+  if (Number.isNaN(planted.getTime())) return 0;
+  const plantedDay = new Date(planted.getFullYear(), planted.getMonth(), planted.getDate());
+  const currentDay = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  return Math.max(0, Math.round((currentDay - plantedDay) / 86_400_000));
+};
+
+const getAutomaticCropStatus = (crop, cropType, now = new Date()) => {
+  if (!cropType || ['HARVESTED', 'DISCARDED'].includes(crop.status)) return crop.status;
+  const elapsedDays = calendarDaysSince(crop.datePlanted || crop.plantedAt, now);
+  const soakingDays = Number(cropType.soakingHours || 0) > 0
+    ? Math.max(1, Math.ceil(Number(cropType.soakingHours) / 24))
+    : 0;
+  const germinationEnd = soakingDays + Number(cropType.germinationDays || 0);
+  const darknessEnd = germinationEnd + Number(cropType.darknessDays || 0);
+  const readyDay = darknessEnd + Number(cropType.lightDays || 0);
+
+  if (elapsedDays >= readyDay) return 'READY';
+  if (elapsedDays >= darknessEnd) return 'LIGHT';
+  if (Number(cropType.darknessDays || 0) > 0 && elapsedDays >= germinationEnd) return 'DARKNESS';
+  if (elapsedDays < soakingDays) return 'SOAKING';
+  return 'GERMINATING';
+};
+
 export const DataProvider = ({ children }) => {
 
     const sanitizeForeignKeys = (obj) => {
@@ -167,8 +193,25 @@ export const DataProvider = ({ children }) => {
         if (purchaseDeliveryNotesData) setPurchaseDeliveryNotes(purchaseDeliveryNotesData);
         if (purchaseDeliveryNoteLinesData) setPurchaseDeliveryNoteLines(purchaseDeliveryNoteLinesData);
         if (cropTypesData) setCropTypes(cropTypesData);
-        if (cropsData) setCrops(cropsData);
-          // if (cropsData && cropTypesData) autoAdvanceCrops(cropsData, cropTypesData);
+        if (cropsData) {
+          const now = new Date();
+          const synchronizedCrops = cropsData.map(crop => {
+            const cropType = cropTypesData?.find(type => type.id === crop.cropTypeId || type.id === crop.seedId);
+            const automaticStatus = getAutomaticCropStatus(crop, cropType, now);
+            return automaticStatus !== crop.status ? { ...crop, status: automaticStatus } : crop;
+          });
+          setCrops(synchronizedCrops);
+
+          const statusChanges = synchronizedCrops.filter((crop, index) => crop.status !== cropsData[index].status);
+          if (statusChanges.length > 0) {
+            const updates = await Promise.all(statusChanges.map(crop =>
+              supabase.from('crops').update({ status: crop.status }).eq('id', crop.id)
+            ));
+            updates.filter(result => result.error).forEach(result =>
+              console.error('No se pudo sincronizar automáticamente la fase del cultivo:', result.error)
+            );
+          }
+        }
         if (harvestTargetsData) setHarvestTargets(harvestTargetsData);
         if (harvestsData) setHarvests(harvestsData);
         if (dailyLogsData) setDailyLogs(dailyLogsData);
