@@ -314,24 +314,52 @@ export default function Supplies() {
     return totalPrice / totalQty;
   };
 
+  const getLatestVarietySeedCost = (varietyId) => {
+    if (!varietyId) return 0;
+    const seedArticleIds = new Set(
+      (articles || [])
+        .filter(article => article.type === 'SEMILLA' && article.varietyId === varietyId)
+        .map(article => article.id)
+    );
+    const latestEntry = (stockEntries || [])
+      .filter(entry =>
+        seedArticleIds.has(entry.articleId) &&
+        entry.purchaseDeliveryNoteId &&
+        Number(entry.quantity) > 0
+      )
+      .sort((a, b) => {
+        const aDate = new Date(a.purchaseDate || a.createdAt || 0).getTime();
+        const bDate = new Date(b.purchaseDate || b.createdAt || 0).getTime();
+        if (bDate !== aDate) return bDate - aDate;
+        return new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime();
+      })[0];
+    if (latestEntry) {
+      const storedUnitCost = Number(latestEntry.unitCost);
+      if (Number.isFinite(storedUnitCost) && storedUnitCost >= 0) return storedUnitCost;
+      const quantity = Number(latestEntry.quantity);
+      if (quantity > 0) return Number(latestEntry.price || 0) / quantity;
+    }
+    const linkedArticle = (articles || []).find(
+      article => article.type === 'SEMILLA' && article.varietyId === varietyId
+    );
+    return Number(linkedArticle?.lastPurchaseUnitCost || 0);
+  };
+
   const substrates = articles?.filter(a => a.type === 'SUSTRATO') || [];
   const containers = articles?.filter(a => a.type === 'ENVASE' || a.type === 'BANDEJA' || a.type === 'SUMINISTROS') || [];
   const selectedArticleType = newStockEntry.articleId ? articles?.find(a => a.id === newStockEntry.articleId)?.type : null;
   const isExpenseOnly = ['GASTO_FIJO', 'SUMINISTROS', 'MANTENIMIENTO', 'MARKETING', 'NOMINAS', 'BANDEJA'].includes(selectedArticleType);
 
   const getLiveCosts = (formData) => {
-    if (!formData) return { totalTray: 0, perKg: 0 };
-    const varietyArticles = articles?.filter(article => article.type === 'SEMILLA' && article.varietyId === formData.varietyId) || [];
-    const varietyCost = varietyArticles.length
-      ? varietyArticles.reduce((sum, article) => sum + getAverageUnitCost(article.id), 0) / varietyArticles.length
-      : 0;
+    if (!formData) return { totalTray: 0, perKg: 0, seedCostPerGram: 0, seedCostPerKg: 0 };
+    const varietyCost = getLatestVarietySeedCost(formData.varietyId);
     const sCost = varietyCost * Number(formData.seedGrams || 0);
     const subCost = getAverageUnitCost(formData.substrateId) * Number(formData.substrateLiters || 0);
     const cCost = getAverageUnitCost(formData.containerId) * 1;
     const totalTray = sCost + subCost + cCost;
     const expKg = Number(formData.expectedYieldGrams || 0) / 1000;
     const perKg = expKg > 0 ? totalTray / expKg : 0;
-    return { totalTray, perKg };
+    return { totalTray, perKg, seedCostPerGram: varietyCost, seedCostPerKg: varietyCost * 1000 };
   };
 
   const newTypeCosts = getLiveCosts(newType);
@@ -929,10 +957,7 @@ export default function Supplies() {
               </thead>
               <tbody>
                 {paginatedTypes.map(c => {
-                  const varietyArticles = articles?.filter(article => article.type === 'SEMILLA' && article.varietyId === c.varietyId) || [];
-                  const varietyUnitCost = varietyArticles.length
-                    ? varietyArticles.reduce((sum, article) => sum + getAverageUnitCost(article.id), 0) / varietyArticles.length
-                    : 0;
+                  const varietyUnitCost = getLatestVarietySeedCost(c.varietyId);
                   const seedCost = varietyUnitCost * Number(c.seedGrams || 0);
                   const subCost = getAverageUnitCost(c.substrateId) * Number(c.substrateLiters || 0);
                   const contCost = getAverageUnitCost(c.containerId) * 1;
@@ -959,6 +984,9 @@ export default function Supplies() {
                           <div>
                             <label className="form-label text-sm">Gramos de Semilla</label>
                             <input type="number" step="0.1" min="0" className="form-control" value={editedCropType.seedGrams} onChange={e => setEditedCropType({...editedCropType, seedGrams: Number(e.target.value)})} />
+                            <p className="text-xs text-slate-500 mt-1">
+                              Última compra: {editTypeCosts.seedCostPerKg > 0 ? `${editTypeCosts.seedCostPerKg.toFixed(2)} €/kg · ${editTypeCosts.seedCostPerGram.toFixed(4)} €/g` : 'sin precio registrado'}
+                            </p>
                           </div>
                           <div>
                             <label className="form-label text-sm">Sustrato</label>
@@ -1034,6 +1062,9 @@ export default function Supplies() {
                       <td className="text-sm text-slate-500">
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem' }}>
                           <span>🌱 {c.seedGrams}g ({seedCost.toFixed(2)}€)</span>
+                          <span style={{ color: '#0f766e', fontWeight: 600 }}>
+                            Última compra: {varietyUnitCost > 0 ? `${(varietyUnitCost * 1000).toFixed(2)} €/kg · ${varietyUnitCost.toFixed(4)} €/g` : 'sin precio'}
+                          </span>
                           {Number(c.substrateLiters) > 0 && <span>🪨 {c.substrateLiters}L ({subCost.toFixed(2)}€)</span>}
                           <span>📦 1 ud ({contCost.toFixed(2)}€)</span>
                           <div style={{ marginTop: '0.5rem', background: '#f1f5f9', padding: '0.2rem 0.5rem', borderRadius: '4px', display: 'flex', gap: '0.5rem', fontSize: '0.75rem', width: 'fit-content' }}>
@@ -1329,6 +1360,9 @@ export default function Supplies() {
                 <div>
                   <label className="form-label">Gramos por Bandeja</label>
                   <input required type="number" step="0.1" min="0" className="form-control" value={newType.seedGrams} onChange={e => setNewType({...newType, seedGrams: Number(e.target.value)})} />
+                  <p className="text-xs text-slate-500 mt-1">
+                    Última compra: {newTypeCosts.seedCostPerKg > 0 ? `${newTypeCosts.seedCostPerKg.toFixed(2)} €/kg · ${newTypeCosts.seedCostPerGram.toFixed(4)} €/g` : 'sin precio registrado'}
+                  </p>
                 </div>
               </div>
 

@@ -176,11 +176,13 @@ export default function EmployeeTasks({ onTaskAction }) {
       };
 
       if(plantWd == targetDayOfWeek && !checkPlanted(0)) {
+        const gramsPerTray = Number(cType.seedGrams || 0);
+        const totalSeedGrams = gramsPerTray * Number(routine.tuppersCount || 0);
         tasksForDate.push({ 
           id: `plant-${dateKey}-${routine.id}`,
           type: 'plant', 
           title: `Plantar ${cType.name}`, 
-          desc: `Rutina semanal: ${routine.tuppersCount} bandejas`, 
+          desc: `Rutina semanal: ${routine.tuppersCount} bandejas · ${gramsPerTray} g/bandeja · ${totalSeedGrams} g total`,
           icon: '🌱', 
           className: 'plant', 
           cropTypeId: cType.id, 
