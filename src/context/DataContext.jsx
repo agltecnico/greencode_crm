@@ -448,27 +448,6 @@ export const DataProvider = ({ children }) => {
     
     const receivePurchaseDeliveryNote = async ({ providerId, number, date, notes = '', lines }) => {
       const normalizedNumber = String(number || '').trim();
-      const { data: existingNotes, error: existingError } = await supabase
-        .from('purchase_delivery_notes')
-        .select('id, number, date')
-        .eq('providerId', providerId)
-        .eq('number', normalizedNumber)
-        .limit(1);
-
-      if (existingError) {
-        await Swal.fire('No se pudo comprobar', 'No se pudo verificar si el albarán ya existe. Inténtalo de nuevo.', 'error');
-        return null;
-      }
-      if (existingNotes?.length) {
-        await refreshData({ force: true });
-        await Swal.fire(
-          'Albarán ya registrado',
-          `El albarán ${normalizedNumber} de este proveedor ya está guardado con fecha ${new Date(existingNotes[0].date).toLocaleDateString('es-ES')}. No se ha duplicado el stock.`,
-          'warning'
-        );
-        return null;
-      }
-
       const { data, error } = await persistOrReload(
         () => supabase.rpc('receive_purchase_delivery_note', {
           p_provider_id: providerId,
