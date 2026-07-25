@@ -132,12 +132,13 @@ export default function Crops() {
     const requiredVarietyIds = productVarietyIds(product);
     const readyCrops = readyCropsForProduct(product);
     const availableVarietyIds = new Set(readyCrops.map(cropVarietyId));
-    const missingVarietyIds = requiredVarietyIds.filter(varietyId => !availableVarietyIds.has(varietyId));
+    const minimumVarieties = Math.min(4, requiredVarietyIds.length);
     return {
       configured: requiredVarietyIds.length > 0,
       readyCrops,
-      missingVarietyIds,
-      canHarvest: requiredVarietyIds.length > 0 && missingVarietyIds.length === 0,
+      minimumVarieties,
+      availableVarieties: availableVarietyIds.size,
+      canHarvest: requiredVarietyIds.length > 0 && availableVarietyIds.size >= minimumVarieties,
       totalTrays: readyCrops.reduce((sum, crop) => sum + Number(crop.traysCount || crop.trays || 0), 0)
     };
   };
@@ -278,7 +279,7 @@ export default function Crops() {
     const product = products?.find(item => item.id === newHarvest.productId);
     const requiredVarietyIds = productVarietyIds(product);
     const selectedVarietyIds = new Set(cropIdsToHarvest.map(cropId => cropVarietyId(crops.find(crop => crop.id === cropId))));
-    const missingVarietyIds = requiredVarietyIds.filter(varietyId => !selectedVarietyIds.has(varietyId));
+    const minimumVarieties = Math.min(4, requiredVarietyIds.length);
     const packagingBreakdown = Object.entries(newHarvest.packagingQuantities || {})
       .map(([formatId, quantity]) => ({ formatId, quantity: Number(quantity || 0) }))
       .filter(item => item.quantity > 0);
@@ -288,9 +289,8 @@ export default function Crops() {
       Swal.fire({ title: 'Faltan datos', text: 'Debes indicar cuántas bandejas vas a cosechar de al menos un cultivo.', icon: 'warning', confirmButtonColor: '#f59e0b' });
       return;
     }
-    if (missingVarietyIds.length > 0) {
-      const names = missingVarietyIds.map(id => seedVarieties?.find(variety => variety.id === id)?.name || 'Variedad').join(', ');
-      Swal.fire({ title: 'Mix incompleto', text: `Debes seleccionar bandejas de todas las variedades del mix. Faltan: ${names}.`, icon: 'warning', confirmButtonColor: '#f59e0b' });
+    if (selectedVarietyIds.size < minimumVarieties) {
+      Swal.fire({ title: 'Mix incompleto', text: `Debes seleccionar al menos ${minimumVarieties} variedades distintas. Ahora has seleccionado ${selectedVarietyIds.size}.`, icon: 'warning', confirmButtonColor: '#f59e0b' });
       return;
     }
     if (totalTuppers <= 0) {
@@ -1898,15 +1898,11 @@ export default function Crops() {
             {(() => {
               return (products || []).map(p => {
                 const availability = productHarvestAvailability(p);
-                const missingNames = availability.missingVarietyIds
-                  .map(id => seedVarieties?.find(variety => variety.id === id)?.name)
-                  .filter(Boolean)
-                  .join(', ');
                 const statusText = !availability.configured
                   ? 'Receta sin configurar'
                   : availability.canHarvest
-                    ? `${availability.totalTrays} bandejas listas`
-                    : `Faltan: ${missingNames || 'variedades listas'}`;
+                    ? `${availability.availableVarieties} variedades · ${availability.totalTrays} bandejas listas`
+                    : `${availability.availableVarieties}/${availability.minimumVarieties} variedades listas`;
                 return (
                   <option key={p.id} value={p.id} disabled={!availability.canHarvest}>
                     {p.name} ({statusText})

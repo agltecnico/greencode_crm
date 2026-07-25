@@ -4,15 +4,33 @@ import { usePagination } from '../hooks/usePagination';
 import { useAdminMode } from '../context/AdminModeContext';
 
 export default function Providers() {
-  const { providers, addProvider, deleteProvider } = useData();
+  const { providers, addProvider, updateProvider, deleteProvider } = useData();
   const { isAdminMode, requireAdmin } = useAdminMode();
   const [searchTerm, setSearchTerm] = useState('');
   const [newProvider, setNewProvider] = useState({ name: '', contact: '', phone: '', email: '' });
+  const [editingId, setEditingId] = useState(null);
 
-  const handleAdd = e => { 
+  const handleSave = async e => {
     e.preventDefault(); 
-    addProvider(newProvider); 
-    setNewProvider({name:'', contact:'', phone:'', email:''}); 
+    if (editingId) await updateProvider(editingId, newProvider);
+    else await addProvider(newProvider);
+    setNewProvider({name:'', contact:'', phone:'', email:''});
+    setEditingId(null);
+  };
+
+  const startEditing = provider => {
+    setEditingId(provider.id);
+    setNewProvider({
+      name: provider.name || '',
+      contact: provider.contact || '',
+      phone: provider.phone || '',
+      email: provider.email || ''
+    });
+  };
+
+  const cancelEditing = () => {
+    setEditingId(null);
+    setNewProvider({name:'', contact:'', phone:'', email:''});
   };
 
   const filteredProviders = providers?.filter(p => p.name.toLowerCase().includes(searchTerm.toLowerCase())) || [];
@@ -37,8 +55,8 @@ export default function Providers() {
       </div>
 
       <div className="card" style={{ marginBottom: '2rem' }}>
-        <h3 className="font-bold mb-4">Añadir Nuevo Proveedor</h3>
-        <form onSubmit={handleAdd} style={{ display: 'flex', gap: '1rem', alignItems: 'flex-end', flexWrap: 'wrap' }}>
+        <h3 className="font-bold mb-4">{editingId ? 'Editar Proveedor' : 'Añadir Nuevo Proveedor'}</h3>
+        <form onSubmit={handleSave} style={{ display: 'flex', gap: '1rem', alignItems: 'flex-end', flexWrap: 'wrap' }}>
           <div style={{ flex: '1 1 200px' }}>
             <label className="form-label">Nombre del Proveedor</label>
             <input required type="text" className="form-control" value={newProvider.name} onChange={e => setNewProvider({...newProvider, name: e.target.value})} />
@@ -55,7 +73,8 @@ export default function Providers() {
             <label className="form-label">Email</label>
             <input type="email" className="form-control" value={newProvider.email} onChange={e => setNewProvider({...newProvider, email: e.target.value})} />
           </div>
-          <button type="submit" className="btn btn-primary" style={{ height: '42px' }}>Guardar Proveedor</button>
+          <button type="submit" className="btn btn-primary" style={{ height: '42px' }}>{editingId ? 'Guardar Cambios' : 'Guardar Proveedor'}</button>
+          {editingId && <button type="button" className="btn btn-secondary" style={{ height: '42px' }} onClick={cancelEditing}>Cancelar</button>}
         </form>
       </div>
 
@@ -78,6 +97,7 @@ export default function Providers() {
                 <td>{p.phone || '-'}</td>
                 <td>{p.email || '-'}</td>
                 <td>
+                  <button className="btn btn-secondary" style={{ padding: '0.3rem 0.6rem', fontSize: '0.8rem', marginRight: '0.4rem' }} onClick={() => startEditing(p)}>Editar</button>
                   {isAdminMode && <button className="btn btn-danger" style={{ padding: '0.3rem 0.6rem', fontSize: '0.8rem' }} onClick={async () => {
                     if (await requireAdmin()) deleteProvider(p.id);
                   }}>Borrar</button>}
