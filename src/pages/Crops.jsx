@@ -158,14 +158,23 @@ export default function Crops() {
   const [plannerView, setPlannerView] = useState('harvest');
   const [newHarvest, setNewHarvest] = useState({ productId: '', tuppersCount: 1, selectedCropUsages: {} });
 
+  const emptySowForm = { cropTypeId: '', traysCount: 1, stockLotId: '' };
+  const openSowModal = (initialValues = {}) => {
+    setNewCrop({ ...emptySowForm, ...initialValues, stockLotId: '' });
+    setIsSowModalOpen(true);
+  };
+  const closeSowModal = () => {
+    setIsSowModalOpen(false);
+    setNewCrop(emptySowForm);
+  };
+
   useEffect(() => {
     const action = searchParams.get('action');
     if (action === 'sow') {
       const cId = searchParams.get('cropTypeId');
       const trays = searchParams.get('trays');
       if (cId) {
-        setNewCrop(prev => ({ ...prev, cropTypeId: cId, traysCount: trays || 1, stockLotId: '' }));
-        setIsSowModalOpen(true);
+        openSowModal({ cropTypeId: cId, traysCount: Number(trays) || 1 });
         // Clean URL so it doesn't reopen on refresh
         setSearchParams({});
       }
@@ -231,8 +240,7 @@ export default function Crops() {
         }
       }
       await sowCrop(newCrop);
-      setNewCrop({ cropTypeId: '', traysCount: 1, stockLotId: '' });
-      setIsSowModalOpen(false);
+      closeSowModal();
       Swal.fire({ title: '¡Cultivo Plantado!', text: 'Stock de semillas y sustrato descontado correctamente.', icon: 'success', confirmButtonColor: '#10b981' });
     } catch (error) {
       Swal.fire({ title: 'Error', text: error.message, icon: 'error', confirmButtonColor: '#ef4444' });
@@ -529,7 +537,7 @@ export default function Crops() {
             <h2 style={{ fontSize: '1.875rem', fontWeight: '900', color: '#1e293b', margin: '0 0 0.25rem 0', letterSpacing: '-0.025em' }}>Gestión de Cultivos</h2>
             <p style={{ color: '#64748b', fontSize: '1.125rem', margin: 0 }}>Bandejas activas y seguimiento</p>
           </div>
-          <button onClick={() => setIsSowModalOpen(true)} className="btn" style={{ background: 'linear-gradient(135deg, #10b981, #059669)', color: 'white', border: 'none', padding: '0.875rem 1.5rem', borderRadius: '12px', fontWeight: 'bold', cursor: 'pointer', fontSize: '1rem', display: 'flex', alignItems: 'center', gap: '0.5rem', boxShadow: '0 10px 15px -3px rgba(16, 185, 129, 0.3)', transition: 'transform 0.2s ease' }} onMouseOver={e=>e.currentTarget.style.transform='translateY(-2px)'} onMouseOut={e=>e.currentTarget.style.transform='none'}>
+          <button onClick={() => openSowModal()} className="btn" style={{ background: 'linear-gradient(135deg, #10b981, #059669)', color: 'white', border: 'none', padding: '0.875rem 1.5rem', borderRadius: '12px', fontWeight: 'bold', cursor: 'pointer', fontSize: '1rem', display: 'flex', alignItems: 'center', gap: '0.5rem', boxShadow: '0 10px 15px -3px rgba(16, 185, 129, 0.3)', transition: 'transform 0.2s ease' }} onMouseOver={e=>e.currentTarget.style.transform='translateY(-2px)'} onMouseOut={e=>e.currentTarget.style.transform='none'}>
             <span style={{ fontSize: '1.2rem' }}>⊕</span> Registrar Siembra
           </button>
         </div>
@@ -579,8 +587,7 @@ export default function Crops() {
                     {tasks.map((t, idx) => (
                       <div key={idx} 
                           onClick={() => {
-                            setNewCrop(prev => ({ ...prev, cropTypeId: t.cropTypeId, traysCount: t.trays, stockLotId: '' }));
-                            setIsSowModalOpen(true);
+                            openSowModal({ cropTypeId: t.cropTypeId, traysCount: t.trays });
                           }}
                           style={{ flex: '1 1 min-content', minWidth: '250px', display: 'flex', justifyContent: 'space-between', padding: '1rem', backgroundColor: 'white', borderRadius: '0.75rem', border: '1px solid #cbd5e1', cursor: 'pointer', transition: 'all 0.2s', boxShadow: '0 1px 3px rgba(0,0,0,0.1)' }}
                           onMouseEnter={(e) => { e.currentTarget.style.borderColor = '#22c55e'; e.currentTarget.style.transform = 'translateY(-2px)'; e.currentTarget.style.boxShadow = '0 10px 15px -3px rgba(34,197,94,0.2)'; }}
@@ -1738,7 +1745,7 @@ export default function Crops() {
                 🖥️ Lanzar en Modo TV
               </button>
             </div>
-            <EmployeeTasks onTaskAction={(task) => { if (task.type === 'plant') { setNewCrop(prev => ({ ...prev, cropTypeId: task.cropTypeId, traysCount: task.trays || 1, stockLotId: '' })); setIsSowModalOpen(true); } else if (task.type === 'harvest') { setIsHarvestModalOpen(true); } }} />
+            <EmployeeTasks onTaskAction={(task) => { if (task.type === 'plant') { openSowModal({ cropTypeId: task.cropTypeId, traysCount: task.trays || 1 }); } else if (task.type === 'harvest') { setIsHarvestModalOpen(true); } }} />
           </div>
         )}
         {activeTab === 'lotes' && renderLotes()}
@@ -1761,7 +1768,7 @@ export default function Crops() {
                     <p style={{ color: '#d1fae5', fontSize: '0.875rem', margin: 0 }}>Añade nuevas bandejas al invernadero</p>
                   </div>
                 </div>
-                <button onClick={() => setIsSowModalOpen(false)} style={{ background: 'none', border: 'none', color: 'white', fontSize: '1.5rem', cursor: 'pointer', opacity: 0.8 }} onMouseOver={e=>e.currentTarget.style.opacity=1} onMouseOut={e=>e.currentTarget.style.opacity=0.8}>&times;</button>
+                <button onClick={closeSowModal} style={{ background: 'none', border: 'none', color: 'white', fontSize: '1.5rem', cursor: 'pointer', opacity: 0.8 }} onMouseOver={e=>e.currentTarget.style.opacity=1} onMouseOut={e=>e.currentTarget.style.opacity=0.8}>&times;</button>
               </div>
               <div style={{ padding: '2rem' }}>
                   
@@ -1825,7 +1832,7 @@ export default function Crops() {
                   </div>
 
                   <div style={{ display: 'flex', gap: '0.75rem', marginTop: '1rem' }}>
-                    <button type="button" onClick={() => setIsSowModalOpen(false)} style={{ flex: '1', padding: '0.75rem 1rem', borderRadius: '0.75rem', border: '2px solid #e2e8f0', color: '#475569', fontWeight: 'bold', backgroundColor: 'white', cursor: 'pointer', transition: 'background-color 0.2s' }} onMouseOver={e=>e.currentTarget.style.backgroundColor='#f8fafc'} onMouseOut={e=>e.currentTarget.style.backgroundColor='white'}>Cancelar</button>
+                    <button type="button" onClick={closeSowModal} style={{ flex: '1', padding: '0.75rem 1rem', borderRadius: '0.75rem', border: '2px solid #e2e8f0', color: '#475569', fontWeight: 'bold', backgroundColor: 'white', cursor: 'pointer', transition: 'background-color 0.2s' }} onMouseOver={e=>e.currentTarget.style.backgroundColor='#f8fafc'} onMouseOut={e=>e.currentTarget.style.backgroundColor='white'}>Cancelar</button>
                     <button type="submit" disabled={selectedCropType && totalAvailableSeed <= 0} style={{ flex: '1', padding: '0.75rem 1rem', borderRadius: '0.75rem', border: 'none', color: 'white', fontWeight: 'bold', background: 'linear-gradient(135deg, #10b981, #059669)', cursor: (selectedCropType && totalAvailableSeed <= 0) ? 'not-allowed' : 'pointer', opacity: (selectedCropType && totalAvailableSeed <= 0) ? 0.5 : 1, boxShadow: '0 4px 6px -1px rgba(16, 185, 129, 0.2)' }}>
                       {selectedCropType && totalAvailableSeed <= 0 ? 'Sin Semilla' : 'Confirmar Siembra'}
                     </button>
