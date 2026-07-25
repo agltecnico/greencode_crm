@@ -33,6 +33,7 @@ export default function Supplies() {
   const [editingCropTypeId, setEditingCropTypeId] = useState(null);
   const [editedCropType, setEditedCropType] = useState(null);
   const [newStockEntry, setNewStockEntry] = useState({ purchaseDate: new Date().toISOString().split('T')[0], deliveryNote: '', batchNumber: '', articleId: '', providerId: '', quantity: 1, price: 0 });
+  const [purchaseLines, setPurchaseLines] = useState([]);
   
   const [newType, setNewType] = useState({
     name: '', varietyId: '', seedGrams: 0, substrateId: '', substrateLiters: 0, containerId: '', expectedYieldGrams: 0
@@ -64,25 +65,55 @@ export default function Supplies() {
     if (isSavingStockEntry) return;
     setIsSavingStockEntry(true);
     try {
+      const pendingLine = newStockEntry.articleId ? {
+        articleId: newStockEntry.articleId,
+        supplierBatch: newStockEntry.batchNumber,
+        quantity: Number(newStockEntry.quantity),
+        totalCost: Number(newStockEntry.price)
+      } : null;
+      const lines = [...purchaseLines, ...(pendingLine ? [pendingLine] : [])];
+      if (lines.length === 0) {
+        await Swal.fire('Faltan artículos', 'Añade al menos un artículo al albarán.', 'warning');
+        return;
+      }
       const result = await receivePurchaseDeliveryNote({
         providerId: newStockEntry.providerId,
         number: newStockEntry.deliveryNote,
         date: newStockEntry.purchaseDate,
         notes: '',
-        lines: [{
-          articleId: newStockEntry.articleId,
-          supplierBatch: newStockEntry.batchNumber,
-          quantity: Number(newStockEntry.quantity),
-          totalCost: Number(newStockEntry.price)
-        }]
+        lines
       });
       if (!result) return;
       setNewStockEntry({...newStockEntry, deliveryNote: '', batchNumber: '', providerId: '', articleId: '', quantity: 1, price: 0});
+      setPurchaseLines([]);
       setShowStockModal(false);
       await Swal.fire('Entrada registrada', 'El lote, el stock y el coste de la referencia se han actualizado.', 'success');
     } finally {
       setIsSavingStockEntry(false);
     }
+  };
+
+  const addPurchaseLine = async () => {
+    if (!newStockEntry.articleId) {
+      await Swal.fire('Falta el artículo', 'Selecciona el artículo que quieres añadir.', 'warning');
+      return;
+    }
+    if (Number(newStockEntry.quantity) <= 0) {
+      await Swal.fire('Cantidad incorrecta', 'La cantidad debe ser mayor que cero.', 'warning');
+      return;
+    }
+    if (!isExpenseOnly && !newStockEntry.batchNumber.trim()) {
+      await Swal.fire('Falta el lote', 'Indica el lote del proveedor para mantener la trazabilidad.', 'warning');
+      return;
+    }
+    setPurchaseLines(previous => [...previous, {
+      id: crypto.randomUUID(),
+      articleId: newStockEntry.articleId,
+      supplierBatch: newStockEntry.batchNumber,
+      quantity: Number(newStockEntry.quantity),
+      totalCost: Number(newStockEntry.price)
+    }]);
+    setNewStockEntry(previous => ({ ...previous, articleId: '', batchNumber: '', quantity: 1, price: 0 }));
   };
 
   const runAdminDelete = async (message, action) => {
@@ -212,16 +243,6 @@ export default function Supplies() {
 
   const newTypeCosts = getLiveCosts(newType);
   const editTypeCosts = getLiveCosts(editedCropType);
-
-  const getStockBalance = (article) => {
-    if (['GASTO_FIJO', 'SUMINISTROS', 'MANTENIMIENTO', 'MARKETING', 'NOMINAS', 'BANDEJA'].includes(article.type)) {
-      return '-';
-    }
-    // Total entradas
-    const totalIn = stockEntries?.filter(e => e.articleId === article.id).reduce((acc, curr) => acc + Number(curr.quantity || 0), 0) || 0;
-    // Nota: Aquí se restaría el consumo (crops) en el futuro
-    return `${totalIn.toFixed(2)} ${getUnitLabel(article.type)}`;
-  };
 
   const totalWarehouseValue = articles?.filter(a => !['GASTO_FIJO', 'SUMINISTROS', 'MANTENIMIENTO', 'MARKETING', 'NOMINAS', 'BANDEJA'].includes(a.type))
     .reduce((sum, a) => {
@@ -1042,7 +1063,10 @@ export default function Supplies() {
             <form onSubmit={handleAddStockEntry} style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '1rem', alignItems: 'start' }}>
               <div>
                 <label className="form-label">Proveedor / Acreedor</label>
-                <select required className="form-control" value={newStockEntry.providerId} onChange={e => setNewStockEntry({...newStockEntry, providerId: e.target.value, articleId: ''})}>
+                <select required className="form-control" value={newStockEntry.providerId} onChange={e => {
+                  setNewStockEntry({...newStockEntry, providerId: e.target.value, articleId: '', batchNumber: ''});
+                  setPurchaseLines([]);
+                }}>
                   <option value="">Selecciona...</option>
                   {providers?.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
                 </select>
@@ -1053,7 +1077,7 @@ export default function Supplies() {
               </div>
               <div style={{ gridColumn: 'span 2' }}>
                 <label className="form-label">Artículo (Semilla, Luz...)</label>
-                <select required className="form-control" value={newStockEntry.articleId} onChange={e => setNewStockEntry({...newStockEntry, articleId: e.target.value})}>
+                <select required={purchaseLines.length === 0} className="form-control" value={newStockEntry.articleId} onChange={e => setNewStockEntry({...newStockEntry, articleId: e.target.value, batchNumber: ''})}>
                   <option value="">Selecciona...</option>
                   {articles?.filter(a => a.active !== false && a.providerId === newStockEntry.providerId).map(a => <option key={a.id} value={a.id}>{getTypeLabel(a.type)} - {a.name}</option>)}
                 </select>
@@ -1064,21 +1088,55 @@ export default function Supplies() {
               </div>
               <div>
                 <label className="form-label">Lote (Para Trazabilidad)</label>
-                <input required={!isExpenseOnly} type="text" className="form-control" placeholder="Lote del proveedor" disabled={isExpenseOnly} value={newStockEntry.batchNumber} onChange={e => setNewStockEntry({...newStockEntry, batchNumber: e.target.value})} />
+                <input required={Boolean(newStockEntry.articleId) && !isExpenseOnly} type="text" className="form-control" placeholder="Lote del proveedor" disabled={!newStockEntry.articleId || isExpenseOnly} value={newStockEntry.batchNumber} onChange={e => setNewStockEntry({...newStockEntry, batchNumber: e.target.value})} />
               </div>
               <div>
                 <label className="form-label">Cant. ({selectedArticleType ? getUnitLabel(selectedArticleType) : 'Uds'})</label>
-                <input required type="number" min="0.01" step="0.01" className="form-control" value={newStockEntry.quantity} onChange={e => setNewStockEntry({...newStockEntry, quantity: Number(e.target.value)})} />
+                <input required={Boolean(newStockEntry.articleId)} disabled={!newStockEntry.articleId} type="number" min="0.01" step="0.01" className="form-control" value={newStockEntry.quantity} onChange={e => setNewStockEntry({...newStockEntry, quantity: Number(e.target.value)})} />
               </div>
               <div>
                 <label className="form-label">Coste Total (€)</label>
-                <input required type="number" step="0.01" min="0" className="form-control" value={newStockEntry.price} onChange={e => setNewStockEntry({...newStockEntry, price: Number(e.target.value)})} />
+                <input required={Boolean(newStockEntry.articleId)} disabled={!newStockEntry.articleId} type="number" step="0.01" min="0" className="form-control" value={newStockEntry.price} onChange={e => setNewStockEntry({...newStockEntry, price: Number(e.target.value)})} />
               </div>
-              
+
+              <div style={{ gridColumn: 'span 2', display: 'flex', justifyContent: 'flex-end' }}>
+                <button type="button" className="btn btn-secondary" onClick={addPurchaseLine} disabled={!newStockEntry.articleId}>
+                  + Añadir artículo al albarán
+                </button>
+              </div>
+
+              {purchaseLines.length > 0 && (
+                <div style={{ gridColumn: 'span 2', border: '1px solid #cbd5e1', borderRadius: '0.75rem', overflow: 'hidden' }}>
+                  <div style={{ padding: '0.75rem 1rem', background: '#f8fafc', fontWeight: 'bold', color: '#334155' }}>
+                    Artículos incluidos ({purchaseLines.length})
+                  </div>
+                  {purchaseLines.map((line, index) => {
+                    const article = articles?.find(item => item.id === line.articleId);
+                    return (
+                      <div key={line.id} style={{ display: 'grid', gridTemplateColumns: '1fr auto auto auto', gap: '1rem', alignItems: 'center', padding: '0.75rem 1rem', borderTop: '1px solid #e2e8f0' }}>
+                        <div>
+                          <strong>{article?.name || 'Artículo'}</strong>
+                          <div className="text-xs text-slate-500">{line.supplierBatch ? `Lote ${line.supplierBatch}` : 'Sin lote'}</div>
+                        </div>
+                        <span>{line.quantity} {article?.unit || getUnitLabel(article?.type)}</span>
+                        <strong>{Number(line.totalCost).toFixed(2)} €</strong>
+                        <button type="button" className="btn btn-danger" onClick={() => setPurchaseLines(previous => previous.filter((_, itemIndex) => itemIndex !== index))}>Quitar</button>
+                      </div>
+                    );
+                  })}
+                  <div style={{ padding: '0.75rem 1rem', borderTop: '1px solid #cbd5e1', textAlign: 'right', fontWeight: 'bold' }}>
+                    Total: {purchaseLines.reduce((sum, line) => sum + Number(line.totalCost || 0), 0).toFixed(2)} €
+                  </div>
+                </div>
+              )}
+
               <div style={{ gridColumn: 'span 2', display: 'flex', justifyContent: 'flex-end', gap: '0.75rem', marginTop: '1rem' }}>
-                <button type="button" className="btn btn-secondary" onClick={() => setShowStockModal(false)}>Cancelar</button>
+                <button type="button" className="btn btn-secondary" onClick={() => {
+                  setShowStockModal(false);
+                  setPurchaseLines([]);
+                }}>Cancelar</button>
                 <button type="submit" className="btn btn-primary" disabled={isSavingStockEntry}>
-                  {isSavingStockEntry ? 'Guardando...' : 'Guardar Entrada'}
+                  {isSavingStockEntry ? 'Guardando...' : 'Guardar Albarán Completo'}
                 </button>
               </div>
             </form>
