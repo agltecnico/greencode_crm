@@ -309,7 +309,7 @@ export default function EmployeeTasks({ onTaskAction }) {
       cancelButtonText: 'Cancelar'
     });
     if (!result.isConfirmed) return;
-    await updateCrop(task.cropId, { status: task.nextStatus });
+    await updateCrop(task.cropId, { status: task.nextStatus, phaseConfirmedAt: new Date().toISOString() });
     await Swal.fire({
       title: 'Tarea completada',
       text: 'La fase física del cultivo se ha actualizado.',
@@ -324,7 +324,7 @@ export default function EmployeeTasks({ onTaskAction }) {
       // Execute moves
       const moves = selectedTasks.filter(t => t.type === 'move');
       for (const m of moves) {
-        await updateCrop(m.cropId, { status: m.nextStatus });
+        await updateCrop(m.cropId, { status: m.nextStatus, phaseConfirmedAt: new Date().toISOString() });
       }
 
       // Execute plants

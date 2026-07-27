@@ -646,7 +646,8 @@ export const DataProvider = ({ children }) => {
 
     await updateCrop(crop.id, { 
       status: nextStatus,
-      datePlanted: newDate.toISOString() 
+      datePlanted: newDate.toISOString(),
+      phaseConfirmedAt: new Date().toISOString()
     });
   };
 
@@ -681,7 +682,8 @@ export const DataProvider = ({ children }) => {
 
     await updateCrop(crop.id, { 
       status: prevStatus,
-      datePlanted: newDate.toISOString() 
+      datePlanted: newDate.toISOString(),
+      phaseConfirmedAt: new Date().toISOString()
     });
   };
 
@@ -719,7 +721,8 @@ export const DataProvider = ({ children }) => {
 
     await updateCrop(crop.id, { 
       status: nextStatus,
-      datePlanted: newDate.toISOString() 
+      datePlanted: newDate.toISOString(),
+      phaseConfirmedAt: new Date().toISOString()
     });
   };
 
