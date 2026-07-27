@@ -47,7 +47,7 @@ function App() {
         <Route path="invoices" element={<Invoices />} />
         <Route path="users" element={<PermissionGate permission="users"><UserAccess /></PermissionGate>} />
                       </Route>
-      <Route path="/crops" element={<PermissionGate permission="crops"><Crops /></PermissionGate>} />
+      <Route path="/crops" element={<PermissionGate permission={['stock', 'tasks', 'crops', 'harvest', 'planner', 'traceability']}><Crops /></PermissionGate>} />
 
       {/* Rutas sin Layout (Pantalla completa) */}
       <Route path="/tv" element={<PermissionGate permission="tv"><TvDashboard /></PermissionGate>} />
