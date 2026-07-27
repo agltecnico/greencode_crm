@@ -2,6 +2,7 @@ import { useNavigate } from 'react-router-dom';
 import { useState } from 'react';
 import { useData } from '../context/DataContext';
 import '../crops.css';
+import Swal from 'sweetalert2';
 
 const CULTIVATION_TASK_ICONS = {
   GERMINACIÓN: '🌿',
@@ -13,7 +14,7 @@ export default function EmployeeTasks({ onTaskAction }) {
   const navigate = useNavigate();
   const { 
     harvestTargets, crops, cropTypes, seedVarieties, articles, stockLots, providers,
-    sowCrop, advanceCropStatus
+    sowCrop, updateCrop
   } = useData();
   
   const [timeFilter, setTimeFilter] = useState(1);
@@ -151,7 +152,8 @@ export default function EmployeeTasks({ onTaskAction }) {
           desc: `${crop.traysCount} bandejas de ${varietyName} (Lote: ${crop.batchNumber})`,
           icon: CULTIVATION_TASK_ICONS[phaseStr] || '🌿',
           className: 'move',
-          cropId: crop.id
+          cropId: crop.id,
+          nextStatus: phaseStr === 'GERMINACIÓN' ? 'GERMINATING' : phaseStr === 'OSCURIDAD' ? 'DARKNESS' : 'LIGHT'
         });
       } else if (action === 'harvest') {
         tasksForDate.push({
@@ -277,9 +279,44 @@ export default function EmployeeTasks({ onTaskAction }) {
       setBatchSelections(initialBatches);
       setIsSowModalOpen(true);
     } else {
-      // Just process moves directly
-      executeBatch([]);
+      confirmAndExecuteBatch([]);
     }
+  };
+
+  const confirmAndExecuteBatch = async (configuredPlants) => {
+    const result = await Swal.fire({
+      title: '¿Confirmar tareas realizadas?',
+      text: `Se actualizarán ${selectedTasks.length} tareas. La fase del cultivo solo cambiará después de esta confirmación.`,
+      icon: 'question',
+      showCancelButton: true,
+      confirmButtonColor: '#059669',
+      cancelButtonColor: '#64748b',
+      confirmButtonText: 'Sí, confirmar',
+      cancelButtonText: 'Cancelar'
+    });
+    if (result.isConfirmed) await executeBatch(configuredPlants);
+  };
+
+  const confirmMoveTask = async (task) => {
+    const result = await Swal.fire({
+      title: `¿Confirmar “${task.title}”?`,
+      text: task.desc,
+      icon: 'question',
+      showCancelButton: true,
+      confirmButtonColor: '#059669',
+      cancelButtonColor: '#64748b',
+      confirmButtonText: 'Sí, tarea realizada',
+      cancelButtonText: 'Cancelar'
+    });
+    if (!result.isConfirmed) return;
+    await updateCrop(task.cropId, { status: task.nextStatus });
+    await Swal.fire({
+      title: 'Tarea completada',
+      text: 'La fase física del cultivo se ha actualizado.',
+      icon: 'success',
+      timer: 1400,
+      showConfirmButton: false
+    });
   };
 
   const executeBatch = async (configuredPlants) => {
@@ -287,7 +324,7 @@ export default function EmployeeTasks({ onTaskAction }) {
       // Execute moves
       const moves = selectedTasks.filter(t => t.type === 'move');
       for (const m of moves) {
-        await advanceCropStatus(m.cropId);
+        await updateCrop(m.cropId, { status: m.nextStatus });
       }
 
       // Execute plants
@@ -300,12 +337,12 @@ export default function EmployeeTasks({ onTaskAction }) {
         // We do not delete routine from harvestTargets! The routine is persistent.
       }
 
-      alert(`¡Se han completado ${selectedTasks.length} tareas automáticamente!`);
+      await Swal.fire('Tareas completadas', `Se han confirmado ${selectedTasks.length} tareas.`, 'success');
       setSelectedTasks([]);
       setIsMultiSelectMode(false);
       setIsSowModalOpen(false);
     } catch (err) {
-      alert("Error procesando tareas: " + err.message);
+      Swal.fire('Error', 'No se pudieron completar las tareas: ' + err.message, 'error');
     }
   };
 
@@ -336,11 +373,13 @@ export default function EmployeeTasks({ onTaskAction }) {
                       if(onTaskAction){onTaskAction(task)}else{navigate('/crops?action=sow&cropTypeId=' + task.cropTypeId + '&trays=' + task.trays)}
                     } else if (task.type === 'harvest') {
                       if(onTaskAction){onTaskAction(task)}else{navigate('/crops?action=harvest&cropTypeId=' + task.cropTypeId)}
+                    } else if (task.type === 'move') {
+                      confirmMoveTask(task);
                     }
                   }
                 }} 
                 style={{ 
-                  cursor: (isMultiSelectMode || task.type === 'plant' || task.type === 'harvest') ? 'pointer' : 'default',
+                  cursor: (isMultiSelectMode || task.type === 'plant' || task.type === 'harvest' || task.type === 'move') ? 'pointer' : 'default',
                   border: isSelected ? '2px solid #22c55e' : '',
                   transform: isSelected ? 'scale(0.98)' : '',
                   position: 'relative'
@@ -493,7 +532,7 @@ export default function EmployeeTasks({ onTaskAction }) {
                       <div style={{ color: '#94a3b8', fontSize: '0.75rem', textAlign: 'center', padding: '1.5rem 0.25rem' }}>Sin tareas</div>
                     ) : dayGroup.items.map((task, taskIndex) => {
                       const isSelected = selectedTasks.some(selected => selected.id === task.id);
-                      const isActionable = isMultiSelectMode || task.type === 'plant' || task.type === 'harvest';
+                      const isActionable = isMultiSelectMode || task.type === 'plant' || task.type === 'harvest' || task.type === 'move';
                       const accentColors = {
                         plant: '#22c55e',
                         move: '#3b82f6',
@@ -513,6 +552,8 @@ export default function EmployeeTasks({ onTaskAction }) {
                             } else if (task.type === 'harvest') {
                               if (onTaskAction) onTaskAction(task);
                               else navigate('/crops?action=harvest&cropTypeId=' + task.cropTypeId);
+                            } else if (task.type === 'move') {
+                              confirmMoveTask(task);
                             }
                           }}
                           style={{
@@ -624,7 +665,7 @@ export default function EmployeeTasks({ onTaskAction }) {
                     ...t,
                     stockLotId: batchSelections[t.id] || getCompatibleLots(cropTypes?.find(c => c.id === t.cropTypeId))[0]?.id || ''
                   }));
-                  executeBatch(plants);
+                  confirmAndExecuteBatch(plants);
                 }}
               >
                 Confirmar y Sembrar
