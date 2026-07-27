@@ -799,7 +799,7 @@ export const DataProvider = ({ children }) => {
     return data?.[0]?.id || tempId;
   };
 
-  const registerHarvest = async ({ productId, batchNumber, harvestDate, selectedCropUsages, packagingBreakdown }) => {
+  const registerHarvest = async ({ productId, batchNumber, harvestDate, selectedCropUsages, packagingBreakdown, registrationNotes }) => {
     const { data, error } = await persistOrReload(
       () => supabase.rpc('register_harvest', {
         p_product_id: productId,
@@ -811,6 +811,16 @@ export const DataProvider = ({ children }) => {
       'registrar la cosecha completa'
     );
     if (error) return null;
+    if (data?.harvestId && registrationNotes?.trim()) {
+      const { error: notesError } = await persistOrReload(
+        () => supabase
+          .from('harvests')
+          .update({ registrationNotes: registrationNotes.trim() })
+          .eq('id', data.harvestId),
+        'guardar el motivo del registro de cosecha'
+      );
+      if (notesError) return null;
+    }
     await refreshData({ force: true });
     return data;
   };

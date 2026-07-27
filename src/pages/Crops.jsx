@@ -14,6 +14,11 @@ import { useAdminMode } from '../context/AdminModeContext';
 const createHarvestBatchNumber = () =>
   `L-${Date.now().toString(36).toUpperCase()}-${crypto.randomUUID().slice(0, 4).toUpperCase()}`;
 
+const toLocalDateTimeInputValue = (date = new Date()) => {
+  const localDate = new Date(date.getTime() - date.getTimezoneOffset() * 60_000);
+  return localDate.toISOString().slice(0, 16);
+};
+
 const calendarDaysSince = (dateValue, now = new Date()) => {
   if (!dateValue) return 0;
   const planted = new Date(dateValue);
@@ -194,7 +199,13 @@ export default function Crops() {
   const [plannerHarvestDay, setPlannerHarvestDay] = useState('');
   const [plannerSelections, setPlannerSelections] = useState({});
   const [plannerView, setPlannerView] = useState('harvest');
-  const emptyHarvestForm = { productId: '', selectedCropUsages: {}, packagingQuantities: {} };
+  const emptyHarvestForm = {
+    productId: '',
+    selectedCropUsages: {},
+    packagingQuantities: {},
+    harvestDate: toLocalDateTimeInputValue(),
+    registrationNotes: ''
+  };
   const [newHarvest, setNewHarvest] = useState(emptyHarvestForm);
 
   const emptySowForm = { cropTypeId: '', traysCount: 1, stockLotId: '' };
@@ -297,6 +308,14 @@ export default function Crops() {
       .map(([articleId, quantity]) => ({ articleId, quantity: Number(quantity || 0) }))
       .filter(item => item.quantity > 0);
     const totalTuppers = packagingBreakdown.reduce((sum, item) => sum + item.quantity, 0);
+    const selectedHarvestDate = new Date(newHarvest.harvestDate);
+    const selectedCrops = cropIdsToHarvest
+      .map(cropId => crops.find(crop => String(crop.id) === String(cropId)))
+      .filter(Boolean);
+    const latestPlantingDate = selectedCrops
+      .map(crop => new Date(crop.datePlanted || crop.plantedAt))
+      .filter(date => !Number.isNaN(date.getTime()))
+      .sort((a, b) => b - a)[0];
     
     if (cropIdsToHarvest.length === 0) {
       Swal.fire({ title: 'Faltan datos', text: 'Debes indicar cuántas bandejas vas a cosechar de al menos un cultivo.', icon: 'warning', confirmButtonColor: '#f59e0b' });
@@ -310,13 +329,31 @@ export default function Crops() {
       Swal.fire({ title: 'Faltan envases', text: 'Indica cuántas unidades se han producido de al menos un formato de táper.', icon: 'warning', confirmButtonColor: '#f59e0b' });
       return;
     }
+    if (Number.isNaN(selectedHarvestDate.getTime())) {
+      Swal.fire({ title: 'Fecha no válida', text: 'Indica la fecha y hora reales de la cosecha.', icon: 'warning', confirmButtonColor: '#f59e0b' });
+      return;
+    }
+    if (selectedHarvestDate.getTime() > Date.now()) {
+      Swal.fire({ title: 'Fecha futura', text: 'La cosecha no puede registrarse con una fecha posterior al momento actual.', icon: 'warning', confirmButtonColor: '#f59e0b' });
+      return;
+    }
+    if (latestPlantingDate && selectedHarvestDate < latestPlantingDate) {
+      Swal.fire({
+        title: 'Fecha anterior a la siembra',
+        text: `La cosecha no puede ser anterior al ${formatSowingDateTime(latestPlantingDate)}.`,
+        icon: 'warning',
+        confirmButtonColor: '#f59e0b'
+      });
+      return;
+    }
 
     const batchNum = createHarvestBatchNumber();
     const harvestResult = await registerHarvest({
       productId: newHarvest.productId,
       selectedCropUsages: newHarvest.selectedCropUsages,
       packagingBreakdown,
-      harvestDate: new Date().toISOString(),
+      harvestDate: selectedHarvestDate.toISOString(),
+      registrationNotes: newHarvest.registrationNotes,
       batchNumber: batchNum
     });
     if (!harvestResult) return;
@@ -1943,7 +1980,35 @@ export default function Crops() {
         
         {/* PASO 1 */}
         <div>
-          <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 'bold', color: '#475569', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '0.5rem' }}>1. Producto a Envasar</label>
+          <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 'bold', color: '#475569', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '0.5rem' }}>1. Fecha y hora reales de cosecha</label>
+          <div style={{ display: 'flex', gap: '0.65rem', alignItems: 'stretch' }}>
+            <input
+              type="datetime-local"
+              required
+              max={toLocalDateTimeInputValue()}
+              className="premium-input"
+              style={{ flex: 1, padding: '0.9rem', borderRadius: '0.75rem', border: '2px solid #e2e8f0', boxSizing: 'border-box', fontWeight: 700 }}
+              value={newHarvest.harvestDate}
+              onChange={event => setNewHarvest(prev => ({ ...prev, harvestDate: event.target.value }))}
+            />
+            <button
+              type="button"
+              className="btn btn-secondary"
+              onClick={() => setNewHarvest(prev => ({ ...prev, harvestDate: toLocalDateTimeInputValue() }))}
+              style={{ padding: '0.75rem 1rem', whiteSpace: 'nowrap' }}
+            >
+              Ahora
+            </button>
+          </div>
+          {newHarvest.harvestDate && new Date(newHarvest.harvestDate).getTime() < Date.now() - 5 * 60_000 && (
+            <div style={{ marginTop: '0.6rem', padding: '0.65rem 0.8rem', borderRadius: '0.6rem', background: '#fffbeb', border: '1px solid #fde68a', color: '#92400e', fontSize: '0.8rem', fontWeight: 700 }}>
+              ⚠️ Registro retroactivo: la trazabilidad utilizará esta fecha como momento real de cosecha.
+            </div>
+          )}
+        </div>
+
+        <div>
+          <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 'bold', color: '#475569', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '0.5rem' }}>2. Producto a Envasar</label>
           <select 
             className="premium-input" 
             style={{ width: '100%', padding: '1rem', borderRadius: '0.75rem', border: '2px solid #e2e8f0', background: '#f8fafc', fontSize: '1rem', fontWeight: 'bold', color: '#0f172a', boxSizing: 'border-box', cursor: 'pointer' }}
@@ -1974,7 +2039,7 @@ export default function Crops() {
 
         {/* PASO 2 */}
         <div>
-          <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 'bold', color: '#475569', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '0.5rem' }}>2. Bandejas a Cortar</label>
+          <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 'bold', color: '#475569', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '0.5rem' }}>3. Bandejas a Cortar</label>
           <div style={{ background: '#f8fafc', border: '1px solid #cbd5e1', borderRadius: '0.75rem', padding: '1rem', maxHeight: '200px', overflowY: 'auto' }}>
             {(() => {
               const harvestProduct = products?.find(p => p.id === newHarvest.productId);
@@ -2038,7 +2103,7 @@ export default function Crops() {
 
         {/* PASO 3 */}
         <div>
-          <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 'bold', color: '#475569', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '0.5rem' }}>3. Formatos y unidades producidas</label>
+          <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 'bold', color: '#475569', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '0.5rem' }}>4. Formatos y unidades producidas</label>
           <div style={{ background: '#f8fafc', border: '1px solid #cbd5e1', borderRadius: '0.75rem', padding: '1rem', display: 'grid', gap: '0.75rem' }}>
             {packagingArticlesForProduct(products?.find(product => product.id === newHarvest.productId)).map(format => {
               const availableStock = articlePhysicalStock(format.id);
@@ -2072,13 +2137,31 @@ export default function Crops() {
           </div>
         </div>
 
+        <div>
+          <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 'bold', color: '#475569', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '0.5rem' }}>5. Motivo o comentario (opcional)</label>
+          <textarea
+            className="premium-input"
+            rows="2"
+            placeholder="Ej.: Cosecha realizada antes de implantar la aplicación"
+            value={newHarvest.registrationNotes}
+            onChange={event => setNewHarvest(prev => ({ ...prev, registrationNotes: event.target.value }))}
+            style={{ width: '100%', padding: '0.85rem', borderRadius: '0.75rem', border: '2px solid #e2e8f0', boxSizing: 'border-box', resize: 'vertical' }}
+          />
+        </div>
+
+        {newHarvest.productId && (
+          <div style={{ background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: '0.75rem', padding: '0.85rem', color: '#166534', fontSize: '0.82rem', lineHeight: 1.6 }}>
+            <strong>Resumen:</strong> {formatSowingDateTime(newHarvest.harvestDate)} · {Object.values(newHarvest.selectedCropUsages || {}).reduce((sum, value) => sum + Number(value || 0), 0)} bandejas · {Object.values(newHarvest.packagingQuantities || {}).reduce((sum, value) => sum + Number(value || 0), 0)} envases.
+          </div>
+        )}
+
         {/* BOTONES */}
         <div style={{ display: 'flex', gap: '1rem', marginTop: '0.5rem' }}>
           <button type="button" onClick={closeHarvestModal} style={{ flex: 1, padding: '1rem', borderRadius: '0.75rem', border: '1px solid #cbd5e1', background: 'white', color: '#475569', fontWeight: 'bold', cursor: 'pointer', transition: 'background 0.2s' }} onMouseOver={e=>e.currentTarget.style.background='#f1f5f9'} onMouseOut={e=>e.currentTarget.style.background='white'}>
             Cancelar
           </button>
           <button type="submit" disabled={!newHarvest.productId || Object.values(newHarvest.selectedCropUsages).every(v => !v) || Object.values(newHarvest.packagingQuantities || {}).every(v => !Number(v))} style={{ flex: 1, padding: '1rem', borderRadius: '0.75rem', border: 'none', background: (!newHarvest.productId || Object.values(newHarvest.selectedCropUsages).every(v => !v) || Object.values(newHarvest.packagingQuantities || {}).every(v => !Number(v))) ? '#94a3b8' : 'linear-gradient(135deg, #10b981, #059669)', color: 'white', fontWeight: 'bold', cursor: (!newHarvest.productId || Object.values(newHarvest.selectedCropUsages).every(v => !v) || Object.values(newHarvest.packagingQuantities || {}).every(v => !Number(v))) ? 'not-allowed' : 'pointer', boxShadow: '0 4px 6px -1px rgba(16, 185, 129, 0.3)', transition: 'all 0.2s' }}>
-            Registrar e Imprimir
+            Registrar Cosecha
           </button>
         </div>
       </form>
