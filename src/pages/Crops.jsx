@@ -19,6 +19,25 @@ const toLocalDateTimeInputValue = (date = new Date()) => {
   return localDate.toISOString().slice(0, 16);
 };
 
+const suggestedStatusForSowingDate = (cropType, dateValue) => {
+  if (!cropType || !dateValue) return 'GERMINATING';
+  const elapsed = calendarDaysSince(dateValue);
+  const cycle = getCropCycleOffsets(cropType);
+  if (cycle.soak > 0 && elapsed < cycle.soak) return 'SOAKING';
+  if (elapsed < cycle.darknessStart) return 'GERMINATING';
+  if (cycle.darkness > 0 && elapsed < cycle.lightStart) return 'DARK';
+  if (elapsed < cycle.harvest) return 'LIGHT';
+  return 'READY';
+};
+
+const CROP_PHASE_OPTIONS = [
+  ['SOAKING', 'Remojo'],
+  ['GERMINATING', 'Germinación'],
+  ['DARK', 'Oscuridad'],
+  ['LIGHT', 'Luz'],
+  ['READY', 'Lista para cosechar']
+];
+
 const calendarDaysSince = (dateValue, now = new Date()) => {
   if (!dateValue) return 0;
   const planted = new Date(dateValue);
@@ -195,7 +214,7 @@ export default function Crops() {
   const [searchParams, setSearchParams] = useSearchParams();
   const [showPhaseChangeModal, setShowPhaseChangeModal] = useState(null);
   const [pendingPhase, setPendingPhase] = useState(null);
-  const [newCrop, setNewCrop] = useState({ cropTypeId: '', traysCount: 1, stockLotId: '' });
+  const [newCrop, setNewCrop] = useState({ cropTypeId: '', traysCount: 1, stockLotId: '', datePlanted: toLocalDateTimeInputValue(), initialStatus: 'GERMINATING' });
   const [plannerHarvestDay, setPlannerHarvestDay] = useState('');
   const [plannerSelections, setPlannerSelections] = useState({});
   const [plannerView, setPlannerView] = useState('harvest');
@@ -208,7 +227,7 @@ export default function Crops() {
   };
   const [newHarvest, setNewHarvest] = useState(emptyHarvestForm);
 
-  const emptySowForm = { cropTypeId: '', traysCount: 1, stockLotId: '' };
+  const emptySowForm = { cropTypeId: '', traysCount: 1, stockLotId: '', datePlanted: toLocalDateTimeInputValue(), initialStatus: 'GERMINATING' };
   const openSowModal = (initialValues = {}) => {
     setNewCrop({ ...emptySowForm, ...initialValues, stockLotId: '' });
     setIsSowModalOpen(true);
@@ -274,6 +293,11 @@ export default function Crops() {
   const handleAddCrop = async (e) => { 
     e.preventDefault(); 
     try {
+      const plantingDate = new Date(newCrop.datePlanted);
+      if (Number.isNaN(plantingDate.getTime()) || plantingDate.getTime() > Date.now()) {
+        Swal.fire({ title: 'Fecha no válida', text: 'La fecha de siembra debe ser válida y no puede estar en el futuro.', icon: 'warning', confirmButtonColor: '#f59e0b' });
+        return;
+      }
       if (selectedCropType) {
         const requiredGrams = (selectedCropType.seedGrams || 0) * newCrop.traysCount;
         const remainingSeed = totalAvailableSeed - requiredGrams;
@@ -1894,14 +1918,53 @@ export default function Crops() {
                   <form onSubmit={handleAddCrop} style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
                   <div>
                     <label style={{ fontSize: '0.875rem', fontWeight: 'bold', marginBottom: '0.5rem', display: 'block', color: '#334155' }}>1. ¿Qué vas a plantar?</label>
-                    <select className="premium-input" style={{ width: '100%', padding: '1rem', borderRadius: '0.75rem', border: '2px solid #e2e8f0', background: '#f8fafc', fontSize: '1rem', fontWeight: '500', boxSizing: 'border-box' }} required value={newCrop.cropTypeId} onChange={e=>setNewCrop({...newCrop, cropTypeId: e.target.value, stockLotId: ''})}>
+                    <select className="premium-input" style={{ width: '100%', padding: '1rem', borderRadius: '0.75rem', border: '2px solid #e2e8f0', background: '#f8fafc', fontSize: '1rem', fontWeight: '500', boxSizing: 'border-box' }} required value={newCrop.cropTypeId} onChange={e => {
+                      const cropTypeId = e.target.value;
+                      const cropType = cropTypes?.find(item => item.id === cropTypeId);
+                      setNewCrop({ ...newCrop, cropTypeId, stockLotId: '', initialStatus: suggestedStatusForSowingDate(cropType, newCrop.datePlanted) });
+                    }}>
                       <option value="">Selecciona una variedad...</option>
                       {cropTypes?.map(c => (
                         <option key={c.id} value={c.id}>{c.name}</option>
                       ))}
                     </select>
                   </div>
-                  
+
+                  <div>
+                    <label style={{ fontSize: '0.875rem', fontWeight: 'bold', marginBottom: '0.5rem', display: 'block', color: '#334155' }}>2. Fecha y hora reales de siembra</label>
+                    <div style={{ display: 'flex', gap: '0.65rem' }}>
+                      <input
+                        type="datetime-local"
+                        required
+                        max={toLocalDateTimeInputValue()}
+                        className="premium-input"
+                        style={{ flex: 1, padding: '0.9rem', borderRadius: '0.75rem', border: '2px solid #e2e8f0', boxSizing: 'border-box', fontWeight: 700 }}
+                        value={newCrop.datePlanted}
+                        onChange={event => {
+                          const datePlanted = event.target.value;
+                          setNewCrop(prev => ({ ...prev, datePlanted, initialStatus: suggestedStatusForSowingDate(selectedCropType, datePlanted) }));
+                        }}
+                      />
+                      <button type="button" className="btn btn-secondary" onClick={() => {
+                        const datePlanted = toLocalDateTimeInputValue();
+                        setNewCrop(prev => ({ ...prev, datePlanted, initialStatus: suggestedStatusForSowingDate(selectedCropType, datePlanted) }));
+                      }}>Ahora</button>
+                    </div>
+                    {newCrop.datePlanted && new Date(newCrop.datePlanted).getTime() < Date.now() - 5 * 60_000 && (
+                      <div style={{ marginTop: '0.6rem', padding: '0.65rem 0.8rem', borderRadius: '0.6rem', background: '#fffbeb', border: '1px solid #fde68a', color: '#92400e', fontSize: '0.8rem', fontWeight: 700 }}>
+                        ⚠️ Siembra retroactiva: se conservará esta fecha en la trazabilidad.
+                      </div>
+                    )}
+                  </div>
+
+                  <div>
+                    <label style={{ fontSize: '0.875rem', fontWeight: 'bold', marginBottom: '0.5rem', display: 'block', color: '#334155' }}>3. Fase física actual</label>
+                    <select className="premium-input" required value={newCrop.initialStatus} onChange={event => setNewCrop(prev => ({ ...prev, initialStatus: event.target.value }))} style={{ width: '100%', padding: '0.9rem', borderRadius: '0.75rem', border: '2px solid #e2e8f0', background: '#f8fafc', fontWeight: 700 }}>
+                      {CROP_PHASE_OPTIONS.map(([value, label]) => <option key={value} value={value}>{label}</option>)}
+                    </select>
+                    <p style={{ margin: '0.45rem 0 0', color: '#64748b', fontSize: '0.75rem' }}>La aplicación propone una fase según la ficha y la fecha; confirma aquí dónde está físicamente el cultivo.</p>
+                  </div>
+
                   {selectedCropType && (
                       <div style={{ background: '#f0fdf4', padding: '1.25rem', borderRadius: '0.75rem', border: '1px solid #bbf7d0', display: 'flex', gap: '1rem', alignItems: 'flex-start', flexDirection: 'column' }}>
                         <div style={{ display: 'flex', gap: '1rem', width: '100%' }}>
@@ -1946,7 +2009,7 @@ export default function Crops() {
                     )}
 
                   <div>
-                    <label style={{ fontSize: '0.875rem', fontWeight: 'bold', marginBottom: '0.5rem', display: 'block', color: '#334155' }}>2. ¿Cuántas bandejas son?</label>
+                    <label style={{ fontSize: '0.875rem', fontWeight: 'bold', marginBottom: '0.5rem', display: 'block', color: '#334155' }}>4. ¿Cuántas bandejas son?</label>
                     <input type="number" required min="1" className="premium-input" style={{ width: '100%', padding: '1rem', borderRadius: '0.75rem', border: '2px solid #e2e8f0', fontSize: '1.5rem', fontWeight: '900', color: '#0f172a', textAlign: 'center', boxSizing: 'border-box' }} value={newCrop.traysCount} onChange={e=>setNewCrop({...newCrop, traysCount: Number(e.target.value)})}/>
                   </div>
 

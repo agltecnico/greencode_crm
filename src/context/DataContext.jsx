@@ -555,8 +555,26 @@ export const DataProvider = ({ children }) => {
         'registrar la siembra y consumir su lote'
       );
       if (error) throw error;
+      const cropId = data?.cropId || data;
+      if (newCrop.datePlanted && cropId) {
+        const plantedAt = new Date(newCrop.datePlanted).toISOString();
+        const cropFields = {
+          datePlanted: plantedAt,
+          status: newCrop.initialStatus || 'GERMINATING'
+        };
+        if (cropFields.status !== 'GERMINATING') cropFields.phaseConfirmedAt = new Date().toISOString();
+        const { error: cropDateError } = await supabase.from('crops').update(cropFields).eq('id', cropId);
+        if (cropDateError) throw cropDateError;
+        if (data?.cultivationBatchNumber) {
+          const { error: movementDateError } = await supabase
+            .from('stock_entries')
+            .update({ purchaseDate: plantedAt.slice(0, 10), createdAt: plantedAt })
+            .eq('deliveryNote', `Consumo siembra ${data.cultivationBatchNumber}`);
+          if (movementDateError) throw movementDateError;
+        }
+      }
       await refreshData({ force: true });
-      return data?.cropId || data;
+      return cropId;
     }
     // 1. Get the CropType definition
     const cType = cropTypes.find(c => c.id === newCrop.cropTypeId);
