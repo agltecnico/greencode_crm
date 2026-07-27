@@ -25,7 +25,7 @@ const suggestedStatusForSowingDate = (cropType, dateValue) => {
   const cycle = getCropCycleOffsets(cropType);
   if (cycle.soak > 0 && elapsed < cycle.soak) return 'SOAKING';
   if (elapsed < cycle.darknessStart) return 'GERMINATING';
-  if (cycle.darkness > 0 && elapsed < cycle.lightStart) return 'DARK';
+  if (cycle.darkness > 0 && elapsed < cycle.lightStart) return 'DARKNESS';
   if (elapsed < cycle.harvest) return 'LIGHT';
   return 'READY';
 };
@@ -33,7 +33,7 @@ const suggestedStatusForSowingDate = (cropType, dateValue) => {
 const CROP_PHASE_OPTIONS = [
   ['SOAKING', 'Remojo'],
   ['GERMINATING', 'Germinación'],
-  ['DARK', 'Oscuridad'],
+  ['DARKNESS', 'Oscuridad'],
   ['LIGHT', 'Luz'],
   ['READY', 'Lista para cosechar']
 ];
