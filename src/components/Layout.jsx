@@ -1,10 +1,12 @@
 import { useState } from 'react';
 import { Outlet, NavLink } from 'react-router-dom';
-import { LayoutDashboard, Users, Truck, FileBox, ShoppingBag, FileText, Receipt, Menu, X, Sprout } from 'lucide-react';
+import { LayoutDashboard, Users, Truck, FileBox, ShoppingBag, FileText, Receipt, Menu, X, UserCog, LogOut } from 'lucide-react';
 import AdminModeButton from './AdminModeButton';
+import { useAuth } from '../context/AuthContext';
 
 export default function Layout() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const { profile, hasPermission, signOut } = useAuth();
 
   return (
     <div className="app-container">
@@ -50,7 +52,9 @@ export default function Layout() {
 
           <div className="sidebar-group-title" style={{ marginTop: '0.75rem', marginBottom: '0.25rem', fontSize: '0.75rem', fontWeight: 'bold', color: '#94a3b8', letterSpacing: '0.05em', paddingLeft: '1rem' }}>OPERACIONES</div>
 
-          
+          {hasPermission('users') && <NavLink onClick={() => setSidebarOpen(false)} to="/admin/users" className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}>
+            <UserCog /> Usuarios y permisos
+          </NavLink>}
         </nav>
       </aside>
       <div className={`sidebar-overlay ${sidebarOpen ? 'open' : ''}`} onClick={() => setSidebarOpen(false)} />
@@ -62,7 +66,9 @@ export default function Layout() {
           </button>
           <h1 className="page-title">Microgreens CRM</h1>
           <div className="user-profile">
+            <span style={{ fontSize: '.75rem', color: '#64748b' }}>{profile?.display_name}</span>
             <AdminModeButton />
+            <button type="button" onClick={signOut} title="Cerrar sesión" style={{ border: 0, background: 'transparent', cursor: 'pointer', color: '#64748b' }}><LogOut size={20} /></button>
             {/* simple avatar placeholder */}
             <div style={{ width: 40, height: 40, borderRadius: '50%', background: 'var(--color-primary-light)', color: 'var(--color-primary-dark)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 'bold' }}>
               A

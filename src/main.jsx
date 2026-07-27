@@ -69,16 +69,15 @@ class GlobalErrorBoundary extends React.Component {
 
 import { DataProvider } from './context/DataContext.jsx'
 import { AdminModeProvider } from './context/AdminModeContext.jsx'
+import { AuthProvider } from './context/AuthContext.jsx'
 import './index.css'
 
 createRoot(document.getElementById('root')).render(
   <StrictMode>
     <BrowserRouter>
-      <AdminModeProvider>
-        <DataProvider>
-          <GlobalErrorBoundary><App /></GlobalErrorBoundary>
-        </DataProvider>
-      </AdminModeProvider>
+      <AuthProvider>
+        <GlobalErrorBoundary><App /></GlobalErrorBoundary>
+      </AuthProvider>
     </BrowserRouter>
   </StrictMode>,
 )
