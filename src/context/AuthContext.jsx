@@ -8,6 +8,7 @@ export function AuthProvider({ children }) {
   const [session, setSession] = useState(null);
   const [profile, setProfile] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [recoveryMode, setRecoveryMode] = useState(false);
 
   const loadProfile = async user => {
     if (!user) {
@@ -28,7 +29,8 @@ export function AuthProvider({ children }) {
         setLoading(false);
       }
     });
-    const { data: listener } = supabase.auth.onAuthStateChange((_event, nextSession) => {
+    const { data: listener } = supabase.auth.onAuthStateChange((event, nextSession) => {
+      if (event === 'PASSWORD_RECOVERY') setRecoveryMode(true);
       setSession(nextSession);
       setLoading(true);
       setTimeout(() => loadProfile(nextSession?.user).finally(() => setLoading(false)), 0);
@@ -45,15 +47,21 @@ export function AuthProvider({ children }) {
     user: session?.user || null,
     profile,
     loading,
+    recoveryMode,
     firstAdminEmail: FIRST_ADMIN_EMAIL,
     hasPermission,
     signIn: (email, password) => supabase.auth.signInWithPassword({ email, password }),
     resetPassword: email => supabase.auth.resetPasswordForEmail(email, {
       redirectTo: `${window.location.origin}/login`
     }),
+    updatePassword: async password => {
+      const result = await supabase.auth.updateUser({ password });
+      if (!result.error) setRecoveryMode(false);
+      return result;
+    },
     signOut: () => supabase.auth.signOut(),
     refreshProfile: () => loadProfile(session?.user)
-  }), [session, profile, loading]);
+  }), [session, profile, loading, recoveryMode]);
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }
