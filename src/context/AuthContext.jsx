@@ -48,11 +48,6 @@ export function AuthProvider({ children }) {
     firstAdminEmail: FIRST_ADMIN_EMAIL,
     hasPermission,
     signIn: (email, password) => supabase.auth.signInWithPassword({ email, password }),
-    signUpFirstAdmin: password => supabase.auth.signUp({
-      email: FIRST_ADMIN_EMAIL,
-      password,
-      options: { data: { display_name: 'Administración GreenCode' } }
-    }),
     resetPassword: email => supabase.auth.resetPasswordForEmail(email, {
       redirectTo: `${window.location.origin}/login`
     }),
