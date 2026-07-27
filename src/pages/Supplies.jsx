@@ -345,21 +345,49 @@ export default function Supplies() {
     return Number(linkedArticle?.lastPurchaseUnitCost || 0);
   };
 
+  const getLatestArticleUnitCost = (articleId) => {
+    if (!articleId) return 0;
+    const latestEntry = (stockEntries || [])
+      .filter(entry =>
+        entry.articleId === articleId &&
+        entry.purchaseDeliveryNoteId &&
+        Number(entry.quantity) > 0
+      )
+      .sort((a, b) => {
+        const aDate = new Date(a.purchaseDate || a.createdAt || 0).getTime();
+        const bDate = new Date(b.purchaseDate || b.createdAt || 0).getTime();
+        if (bDate !== aDate) return bDate - aDate;
+        return new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime();
+      })[0];
+    if (latestEntry) {
+      const storedUnitCost = Number(latestEntry.unitCost);
+      if (Number.isFinite(storedUnitCost) && storedUnitCost >= 0) return storedUnitCost;
+      const quantity = Number(latestEntry.quantity);
+      if (quantity > 0) return Number(latestEntry.price || 0) / quantity;
+    }
+    const article = (articles || []).find(item => item.id === articleId);
+    return Number(article?.lastPurchaseUnitCost || article?.currentUnitCost || 0);
+  };
+
   const substrates = articles?.filter(a => a.type === 'SUSTRATO') || [];
   const containers = articles?.filter(a => a.type === 'ENVASE' || a.type === 'BANDEJA' || a.type === 'SUMINISTROS') || [];
   const selectedArticleType = newStockEntry.articleId ? articles?.find(a => a.id === newStockEntry.articleId)?.type : null;
   const isExpenseOnly = ['GASTO_FIJO', 'SUMINISTROS', 'MANTENIMIENTO', 'MARKETING', 'NOMINAS', 'BANDEJA'].includes(selectedArticleType);
 
   const getLiveCosts = (formData) => {
-    if (!formData) return { totalTray: 0, perKg: 0, seedCostPerGram: 0, seedCostPerKg: 0 };
+    if (!formData) return { totalTray: 0, perKg: 0, seedCostPerGram: 0, seedCostPerKg: 0, substrateUnitCost: 0, substrateCost: 0 };
     const varietyCost = getLatestVarietySeedCost(formData.varietyId);
     const sCost = varietyCost * Number(formData.seedGrams || 0);
-    const subCost = getAverageUnitCost(formData.substrateId) * Number(formData.substrateLiters || 0);
+    const substrateUnitCost = getLatestArticleUnitCost(formData.substrateId);
+    const subCost = substrateUnitCost * Number(formData.substrateLiters || 0);
     const cCost = getAverageUnitCost(formData.containerId) * 1;
     const totalTray = sCost + subCost + cCost;
     const expKg = Number(formData.expectedYieldGrams || 0) / 1000;
     const perKg = expKg > 0 ? totalTray / expKg : 0;
-    return { totalTray, perKg, seedCostPerGram: varietyCost, seedCostPerKg: varietyCost * 1000 };
+    return {
+      totalTray, perKg, seedCostPerGram: varietyCost, seedCostPerKg: varietyCost * 1000,
+      substrateUnitCost, substrateCost: subCost
+    };
   };
 
   const newTypeCosts = getLiveCosts(newType);
@@ -959,7 +987,8 @@ export default function Supplies() {
                 {paginatedTypes.map(c => {
                   const varietyUnitCost = getLatestVarietySeedCost(c.varietyId);
                   const seedCost = varietyUnitCost * Number(c.seedGrams || 0);
-                  const subCost = getAverageUnitCost(c.substrateId) * Number(c.substrateLiters || 0);
+                  const substrateUnitCost = getLatestArticleUnitCost(c.substrateId);
+                  const subCost = substrateUnitCost * Number(c.substrateLiters || 0);
                   const contCost = getAverageUnitCost(c.containerId) * 1;
                   
                   const totalCost = seedCost + subCost + contCost;
@@ -998,6 +1027,11 @@ export default function Supplies() {
                           <div>
                             <label className="form-label text-sm">Litros de Sustrato</label>
                             <input type="number" step="0.1" min="0" className="form-control" value={editedCropType.substrateLiters} onChange={e => setEditedCropType({...editedCropType, substrateLiters: Number(e.target.value)})} />
+                            <p className="text-xs text-slate-500 mt-1">
+                              Última compra: {editTypeCosts.substrateUnitCost > 0
+                                ? `${editTypeCosts.substrateUnitCost.toFixed(4)} €/L · ${Number(editedCropType.substrateLiters || 0)} L × ${editTypeCosts.substrateUnitCost.toFixed(4)} €/L = ${editTypeCosts.substrateCost.toFixed(2)} €`
+                                : 'sin precio registrado'}
+                            </p>
                           </div>
                           <div>
                             <label className="form-label text-sm">Envase / Bandeja</label>
@@ -1065,7 +1099,16 @@ export default function Supplies() {
                           <span style={{ color: '#0f766e', fontWeight: 600 }}>
                             Última compra: {varietyUnitCost > 0 ? `${(varietyUnitCost * 1000).toFixed(2)} €/kg · ${varietyUnitCost.toFixed(4)} €/g` : 'sin precio'}
                           </span>
-                          {Number(c.substrateLiters) > 0 && <span>🪨 {c.substrateLiters}L ({subCost.toFixed(2)}€)</span>}
+                          {Number(c.substrateLiters) > 0 && (
+                            <>
+                              <span>🪨 {c.substrateLiters} L ({subCost.toFixed(2)} €)</span>
+                              <span style={{ color: '#0f766e', fontWeight: 600 }}>
+                                Última compra: {substrateUnitCost > 0
+                                  ? `${substrateUnitCost.toFixed(4)} €/L · ${c.substrateLiters} L × ${substrateUnitCost.toFixed(4)} €/L = ${subCost.toFixed(2)} €`
+                                  : 'sin precio'}
+                              </span>
+                            </>
+                          )}
                           <span>📦 1 ud ({contCost.toFixed(2)}€)</span>
                           <div style={{ marginTop: '0.5rem', background: '#f1f5f9', padding: '0.2rem 0.5rem', borderRadius: '4px', display: 'flex', gap: '0.5rem', fontSize: '0.75rem', width: 'fit-content' }}>
                             <span title="Remojo">💧 {c.soakingHours || 0}h</span>
@@ -1402,6 +1445,11 @@ export default function Supplies() {
                 <div>
                   <label className="form-label">Litros por Bandeja</label>
                   <input type="number" step="0.1" min="0" className="form-control" value={newType.substrateLiters} onChange={e => setNewType({...newType, substrateLiters: Number(e.target.value)})} />
+                  <p className="text-xs text-slate-500 mt-1">
+                    Última compra: {newTypeCosts.substrateUnitCost > 0
+                      ? `${newTypeCosts.substrateUnitCost.toFixed(4)} €/L · ${Number(newType.substrateLiters || 0)} L × ${newTypeCosts.substrateUnitCost.toFixed(4)} €/L = ${newTypeCosts.substrateCost.toFixed(2)} €`
+                      : 'sin precio registrado'}
+                  </p>
                 </div>
               </div>
 
