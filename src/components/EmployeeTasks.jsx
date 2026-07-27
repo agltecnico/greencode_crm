@@ -10,6 +10,21 @@ const CULTIVATION_TASK_ICONS = {
   LUZ: '☀️'
 };
 
+const localDateKey = (dateValue) => {
+  const date = new Date(dateValue);
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+};
+
+const calendarDayNumber = (dateValue) => {
+  const date = new Date(dateValue);
+  return Math.floor(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()) / 86400000);
+};
+
+const calendarDaysBetween = (from, to) => calendarDayNumber(to) - calendarDayNumber(from);
+
 export default function EmployeeTasks({ onTaskAction, onHarvestBatchAction }) {
   const navigate = useNavigate();
   const { 
@@ -72,7 +87,7 @@ export default function EmployeeTasks({ onTaskAction, onHarvestBatchAction }) {
     const calendarEnd = new Date(monthEnd);
     const trailingDays = (7 - calendarEnd.getDay()) % 7;
     calendarEnd.setDate(monthEnd.getDate() + trailingDays);
-    const dayCount = Math.round((calendarEnd - calendarStart) / 86400000) + 1;
+    const dayCount = calendarDaysBetween(calendarStart, calendarEnd) + 1;
 
     return Array.from({ length: dayCount }).map((_, i) => {
       const d = new Date(calendarStart);
@@ -85,8 +100,9 @@ export default function EmployeeTasks({ onTaskAction, onHarvestBatchAction }) {
 
   datesToAnalyze.forEach(targetDate => {
     const targetDayOfWeek = targetDate.getDay();
-    const dateKey = targetDate.toISOString().split('T')[0];
-    const isToday = dateKey === today.toISOString().split('T')[0];
+    const dateKey = localDateKey(targetDate);
+    const isToday = dateKey === localDateKey(today);
+    const isPast = calendarDayNumber(targetDate) < calendarDayNumber(today);
 
     const tasksForDate = [];
 
@@ -96,8 +112,7 @@ export default function EmployeeTasks({ onTaskAction, onHarvestBatchAction }) {
       const varietyName = getCropVarietyName(cType, crop);
 
       const planted = new Date(crop.datePlanted || crop.plantedAt);
-      planted.setHours(0,0,0,0);
-      const daysSincePlanted = Math.floor((targetDate - planted) / (1000 * 60 * 60 * 24));
+      const daysSincePlanted = calendarDaysBetween(planted, targetDate);
       if (daysSincePlanted < 0) return;
 
       const soakOffset = (cType?.soakingHours || 0) > 0 ? 1 : 0;
@@ -129,14 +144,14 @@ export default function EmployeeTasks({ onTaskAction, onHarvestBatchAction }) {
         else if (daysSincePlanted >= harvestDay && st === 'LIGHT') { 
           action = 'harvest'; 
         }
-      } else {
-        if (daysSincePlanted === germDay) { 
+      } else if (!isPast) {
+        if (daysSincePlanted === germDay && (st === 'SOAKING' || st === 'SOWED')) {
           action = 'move'; phaseStr = 'GERMINACIÓN'; 
         }
-        else if (hasDarkness && daysSincePlanted === darkDay) { 
+        else if (hasDarkness && daysSincePlanted === darkDay && ['SOAKING', 'SOWED', 'GERMINATING'].includes(st)) {
           action = 'move'; phaseStr = 'OSCURIDAD'; 
         }
-        else if (daysSincePlanted === lightDay) { 
+        else if (daysSincePlanted === lightDay && !['LIGHT', 'READY'].includes(st)) {
           action = 'move'; phaseStr = 'LUZ'; 
         }
         else if (daysSincePlanted === harvestDay) { 
@@ -190,12 +205,11 @@ export default function EmployeeTasks({ onTaskAction, onHarvestBatchAction }) {
           if (c.status === 'DISCARDED' || c.status === 'HARVESTED') return false;
           if (c.cropTypeId != routine.productId && c.seedId != routine.productId) return false;
           const cDate = new Date(c.datePlanted);
-          cDate.setHours(0,0,0,0);
-          return Math.abs((cDate - tDate) / 86400000) <= 1;
+          return calendarDaysBetween(cDate, tDate) === 0;
         });
       };
 
-      if(plantWd == targetDayOfWeek && !isAlreadyPlanted()) {
+      if(!isPast && plantWd == targetDayOfWeek && !isAlreadyPlanted()) {
         const gramsPerTray = Number(cType.seedGrams || 0);
         const totalSeedGrams = gramsPerTray * Number(routine.tuppersCount || 0);
         tasksForDate.push({ 
