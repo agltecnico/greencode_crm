@@ -1901,9 +1901,9 @@ export default function Crops() {
       
     
       {isSowModalOpen && (
-          <div style={modalOverlayStyle}>
-            <div style={{ ...modalCardStyle, maxWidth: '500px', padding: 0, overflow: 'hidden' }}>
-              <div style={{ background: 'linear-gradient(135deg, #10b981, #059669)', padding: '1.5rem', color: 'white', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <div style={{ ...modalOverlayStyle, padding: '0.75rem', boxSizing: 'border-box' }}>
+            <div style={{ ...modalCardStyle, maxWidth: '500px', width: '100%', margin: 0, padding: 0, overflow: 'hidden', maxHeight: 'calc(100dvh - 1.5rem)', display: 'flex', flexDirection: 'column' }}>
+              <div style={{ background: 'linear-gradient(135deg, #10b981, #059669)', padding: '1.5rem', color: 'white', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexShrink: 0 }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
                   <div style={{ backgroundColor: 'rgba(255,255,255,0.2)', padding: '0.5rem', borderRadius: '0.5rem', fontSize: '1.5rem' }}>🌱</div>
                   <div>
@@ -1913,7 +1913,7 @@ export default function Crops() {
                 </div>
                 <button onClick={closeSowModal} style={{ background: 'none', border: 'none', color: 'white', fontSize: '1.5rem', cursor: 'pointer', opacity: 0.8 }} onMouseOver={e=>e.currentTarget.style.opacity=1} onMouseOut={e=>e.currentTarget.style.opacity=0.8}>&times;</button>
               </div>
-              <div style={{ padding: '2rem' }}>
+              <div style={{ padding: '2rem', overflowY: 'auto', minHeight: 0, overscrollBehavior: 'contain', WebkitOverflowScrolling: 'touch' }}>
                   
                   <form onSubmit={handleAddCrop} style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
                   <div>
