@@ -186,6 +186,7 @@ export default function Crops() {
   // Modals state
   const [isSowModalOpen, setIsSowModalOpen] = useState(false);
   const [isHarvestModalOpen, setIsHarvestModalOpen] = useState(false);
+  const [harvestBatchQueue, setHarvestBatchQueue] = useState([]);
   const [searchParams, setSearchParams] = useSearchParams();
   const [showPhaseChangeModal, setShowPhaseChangeModal] = useState(null);
   const [pendingPhase, setPendingPhase] = useState(null);
@@ -319,7 +320,11 @@ export default function Crops() {
       batchNumber: batchNum
     });
     if (!harvestResult) return;
-    
+
+    const completedCropIds = new Set(cropIdsToHarvest.map(String));
+    const remainingHarvestQueue = harvestBatchQueue.filter(crop => !completedCropIds.has(String(crop.id)));
+    const wasBatchHarvest = harvestBatchQueue.length > 0;
+    setHarvestBatchQueue(remainingHarvestQueue);
     setNewHarvest(emptyHarvestForm);
     setIsHarvestModalOpen(false);
     
@@ -336,6 +341,9 @@ export default function Crops() {
       }).then((result) => {
         if (result.isConfirmed) {
           handlePrintLabelsSafe(product, batchNum, totalTuppers);
+        }
+        if (wasBatchHarvest && remainingHarvestQueue.length > 0) {
+          openHarvestModalForCrop(remainingHarvestQueue[0]);
         }
       });
     }, 300);
@@ -365,6 +373,21 @@ export default function Crops() {
     }
     
     setIsHarvestModalOpen(true);
+  };
+
+  const openHarvestBatch = (tasks) => {
+    const queuedCrops = tasks
+      .map(task => crops?.find(crop => String(crop.id) === String(task.cropId)))
+      .filter((crop, index, list) => crop && list.findIndex(item => String(item.id) === String(crop.id)) === index);
+    if (queuedCrops.length === 0) return;
+    setHarvestBatchQueue(queuedCrops);
+    openHarvestModalForCrop(queuedCrops[0]);
+  };
+
+  const closeHarvestModal = () => {
+    setIsHarvestModalOpen(false);
+    setNewHarvest(emptyHarvestForm);
+    setHarvestBatchQueue([]);
   };
 
   
@@ -1792,7 +1815,18 @@ export default function Crops() {
                 🖥️ Lanzar en Modo TV
               </button>
             </div>
-            <EmployeeTasks onTaskAction={(task) => { if (task.type === 'plant') { openSowModal({ cropTypeId: task.cropTypeId, traysCount: task.trays || 1 }); } else if (task.type === 'harvest') { setIsHarvestModalOpen(true); } }} />
+            <EmployeeTasks
+              onTaskAction={(task) => {
+                if (task.type === 'plant') {
+                  openSowModal({ cropTypeId: task.cropTypeId, traysCount: task.trays || 1 });
+                } else if (task.type === 'harvest') {
+                  const crop = crops?.find(item => String(item.id) === String(task.cropId));
+                  if (crop) openHarvestModalForCrop(crop);
+                  else setIsHarvestModalOpen(true);
+                }
+              }}
+              onHarvestBatchAction={openHarvestBatch}
+            />
           </div>
         )}
         {activeTab === 'lotes' && renderLotes()}
@@ -1901,7 +1935,8 @@ export default function Crops() {
           <span>✂️</span> Registrar Cosecha
         </h3>
         <p style={{ margin: '0.5rem 0 0 0', color: '#94a3b8', fontSize: '0.9rem' }}>Selecciona el producto a envasar y las bandejas a cortar.</p>
-        <button onClick={() => { setIsHarvestModalOpen(false); setNewHarvest(emptyHarvestForm); }} style={{ position: 'absolute', top: '1.25rem', right: '1.25rem', background: 'rgba(255,255,255,0.1)', border: 'none', color: 'white', width: '32px', height: '32px', borderRadius: '50%', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'background 0.2s' }} onMouseOver={e=>e.currentTarget.style.background='rgba(255,255,255,0.2)'} onMouseOut={e=>e.currentTarget.style.background='rgba(255,255,255,0.1)'}>&times;</button>
+        {harvestBatchQueue.length > 0 && <p style={{ margin: '0.35rem 0 0 2rem', color: '#bbf7d0', fontSize: '0.8rem', fontWeight: 700 }}>Modo múltiple · {harvestBatchQueue.length} cosecha{harvestBatchQueue.length === 1 ? '' : 's'} pendiente{harvestBatchQueue.length === 1 ? '' : 's'}</p>}
+        <button onClick={closeHarvestModal} style={{ position: 'absolute', top: '1.25rem', right: '1.25rem', background: 'rgba(255,255,255,0.1)', border: 'none', color: 'white', width: '32px', height: '32px', borderRadius: '50%', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'background 0.2s' }} onMouseOver={e=>e.currentTarget.style.background='rgba(255,255,255,0.2)'} onMouseOut={e=>e.currentTarget.style.background='rgba(255,255,255,0.1)'}>&times;</button>
       </div>
 
       <form onSubmit={handleRegisterHarvest} style={{ padding: '1.5rem', display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
@@ -2039,7 +2074,7 @@ export default function Crops() {
 
         {/* BOTONES */}
         <div style={{ display: 'flex', gap: '1rem', marginTop: '0.5rem' }}>
-          <button type="button" onClick={() => { setIsHarvestModalOpen(false); setNewHarvest(emptyHarvestForm); }} style={{ flex: 1, padding: '1rem', borderRadius: '0.75rem', border: '1px solid #cbd5e1', background: 'white', color: '#475569', fontWeight: 'bold', cursor: 'pointer', transition: 'background 0.2s' }} onMouseOver={e=>e.currentTarget.style.background='#f1f5f9'} onMouseOut={e=>e.currentTarget.style.background='white'}>
+          <button type="button" onClick={closeHarvestModal} style={{ flex: 1, padding: '1rem', borderRadius: '0.75rem', border: '1px solid #cbd5e1', background: 'white', color: '#475569', fontWeight: 'bold', cursor: 'pointer', transition: 'background 0.2s' }} onMouseOver={e=>e.currentTarget.style.background='#f1f5f9'} onMouseOut={e=>e.currentTarget.style.background='white'}>
             Cancelar
           </button>
           <button type="submit" disabled={!newHarvest.productId || Object.values(newHarvest.selectedCropUsages).every(v => !v) || Object.values(newHarvest.packagingQuantities || {}).every(v => !Number(v))} style={{ flex: 1, padding: '1rem', borderRadius: '0.75rem', border: 'none', background: (!newHarvest.productId || Object.values(newHarvest.selectedCropUsages).every(v => !v) || Object.values(newHarvest.packagingQuantities || {}).every(v => !Number(v))) ? '#94a3b8' : 'linear-gradient(135deg, #10b981, #059669)', color: 'white', fontWeight: 'bold', cursor: (!newHarvest.productId || Object.values(newHarvest.selectedCropUsages).every(v => !v) || Object.values(newHarvest.packagingQuantities || {}).every(v => !Number(v))) ? 'not-allowed' : 'pointer', boxShadow: '0 4px 6px -1px rgba(16, 185, 129, 0.3)', transition: 'all 0.2s' }}>

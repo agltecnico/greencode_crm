@@ -10,7 +10,7 @@ const CULTIVATION_TASK_ICONS = {
   LUZ: '☀️'
 };
 
-export default function EmployeeTasks({ onTaskAction }) {
+export default function EmployeeTasks({ onTaskAction, onHarvestBatchAction }) {
   const navigate = useNavigate();
   const { 
     harvestTargets, crops, cropTypes, seedVarieties, articles, stockLots, providers,
@@ -221,9 +221,16 @@ export default function EmployeeTasks({ onTaskAction }) {
   });
 
   const toggleTaskSelection = (task) => {
-    // Only allow selecting plant and move tasks for batch completion
-    if (task.type !== 'plant' && task.type !== 'move') {
-      alert("Solo se pueden completar automáticamente las tareas de Siembra y Cambio de Fase.");
+    if (!['plant', 'move', 'harvest'].includes(task.type)) {
+      alert("Esta tarea no admite selección múltiple.");
+      return;
+    }
+
+    const selectingHarvest = task.type === 'harvest';
+    const hasHarvests = selectedTasks.some(selected => selected.type === 'harvest');
+    const hasOperationalTasks = selectedTasks.some(selected => selected.type !== 'harvest');
+    if ((selectingHarvest && hasOperationalTasks) || (!selectingHarvest && hasHarvests)) {
+      alert("Las cosechas se procesan por separado de las siembras y los cambios de fase.");
       return;
     }
     
@@ -235,6 +242,18 @@ export default function EmployeeTasks({ onTaskAction }) {
   };
 
   const handleBatchActionClick = () => {
+    const harvestTasks = selectedTasks.filter(t => t.type === 'harvest');
+    if (harvestTasks.length > 0) {
+      if (onHarvestBatchAction) {
+        onHarvestBatchAction(harvestTasks);
+      } else if (onTaskAction) {
+        onTaskAction(harvestTasks[0]);
+      }
+      setSelectedTasks([]);
+      setIsMultiSelectMode(false);
+      return;
+    }
+
     const plants = selectedTasks.filter(t => t.type === 'plant');
     if (plants.length > 0) {
       // Open modal to configure seed batches
@@ -352,7 +371,7 @@ export default function EmployeeTasks({ onTaskAction }) {
                   position: 'relative'
                 }}
               >
-                {isMultiSelectMode && (task.type === 'plant' || task.type === 'move') && (
+                {isMultiSelectMode && (task.type === 'plant' || task.type === 'move' || task.type === 'harvest') && (
                   <div style={{ position: 'absolute', top: '10px', right: '10px' }}>
                     <input type="checkbox" checked={isSelected} readOnly style={{ transform: 'scale(1.5)', accentColor: '#22c55e' }} />
                   </div>
@@ -533,7 +552,7 @@ export default function EmployeeTasks({ onTaskAction }) {
                             cursor: isActionable ? 'pointer' : 'default'
                           }}
                         >
-                          {isMultiSelectMode && (task.type === 'plant' || task.type === 'move') && (
+                          {isMultiSelectMode && (task.type === 'plant' || task.type === 'move' || task.type === 'harvest') && (
                             <input type="checkbox" checked={isSelected} readOnly style={{ position: 'absolute', top: '0.45rem', right: '0.45rem', accentColor: '#22c55e' }} />
                           )}
                           <div style={{ display: 'flex', alignItems: 'flex-start', gap: '0.35rem', paddingRight: isMultiSelectMode ? '1rem' : 0 }}>
