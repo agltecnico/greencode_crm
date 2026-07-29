@@ -1,5 +1,7 @@
 import { useMemo, useState } from 'react';
-import { BarChart3, CircleDollarSign, LayoutList, PackageCheck, Percent, TriangleAlert } from 'lucide-react';
+import { BarChart3, CircleDollarSign, Download, LayoutList, PackageCheck, Percent, TriangleAlert, X } from 'lucide-react';
+import { jsPDF } from 'jspdf';
+import autoTable from 'jspdf-autotable';
 import {
   Bar, BarChart, CartesianGrid, Cell, Pie, PieChart,
   ResponsiveContainer, Tooltip, XAxis, YAxis
@@ -42,8 +44,11 @@ const StatCard = ({ icon, label, value, detail, tone = 'green' }) => (
   </article>
 );
 
-export default function Profitability() {
-  const { orders, deliveryNotes, clients, products, productMovements, harvests } = useData();
+export default function Profitability({ modal = false, onClose }) {
+  const {
+    orders, deliveryNotes, clients, products, productMovements, harvests,
+    cropTypes, seedVarieties, articles, stockEntries, companyProfile
+  } = useData();
   const [initialBounds] = useState(() => monthBounds());
   const [filterMode, setFilterMode] = useState('month');
   const [selectedMonth, setSelectedMonth] = useState(initialBounds.start.slice(0, 7));
@@ -51,9 +56,33 @@ export default function Profitability() {
   const [endDate, setEndDate] = useState(initialBounds.end);
   const [view, setView] = useState('products');
   const [displayMode, setDisplayMode] = useState('visual');
+  const [query, setQuery] = useState('');
   const selectedBounds = filterMode === 'month'
     ? boundsForMonth(selectedMonth)
     : { start: startDate, end: endDate };
+
+  const latestArticleUnitCost = articleId => {
+    if (!articleId) return 0;
+    const latestEntry = (stockEntries || [])
+      .filter(entry => entry.articleId === articleId && entry.purchaseDeliveryNoteId && Number(entry.quantity) > 0)
+      .sort((a, b) => new Date(b.purchaseDate || b.createdAt || 0) - new Date(a.purchaseDate || a.createdAt || 0))[0];
+    if (latestEntry) {
+      const stored = Number(latestEntry.unitCost);
+      if (Number.isFinite(stored) && stored >= 0) return stored;
+      return Number(latestEntry.price || 0) / Number(latestEntry.quantity || 1);
+    }
+    const article = (articles || []).find(item => item.id === articleId);
+    return Number(article?.lastPurchaseUnitCost || article?.currentUnitCost || 0);
+  };
+
+  const latestVarietySeedCost = varietyId => {
+    const seedIds = new Set((articles || []).filter(item => item.type === 'SEMILLA' && item.varietyId === varietyId).map(item => item.id));
+    const latestEntry = (stockEntries || [])
+      .filter(entry => seedIds.has(entry.articleId) && entry.purchaseDeliveryNoteId && Number(entry.quantity) > 0)
+      .sort((a, b) => new Date(b.purchaseDate || b.createdAt || 0) - new Date(a.purchaseDate || a.createdAt || 0))[0];
+    if (latestEntry) return Number(latestEntry.unitCost ?? (Number(latestEntry.price || 0) / Number(latestEntry.quantity || 1)));
+    return Number((articles || []).find(item => item.type === 'SEMILLA' && item.varietyId === varietyId)?.lastPurchaseUnitCost || 0);
+  };
 
   const report = useMemo(() => {
     const noteByOrder = new Map((deliveryNotes || []).map(note => [note.orderId, note]));
@@ -144,13 +173,22 @@ export default function Profitability() {
       });
 
     const finishRows = rows => [...rows.values()]
-      .map(row => ({
-        ...row,
-        pendingUnits: Math.max(row.units - row.costedUnits, 0),
-        margin: row.revenue - row.cost,
-        marginPercent: row.revenue > 0 ? ((row.revenue - row.cost) / row.revenue) * 100 : 0
-      }))
+      .map(row => {
+        const tracedRevenue = row.units > 0 ? row.revenue * (row.costedUnits / row.units) : 0;
+        return {
+          ...row,
+          tracedRevenue,
+          pendingUnits: Math.max(row.units - row.costedUnits, 0),
+          margin: tracedRevenue - row.cost,
+          marginPercent: tracedRevenue > 0 ? ((tracedRevenue - row.cost) / tracedRevenue) * 100 : 0
+        };
+      })
       .sort((a, b) => b.revenue - a.revenue);
+
+    const finishedProducts = finishRows(productRows);
+    const finishedClients = finishRows(clientRows);
+    const tracedRevenue = finishedProducts.reduce((sum, row) => sum + row.tracedRevenue, 0);
+    const tracedMargin = finishedProducts.reduce((sum, row) => sum + row.margin, 0);
 
     return {
       revenue,
@@ -158,15 +196,49 @@ export default function Profitability() {
       units,
       costedUnits,
       pendingUnits: Math.max(units - costedUnits, 0),
-      margin: revenue - cost,
-      marginPercent: revenue > 0 ? ((revenue - cost) / revenue) * 100 : 0,
+      tracedRevenue,
+      margin: tracedMargin,
+      marginPercent: tracedRevenue > 0 ? (tracedMargin / tracedRevenue) * 100 : 0,
       coverage: units > 0 ? (costedUnits / units) * 100 : 0,
-      productRows: finishRows(productRows),
-      clientRows: finishRows(clientRows)
+      productRows: finishedProducts,
+      clientRows: finishedClients
     };
   }, [clients, deliveryNotes, harvests, orders, productMovements, products, selectedBounds.end, selectedBounds.start]);
 
-  const rows = view === 'products' ? report.productRows : report.clientRows;
+  const productionRows = (cropTypes || []).map(cropType => {
+    const seedCost = latestVarietySeedCost(cropType.varietyId) * Number(cropType.seedGrams || 0);
+    const substrateCost = latestArticleUnitCost(cropType.substrateId) * Number(cropType.substrateLiters || 0);
+    const trayCost = latestArticleUnitCost(cropType.containerId);
+    const total = seedCost + substrateCost + trayCost;
+    const expectedKg = Number(cropType.expectedYieldGrams || 0) / 1000;
+    return {
+      id: cropType.id,
+      name: cropType.name || seedVarieties?.find(item => item.id === cropType.varietyId)?.name || 'Ficha sin nombre',
+      seedCost,
+      substrateCost,
+      trayCost,
+      total,
+      costPerKg: expectedKg > 0 ? total / expectedKg : 0
+    };
+  }).sort((a, b) => b.total - a.total);
+  const packagingRows = (articles || [])
+    .filter(article => article.type === 'ENVASE')
+    .map(article => ({
+      id: article.id,
+      name: article.name,
+      unitCost: latestArticleUnitCost(article.id),
+      stock: (stockEntries || []).filter(entry => entry.articleId === article.id).reduce((sum, entry) => sum + Number(entry.quantity || 0), 0)
+    }))
+    .sort((a, b) => b.unitCost - a.unitCost);
+  const baseRows = view === 'products'
+    ? report.productRows
+    : view === 'clients'
+      ? report.clientRows
+      : view === 'production'
+        ? productionRows
+        : packagingRows;
+  const normalizedQuery = query.trim().toLocaleLowerCase('es');
+  const rows = baseRows.filter(row => row.name.toLocaleLowerCase('es').includes(normalizedQuery));
   const chartRows = rows.slice(0, 8).map(row => ({
     name: row.name.length > 22 ? `${row.name.slice(0, 20)}…` : row.name,
     Ventas: Number(row.revenue.toFixed(2)),
@@ -178,34 +250,110 @@ export default function Profitability() {
   }));
   const chartColors = ['#10b981', '#0ea5e9', '#8b5cf6', '#f59e0b', '#ec4899', '#64748b'];
 
-  return (
-    <div className="admin-container profitability-page">
+  const exportPdf = async () => {
+    const doc = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' });
+    doc.setFillColor(16, 42, 34);
+    doc.rect(0, 0, 297, 32, 'F');
+    doc.setFillColor(255, 255, 255);
+    doc.roundedRect(10, 6, 46, 21, 3, 3, 'F');
+    try {
+      const logo = new Image();
+      logo.src = '/logo.png';
+      await new Promise((resolve, reject) => {
+        logo.onload = resolve;
+        logo.onerror = reject;
+      });
+      doc.addImage(logo, 'PNG', 14, 9, 38, 15, undefined, 'FAST');
+    } catch {
+      // El informe sigue siendo válido si el navegador no puede cargar el logotipo.
+    }
+    doc.setTextColor(255, 255, 255);
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(18);
+    doc.text('INFORME DE RENTABILIDAD', 62, 16);
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(9);
+    doc.text(`${companyProfile?.commercialName || companyProfile?.fiscalName || 'GreenCode'}  |  ${selectedBounds.start} a ${selectedBounds.end}`, 62, 23);
+    doc.setTextColor(16, 42, 34);
+    doc.setFontSize(9);
+    doc.text(`Generado: ${new Date().toLocaleString('es-ES')}  |  Ventas: ${money(report.revenue)}  |  Costes trazados: ${money(report.cost)}  |  Margen trazado: ${money(report.margin)}  |  Cobertura: ${report.coverage.toFixed(1)} %`, 14, 40);
+
+    const configurations = {
+      products: {
+        title: 'Rentabilidad completa por producto',
+        head: [['Producto', 'Uds.', 'Ventas', 'Venta trazada', 'Coste', 'Margen', '%', 'Sin coste']],
+        body: rows.map(row => [row.name, row.units, money(row.revenue), money(row.tracedRevenue), money(row.cost), money(row.margin), `${row.marginPercent.toFixed(1)} %`, row.pendingUnits])
+      },
+      clients: {
+        title: 'Ventas y rentabilidad por cliente',
+        head: [['Cliente', 'Uds.', 'Ventas', 'Venta trazada', 'Coste', 'Margen', '%', 'Sin coste']],
+        body: rows.map(row => [row.name, row.units, money(row.revenue), money(row.tracedRevenue), money(row.cost), money(row.margin), `${row.marginPercent.toFixed(1)} %`, row.pendingUnits])
+      },
+      production: {
+        title: 'Costes de producción por variedad',
+        head: [['Variedad / ficha', 'Semilla', 'Sustrato', 'Bandeja', 'Coste/bandeja', 'Coste/kg']],
+        body: rows.map(row => [row.name, money(row.seedCost), money(row.substrateCost), money(row.trayCost), money(row.total), money(row.costPerKg)])
+      },
+      packaging: {
+        title: 'Costes y existencias de envases',
+        head: [['Envase', 'Último coste unitario', 'Stock actual']],
+        body: rows.map(row => [row.name, money(row.unitCost), row.stock])
+      }
+    };
+    const selected = configurations[view];
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(13);
+    doc.text(selected.title, 14, 50);
+    autoTable(doc, {
+      startY: 55,
+      head: selected.head,
+      body: selected.body,
+      theme: 'grid',
+      styles: { fontSize: 8, cellPadding: 2.6, textColor: [51, 65, 85] },
+      headStyles: { fillColor: [5, 150, 105], textColor: 255, fontStyle: 'bold' },
+      alternateRowStyles: { fillColor: [244, 250, 247] },
+      didDrawPage: data => {
+        doc.setFontSize(8);
+        doc.setTextColor(100);
+        doc.text(`GreenCode - Informe financiero`, 14, 202);
+        doc.text(`Página ${data.pageNumber}`, 280, 202, { align: 'right' });
+      }
+    });
+    doc.save(`greencode-rentabilidad-${view}-${selectedBounds.start}-${selectedBounds.end}.pdf`);
+  };
+
+  const content = (
+    <div className={`admin-container profitability-page ${modal ? 'profitability-modal' : ''}`}>
       <header className="profit-header">
         <div>
           <p className="profit-eyebrow">CONTROL ECONÓMICO</p>
           <h1>Ventas y rentabilidad</h1>
           <p>Ingresos netos sin IVA y costes directos trazados de semilla, sustrato y envases.</p>
         </div>
-        <div className="profit-filters">
-          <div className="profit-filter-mode">
-            <button className={filterMode === 'month' ? 'active' : ''} onClick={() => setFilterMode('month')}>Mes</button>
-            <button className={filterMode === 'range' ? 'active' : ''} onClick={() => setFilterMode('range')}>Tramo de fechas</button>
+        <div className="profit-header-right">
+          <div className="profit-filters">
+            <div className="profit-filter-mode">
+              <button className={filterMode === 'month' ? 'active' : ''} onClick={() => setFilterMode('month')}>Mes</button>
+              <button className={filterMode === 'range' ? 'active' : ''} onClick={() => setFilterMode('range')}>Fechas</button>
+            </div>
+            {filterMode === 'month' ? (
+              <label>Periodo<input type="month" value={selectedMonth} onChange={event => setSelectedMonth(event.target.value)} /></label>
+            ) : (
+              <>
+                <label>Desde<input type="date" value={startDate} max={endDate} onChange={event => setStartDate(event.target.value)} /></label>
+                <label>Hasta<input type="date" value={endDate} min={startDate} onChange={event => setEndDate(event.target.value)} /></label>
+              </>
+            )}
           </div>
-          {filterMode === 'month' ? (
-            <label>Seleccionar mes<input type="month" value={selectedMonth} onChange={event => setSelectedMonth(event.target.value)} /></label>
-          ) : (
-            <>
-              <label>Desde<input type="date" value={startDate} max={endDate} onChange={event => setStartDate(event.target.value)} /></label>
-              <label>Hasta<input type="date" value={endDate} min={startDate} onChange={event => setEndDate(event.target.value)} /></label>
-            </>
-          )}
+          <button className="profit-pdf-button" onClick={exportPdf}><Download size={16} /> Descargar PDF</button>
+          {modal && <button className="profit-close-button" onClick={onClose} aria-label="Cerrar análisis"><X size={20} /></button>}
         </div>
       </header>
 
       <section className="profit-stats">
         <StatCard icon={<CircleDollarSign size={22} />} label="Ventas netas" value={money(report.revenue)} detail={`${report.units} unidades entregadas`} />
         <StatCard icon={<PackageCheck size={22} />} label="Costes directos" value={money(report.cost)} detail={`${report.costedUnits} unidades con coste`} tone="blue" />
-        <StatCard icon={<BarChart3 size={22} />} label="Margen bruto" value={money(report.margin)} detail="Antes de costes indirectos" tone="purple" />
+        <StatCard icon={<BarChart3 size={22} />} label="Margen trazado" value={money(report.margin)} detail="Solo ventas con coste conocido" tone="purple" />
         <StatCard icon={<Percent size={22} />} label="Margen" value={`${report.marginPercent.toFixed(1)} %`} detail={`${report.coverage.toFixed(1)} % con coste trazado`} tone="amber" />
       </section>
 
@@ -214,7 +362,7 @@ export default function Profitability() {
           <TriangleAlert size={20} />
           <div>
             <strong>{report.pendingUnits} unidades vendidas todavía no tienen coste trazable.</strong>
-            <span>Son ventas anteriores al nuevo registro económico de cosechas. Se incluyen en ingresos, pero su margen es provisional.</span>
+            <span>Se incluyen en ventas, pero quedan fuera del margen hasta conocer su coste real.</span>
           </div>
         </div>
       )}
@@ -229,15 +377,18 @@ export default function Profitability() {
             <div className="profit-tabs">
               <button className={view === 'products' ? 'active' : ''} onClick={() => setView('products')}>Por producto</button>
               <button className={view === 'clients' ? 'active' : ''} onClick={() => setView('clients')}>Por cliente</button>
+              <button className={view === 'production' ? 'active' : ''} onClick={() => { setView('production'); setDisplayMode('detail'); }}>Coste variedades</button>
+              <button className={view === 'packaging' ? 'active' : ''} onClick={() => { setView('packaging'); setDisplayMode('detail'); }}>Envases</button>
             </div>
-            <div className="profit-tabs">
+            {(view === 'products' || view === 'clients') && <div className="profit-tabs">
               <button className={displayMode === 'visual' ? 'active' : ''} onClick={() => setDisplayMode('visual')}><BarChart3 size={15} /> Gráficas</button>
               <button className={displayMode === 'detail' ? 'active' : ''} onClick={() => setDisplayMode('detail')}><LayoutList size={15} /> Detalle</button>
-            </div>
+            </div>}
+            <input className="profit-search" value={query} onChange={event => setQuery(event.target.value)} placeholder="Buscar…" />
           </div>
         </div>
 
-        {displayMode === 'visual' ? (
+        {displayMode === 'visual' && (view === 'products' || view === 'clients') ? (
           <div className="profit-charts">
             <article className="profit-chart-main">
               <div><h3>Ventas frente a costes</h3><p>Principales {view === 'products' ? 'productos' : 'clientes'} del periodo</p></div>
@@ -277,18 +428,20 @@ export default function Profitability() {
         ) : <div className="table-container">
           <table>
             <thead>
-              <tr>
+              {(view === 'products' || view === 'clients') && <tr>
                 <th>{view === 'products' ? 'Producto' : 'Cliente'}</th>
                 <th>Unidades</th>
                 <th>Ventas</th>
                 <th>Coste directo</th>
-                <th>Margen provisional</th>
+                <th>Margen trazado</th>
                 <th>Margen</th>
                 <th>Cobertura</th>
-              </tr>
+              </tr>}
+              {view === 'production' && <tr><th>Variedad / ficha</th><th>Semilla</th><th>Sustrato</th><th>Bandeja</th><th>Coste/bandeja</th><th>Coste/kg</th></tr>}
+              {view === 'packaging' && <tr><th>Envase</th><th>Último coste unitario</th><th>Stock actual</th></tr>}
             </thead>
             <tbody>
-              {rows.map(row => (
+              {(view === 'products' || view === 'clients') && rows.map(row => (
                 <tr key={row.id}>
                   <td><strong>{row.name}</strong></td>
                   <td>{row.units}</td>
@@ -303,8 +456,14 @@ export default function Profitability() {
                   </td>
                 </tr>
               ))}
+              {view === 'production' && rows.map(row => (
+                <tr key={row.id}><td><strong>{row.name}</strong></td><td>{money(row.seedCost)}</td><td>{money(row.substrateCost)}</td><td>{money(row.trayCost)}</td><td><strong>{money(row.total)}</strong></td><td>{money(row.costPerKg)}</td></tr>
+              ))}
+              {view === 'packaging' && rows.map(row => (
+                <tr key={row.id}><td><strong>{row.name}</strong></td><td>{money(row.unitCost)}</td><td>{row.stock}</td></tr>
+              ))}
               {!rows.length && (
-                <tr><td colSpan="7" className="profit-empty">No hay ventas entregadas en este periodo.</td></tr>
+                <tr><td colSpan="8" className="profit-empty">No hay datos para esta consulta.</td></tr>
               )}
             </tbody>
           </table>
@@ -312,4 +471,7 @@ export default function Profitability() {
       </section>
     </div>
   );
+  return modal
+    ? <div className="profit-modal-backdrop" role="presentation" onMouseDown={event => { if (event.target === event.currentTarget) onClose?.(); }}>{content}</div>
+    : content;
 }

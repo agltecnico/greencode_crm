@@ -9,6 +9,7 @@ import {
   ResponsiveContainer, Tooltip, XAxis, YAxis
 } from 'recharts';
 import { useData } from '../context/DataContext';
+import Profitability from './Profitability';
 
 const money = value => new Intl.NumberFormat('es-ES', {
   style: 'currency',
@@ -67,6 +68,7 @@ export default function Dashboard() {
   const [rangeStart, setRangeStart] = useState(localDate(new Date(today.getFullYear(), today.getMonth(), 1)));
   const [rangeEnd, setRangeEnd] = useState(localDate(today));
   const [detailsOpen, setDetailsOpen] = useState(false);
+  const [financialOpen, setFinancialOpen] = useState(false);
   const [reportView, setReportView] = useState('products');
   const [reportQuery, setReportQuery] = useState('');
   const [companyForm, setCompanyForm] = useState(companyProfile || {});
@@ -260,7 +262,6 @@ export default function Dashboard() {
     { label: 'Nuevo pedido', detail: 'Registrar una venta', icon: <ShoppingBag />, path: '/admin/orders' },
     { label: 'Clientes', detail: `${clients.length} fichas`, icon: <Users />, path: '/admin/clients' },
     { label: 'Productos', detail: `${products.length} productos`, icon: <Package />, path: '/admin/products' },
-    { label: 'Rentabilidad', detail: 'Informes económicos', icon: <TrendingUp />, path: '/admin/profitability' },
     { label: 'Trazabilidad', detail: 'Lotes y cadena sanitaria', icon: <ShieldCheck />, path: '/crops?tab=trazabilidad' }
   ];
   const normalizedReportQuery = reportQuery.trim().toLocaleLowerCase('es');
@@ -282,7 +283,7 @@ export default function Dashboard() {
         </div>
         <div className="admin-header-actions">
           <button className="admin-secondary-action" onClick={() => setDetailsOpen(true)}>Ver informe completo</button>
-          <button className="admin-primary-action" onClick={() => navigate('/admin/profitability')}>Ver rentabilidad <ArrowRight size={17} /></button>
+          <button className="admin-primary-action" onClick={() => setFinancialOpen(true)}>Ver rentabilidad <ArrowRight size={17} /></button>
         </div>
       </header>
 
@@ -436,7 +437,7 @@ export default function Dashboard() {
                 <button className={reportView === 'clients' ? 'active' : ''} onClick={() => setReportView('clients')}>Clientes</button>
               </div>
               <input value={reportQuery} onChange={event => setReportQuery(event.target.value)} placeholder={`Buscar ${reportView === 'products' ? 'producto' : 'cliente'}…`} />
-              <button className="admin-report-profitability" onClick={() => navigate('/admin/profitability')}>Rentabilidad avanzada <ArrowRight size={15} /></button>
+              <button className="admin-report-profitability" onClick={() => { setDetailsOpen(false); setFinancialOpen(true); }}>Rentabilidad avanzada <ArrowRight size={15} /></button>
             </div>
             <div className="admin-report-content">
               {reportView === 'products' ? (
@@ -478,6 +479,7 @@ export default function Dashboard() {
           </section>
         </div>
       )}
+      {financialOpen && <Profitability modal onClose={() => setFinancialOpen(false)} />}
     </div>
   );
 }

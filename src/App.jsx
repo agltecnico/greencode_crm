@@ -14,7 +14,6 @@ import DriverView from './pages/DriverView';
 import PublicTicket from './pages/PublicTicket';
 import Login from './pages/Login';
 import UserAccess from './pages/UserAccess';
-import Profitability from './pages/Profitability';
 import ProtectedRoute from './components/ProtectedRoute';
 import { DataProvider } from './context/DataContext';
 import { AdminModeProvider } from './context/AdminModeContext';
@@ -46,7 +45,6 @@ function App() {
         <Route path="orders" element={<Orders />} />
         <Route path="delivery-notes" element={<DeliveryNotes />} />
         <Route path="invoices" element={<Invoices />} />
-        <Route path="profitability" element={<Profitability />} />
         <Route path="users" element={<PermissionGate permission="users"><UserAccess /></PermissionGate>} />
                       </Route>
       <Route path="/crops" element={<PermissionGate permission={['stock', 'tasks', 'crops', 'harvest', 'planner', 'traceability']}><Crops /></PermissionGate>} />
