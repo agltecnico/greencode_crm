@@ -2,6 +2,8 @@ import { createClient } from 'npm:@supabase/supabase-js@2.110.7';
 
 const APP_URL = 'https://pedidos.mygreencode.es';
 const INVITE_REDIRECT_URL = `${APP_URL}/login?mode=invite`;
+const RECOVERY_REDIRECT_URL = `${APP_URL}/login`;
+const FIRST_ADMIN_EMAIL = 'administracion@mygreencode.es';
 const cors = {
   'Access-Control-Allow-Origin': APP_URL,
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type'
@@ -35,6 +37,68 @@ Deno.serve(async req => {
     }
 
     const body = await req.json();
+    const action = String(body.action || 'invite');
+
+    if (action !== 'invite') {
+      const targetId = String(body.targetId || '');
+      if (!targetId) throw new Error('Usuario obligatorio');
+      if (targetId === user.id) throw new Error('No puedes modificar tu propio acceso.');
+
+      const { data: target, error: targetError } = await adminClient
+        .from('user_profiles')
+        .select('id,email,role,active')
+        .eq('id', targetId)
+        .single();
+      if (targetError || !target) throw new Error('Usuario no encontrado');
+      if (target.role === 'superadmin' || target.email === FIRST_ADMIN_EMAIL) {
+        throw new Error('El superadministrador principal está protegido.');
+      }
+
+      if (action === 'resend-access') {
+        const { data: authData, error: authError } = await adminClient.auth.admin.getUserById(targetId);
+        if (authError || !authData.user) throw authError || new Error('Usuario de acceso no encontrado');
+        if (!authData.user.email_confirmed_at) {
+          const { error: confirmError } = await adminClient.auth.admin.updateUserById(targetId, { email_confirm: true });
+          if (confirmError) throw confirmError;
+        }
+        const publicClient = createClient(url, anon);
+        const { error: recoveryError } = await publicClient.auth.resetPasswordForEmail(target.email, {
+          redirectTo: RECOVERY_REDIRECT_URL
+        });
+        if (recoveryError) throw recoveryError;
+        return new Response(JSON.stringify({ ok: true }), {
+          headers: { ...cors, 'Content-Type': 'application/json' }
+        });
+      }
+
+      if (action === 'set-active') {
+        const active = body.active === true;
+        const { error: authError } = await adminClient.auth.admin.updateUserById(targetId, {
+          ban_duration: active ? 'none' : '876000h'
+        });
+        if (authError) throw authError;
+        const { error: profileError } = await adminClient
+          .from('user_profiles')
+          .update({ active, updated_at: new Date().toISOString() })
+          .eq('id', targetId);
+        if (profileError) throw profileError;
+        return new Response(JSON.stringify({ ok: true, active }), {
+          headers: { ...cors, 'Content-Type': 'application/json' }
+        });
+      }
+
+      if (action === 'delete-user') {
+        const { error: authError } = await adminClient.auth.admin.deleteUser(targetId);
+        if (authError) throw authError;
+        await adminClient.from('user_profiles').delete().eq('id', targetId);
+        return new Response(JSON.stringify({ ok: true }), {
+          headers: { ...cors, 'Content-Type': 'application/json' }
+        });
+      }
+
+      throw new Error('Acción no válida');
+    }
+
     const email = String(body.email || '').trim().toLowerCase();
     if (!email) throw new Error('Correo obligatorio');
 
