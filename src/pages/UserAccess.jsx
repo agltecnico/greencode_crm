@@ -11,11 +11,20 @@ const MODULES = [
 ];
 const blankPermissions = Object.fromEntries(MODULES.map(([key]) => [key, false]));
 
+const PermissionChecks = ({ permissions, onChange, disabled = false }) => (
+  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(150px,1fr))', gap: '.55rem' }}>
+    {MODULES.map(([key, label]) => <label key={key} style={{ display: 'flex', gap: '.45rem', alignItems: 'center', fontSize: '.82rem', fontWeight: 700 }}>
+      <input type="checkbox" disabled={disabled} checked={permissions?.[key] === true} onChange={e => onChange(key, e.target.checked)} /> {label}
+    </label>)}
+  </div>
+);
+
 export default function UserAccess() {
   const { profile } = useAuth();
   const [users, setUsers] = useState([]);
   const [form, setForm] = useState({ email: '', displayName: '', role: 'user', permissions: { ...blankPermissions } });
   const [busy, setBusy] = useState(false);
+  const [actionBusy, setActionBusy] = useState('');
 
   const load = async () => {
     const { data, error } = await supabase.from('user_profiles').select('*').order('created_at');
@@ -40,22 +49,68 @@ export default function UserAccess() {
       display_name: user.display_name,
       role: user.role,
       permissions: user.permissions,
-      active: user.active,
       updated_at: new Date().toISOString()
     }).eq('id', user.id);
     Swal.fire(error ? 'Error' : 'Permisos guardados', error?.message || 'Los cambios ya están activos.', error ? 'error' : 'success');
     if (!error) load();
   };
 
-  if (profile?.role !== 'superadmin') return <div className="premium-card">No tienes permiso para gestionar usuarios.</div>;
+  const runUserAction = async (user, action) => {
+    if (action === 'resend-access') {
+      const confirmation = await Swal.fire({
+        title: '¿Reenviar acceso?',
+        text: `Se enviará un nuevo enlace a ${user.email}.`,
+        icon: 'question',
+        showCancelButton: true,
+        confirmButtonText: 'Sí, enviar',
+        cancelButtonText: 'Cancelar',
+        confirmButtonColor: '#2563eb'
+      });
+      if (!confirmation.isConfirmed) return;
+    }
 
-  const PermissionChecks = ({ permissions, onChange, disabled = false }) => (
-    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(150px,1fr))', gap: '.55rem' }}>
-      {MODULES.map(([key, label]) => <label key={key} style={{ display: 'flex', gap: '.45rem', alignItems: 'center', fontSize: '.82rem', fontWeight: 700 }}>
-        <input type="checkbox" disabled={disabled} checked={permissions?.[key] === true} onChange={e => onChange(key, e.target.checked)} /> {label}
-      </label>)}
-    </div>
-  );
+    if (action === 'delete-user') {
+      const confirmation = await Swal.fire({
+        title: 'Eliminar acceso definitivamente',
+        html: `Se eliminará el acceso de <strong>${user.email}</strong>.<br>Escribe el correo completo para confirmar.`,
+        input: 'text',
+        inputPlaceholder: user.email,
+        icon: 'warning',
+        showCancelButton: true,
+        confirmButtonText: 'Eliminar usuario',
+        cancelButtonText: 'Cancelar',
+        confirmButtonColor: '#dc2626',
+        preConfirm: value => {
+          if (String(value || '').trim().toLowerCase() !== user.email.toLowerCase()) {
+            Swal.showValidationMessage('El correo no coincide.');
+            return false;
+          }
+          return true;
+        }
+      });
+      if (!confirmation.isConfirmed) return;
+    }
+
+    const nextActive = action === 'set-active' ? !user.active : undefined;
+    setActionBusy(`${action}-${user.id}`);
+    const { data, error } = await supabase.functions.invoke('manage-app-user', {
+      body: { action, targetId: user.id, active: nextActive }
+    });
+    setActionBusy('');
+    if (error || data?.error) {
+      return Swal.fire('No se pudo completar', data?.error || error.message, 'error');
+    }
+
+    const messages = {
+      'resend-access': ['Enlace enviado', `Se ha enviado un nuevo acceso a ${user.email}.`],
+      'set-active': [nextActive ? 'Usuario activado' : 'Usuario desactivado', nextActive ? 'Ya puede volver a iniciar sesión.' : 'Su acceso ha quedado bloqueado.'],
+      'delete-user': ['Usuario eliminado', 'Su acceso y perfil de usuario han sido eliminados.']
+    };
+    await Swal.fire(messages[action][0], messages[action][1], 'success');
+    load();
+  };
+
+  if (profile?.role !== 'superadmin') return <div className="premium-card">No tienes permiso para gestionar usuarios.</div>;
 
   return <div>
     <h2>Usuarios y permisos</h2>
@@ -72,14 +127,36 @@ export default function UserAccess() {
     <div style={{ display: 'grid', gap: '1rem' }}>
       {users.map((user, index) => <div className="premium-card" key={user.id}>
         <div style={{ display: 'flex', justifyContent: 'space-between', gap: '1rem', marginBottom: '.8rem', flexWrap: 'wrap' }}>
-          <div><strong>{user.display_name || user.email}</strong><div style={{ color: '#64748b', fontSize: '.8rem' }}>{user.email}</div></div>
-          <div style={{ display: 'flex', gap: '.5rem' }}>
-            <select className="premium-input" disabled={user.role === 'superadmin'} value={user.role} onChange={e => setUsers(prev => prev.map((item, i) => i === index ? { ...item, role: e.target.value } : item))}><option value="user">Usuario</option><option value="admin">Administrador</option><option value="superadmin">Superadministrador</option></select>
-            <label><input type="checkbox" disabled={user.role === 'superadmin'} checked={user.active} onChange={e => setUsers(prev => prev.map((item, i) => i === index ? { ...item, active: e.target.checked } : item))} /> Activo</label>
+          <div>
+            <strong>{user.display_name || user.email}</strong>
+            <div style={{ color: '#64748b', fontSize: '.8rem' }}>{user.email}</div>
+            <span style={{ display: 'inline-block', marginTop: '.35rem', padding: '.18rem .5rem', borderRadius: '999px', fontSize: '.7rem', fontWeight: 800, background: user.active ? '#dcfce7' : '#fee2e2', color: user.active ? '#166534' : '#991b1b' }}>
+              {user.active ? 'ACTIVO' : 'INACTIVO'}
+            </span>
+          </div>
+          <div style={{ display: 'flex', gap: '.5rem', alignItems: 'center' }}>
+            <select className="premium-input" disabled={user.role === 'superadmin'} value={user.role} onChange={e => setUsers(prev => prev.map((item, i) => i === index ? { ...item, role: e.target.value } : item))}>
+              <option value="user">Usuario</option>
+              <option value="admin">Administrador</option>
+              {user.role === 'superadmin' && <option value="superadmin">Superadministrador</option>}
+            </select>
           </div>
         </div>
         <PermissionChecks disabled={user.role === 'superadmin'} permissions={user.role === 'superadmin' ? Object.fromEntries(MODULES.map(([key]) => [key, true])) : user.permissions} onChange={(key, checked) => setUsers(prev => prev.map((item, i) => i === index ? { ...item, permissions: { ...item.permissions, [key]: checked } } : item))} />
-        <button className="btn btn-success" style={{ marginTop: '1rem' }} onClick={() => save(user)}>Guardar permisos</button>
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '.6rem', marginTop: '1rem' }}>
+          <button className="btn btn-success" onClick={() => save(user)}>Guardar permisos</button>
+          {user.role !== 'superadmin' && <>
+            <button className="btn btn-secondary" disabled={Boolean(actionBusy)} onClick={() => runUserAction(user, 'resend-access')}>
+              {actionBusy === `resend-access-${user.id}` ? 'Enviando…' : 'Reenviar acceso'}
+            </button>
+            <button className={user.active ? 'btn btn-danger' : 'btn btn-primary'} disabled={Boolean(actionBusy)} onClick={() => runUserAction(user, 'set-active')}>
+              {actionBusy === `set-active-${user.id}` ? 'Procesando…' : user.active ? 'Desactivar' : 'Activar'}
+            </button>
+            <button className="btn btn-danger" disabled={Boolean(actionBusy)} onClick={() => runUserAction(user, 'delete-user')}>
+              {actionBusy === `delete-user-${user.id}` ? 'Eliminando…' : 'Eliminar usuario'}
+            </button>
+          </>}
+        </div>
       </div>)}
     </div>
   </div>;
