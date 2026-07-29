@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Outlet, NavLink } from 'react-router-dom';
-import { LayoutDashboard, Users, Truck, FileBox, ShoppingBag, FileText, Receipt, Menu, X, UserCog, LogOut } from 'lucide-react';
+import { LayoutDashboard, Users, Truck, FileBox, ShoppingBag, FileText, Receipt, Menu, X, UserCog, LogOut, TrendingUp } from 'lucide-react';
 import AdminModeButton from './AdminModeButton';
 import { useAuth } from '../context/AuthContext';
 
@@ -48,6 +48,10 @@ export default function Layout() {
           </NavLink>
           <NavLink onClick={() => setSidebarOpen(false)} to="/admin/invoices" className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}>
             <Receipt /> Facturación
+          </NavLink>
+
+          <NavLink onClick={() => setSidebarOpen(false)} to="/admin/profitability" className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}>
+            <TrendingUp /> Rentabilidad
           </NavLink>
 
           <div className="sidebar-group-title" style={{ marginTop: '0.75rem', marginBottom: '0.25rem', fontSize: '0.75rem', fontWeight: 'bold', color: '#94a3b8', letterSpacing: '0.05em', paddingLeft: '1rem' }}>OPERACIONES</div>
