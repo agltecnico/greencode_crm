@@ -1,5 +1,9 @@
 import { useMemo, useState } from 'react';
-import { BarChart3, CircleDollarSign, PackageCheck, Percent, TriangleAlert } from 'lucide-react';
+import { BarChart3, CircleDollarSign, LayoutList, PackageCheck, Percent, TriangleAlert } from 'lucide-react';
+import {
+  Bar, BarChart, CartesianGrid, Cell, Pie, PieChart,
+  ResponsiveContainer, Tooltip, XAxis, YAxis
+} from 'recharts';
 import { useData } from '../context/DataContext';
 
 const money = value => new Intl.NumberFormat('es-ES', {
@@ -46,6 +50,7 @@ export default function Profitability() {
   const [startDate, setStartDate] = useState(initialBounds.start);
   const [endDate, setEndDate] = useState(initialBounds.end);
   const [view, setView] = useState('products');
+  const [displayMode, setDisplayMode] = useState('visual');
   const selectedBounds = filterMode === 'month'
     ? boundsForMonth(selectedMonth)
     : { start: startDate, end: endDate };
@@ -94,7 +99,7 @@ export default function Profitability() {
         const groupedItems = new Map();
         (order.items || []).forEach(item => {
           if (!item.productId || Number(item.quantity || 0) <= 0) return;
-          const current = groupedItems.get(item.productId) || { quantity: 0, revenue: 0 };
+          const current = groupedItems.get(item.productId) || { quantity: 0, revenue: 0, name: item.name };
           const itemRevenue = Number(item.price || 0)
             * Number(item.quantity || 0)
             * (1 - Number(item.discount || 0) / 100);
@@ -108,7 +113,7 @@ export default function Profitability() {
             || { quantity: 0, cost: 0, costedQuantity: 0 };
           const product = productById.get(productId);
           const client = clientById.get(order.clientId);
-          const productName = product?.name || 'Producto sin ficha';
+          const productName = product?.name || item.name || 'Producto histórico sin ficha';
           const clientName = client?.commercialName || client?.name
             || order.clientCommercialName || order.clientName || 'Cliente sin identificar';
 
@@ -162,6 +167,16 @@ export default function Profitability() {
   }, [clients, deliveryNotes, harvests, orders, productMovements, products, selectedBounds.end, selectedBounds.start]);
 
   const rows = view === 'products' ? report.productRows : report.clientRows;
+  const chartRows = rows.slice(0, 8).map(row => ({
+    name: row.name.length > 22 ? `${row.name.slice(0, 20)}…` : row.name,
+    Ventas: Number(row.revenue.toFixed(2)),
+    Costes: Number(row.cost.toFixed(2))
+  }));
+  const distributionRows = report.productRows.slice(0, 6).map(row => ({
+    name: row.name,
+    value: Number(row.revenue.toFixed(2))
+  }));
+  const chartColors = ['#10b981', '#0ea5e9', '#8b5cf6', '#f59e0b', '#ec4899', '#64748b'];
 
   return (
     <div className="admin-container profitability-page">
@@ -210,13 +225,56 @@ export default function Profitability() {
             <h2>Desglose de resultados</h2>
             <p>Solo se contabilizan pedidos entregados dentro del periodo.</p>
           </div>
-          <div className="profit-tabs">
-            <button className={view === 'products' ? 'active' : ''} onClick={() => setView('products')}>Por producto</button>
-            <button className={view === 'clients' ? 'active' : ''} onClick={() => setView('clients')}>Por cliente</button>
+          <div className="profit-heading-actions">
+            <div className="profit-tabs">
+              <button className={view === 'products' ? 'active' : ''} onClick={() => setView('products')}>Por producto</button>
+              <button className={view === 'clients' ? 'active' : ''} onClick={() => setView('clients')}>Por cliente</button>
+            </div>
+            <div className="profit-tabs">
+              <button className={displayMode === 'visual' ? 'active' : ''} onClick={() => setDisplayMode('visual')}><BarChart3 size={15} /> Gráficas</button>
+              <button className={displayMode === 'detail' ? 'active' : ''} onClick={() => setDisplayMode('detail')}><LayoutList size={15} /> Detalle</button>
+            </div>
           </div>
         </div>
 
-        <div className="table-container">
+        {displayMode === 'visual' ? (
+          <div className="profit-charts">
+            <article className="profit-chart-main">
+              <div><h3>Ventas frente a costes</h3><p>Principales {view === 'products' ? 'productos' : 'clientes'} del periodo</p></div>
+              <div className="profit-chart-canvas">
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart data={chartRows} margin={{ top: 12, right: 12, left: 0, bottom: 8 }}>
+                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
+                    <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fill: '#64748b', fontSize: 11 }} />
+                    <YAxis axisLine={false} tickLine={false} tick={{ fill: '#94a3b8', fontSize: 11 }} tickFormatter={value => `${value} €`} />
+                    <Tooltip formatter={value => money(value)} contentStyle={{ border: 0, borderRadius: 12, boxShadow: '0 12px 35px rgba(15,23,42,.12)' }} />
+                    <Bar dataKey="Ventas" fill="#10b981" radius={[6, 6, 0, 0]} maxBarSize={34} />
+                    <Bar dataKey="Costes" fill="#cbd5e1" radius={[6, 6, 0, 0]} maxBarSize={34} />
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
+            </article>
+            <article className="profit-chart-side">
+              <div><h3>Distribución de ventas</h3><p>Peso de los productos principales</p></div>
+              <div className="profit-donut">
+                <ResponsiveContainer width="100%" height="100%">
+                  <PieChart>
+                    <Pie data={distributionRows} dataKey="value" nameKey="name" innerRadius={58} outerRadius={88} paddingAngle={3}>
+                      {distributionRows.map((row, index) => <Cell key={row.name} fill={chartColors[index % chartColors.length]} />)}
+                    </Pie>
+                    <Tooltip formatter={value => money(value)} />
+                  </PieChart>
+                </ResponsiveContainer>
+                <div><strong>{money(report.revenue)}</strong><span>Total</span></div>
+              </div>
+              <div className="profit-legend">
+                {distributionRows.map((row, index) => (
+                  <span key={row.name}><i style={{ background: chartColors[index % chartColors.length] }} />{row.name}</span>
+                ))}
+              </div>
+            </article>
+          </div>
+        ) : <div className="table-container">
           <table>
             <thead>
               <tr>
@@ -250,7 +308,7 @@ export default function Profitability() {
               )}
             </tbody>
           </table>
-        </div>
+        </div>}
       </section>
     </div>
   );
