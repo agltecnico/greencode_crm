@@ -3,12 +3,19 @@ import { supabase } from '../config/supabase';
 
 const AuthContext = createContext(null);
 const FIRST_ADMIN_EMAIL = 'administracion@mygreencode.es';
+const isPasswordSetupCallback = () => {
+  const params = new URLSearchParams(window.location.search);
+  const hashParams = new URLSearchParams(window.location.hash.replace(/^#/, ''));
+  return params.get('mode') === 'invite'
+    || hashParams.get('type') === 'invite'
+    || hashParams.get('type') === 'recovery';
+};
 
 export function AuthProvider({ children }) {
   const [session, setSession] = useState(null);
   const [profile, setProfile] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [recoveryMode, setRecoveryMode] = useState(false);
+  const [recoveryMode, setRecoveryMode] = useState(isPasswordSetupCallback);
 
   const loadProfile = async user => {
     if (!user) {
@@ -30,7 +37,9 @@ export function AuthProvider({ children }) {
       }
     });
     const { data: listener } = supabase.auth.onAuthStateChange((event, nextSession) => {
-      if (event === 'PASSWORD_RECOVERY') setRecoveryMode(true);
+      if (event === 'PASSWORD_RECOVERY' || (event === 'SIGNED_IN' && isPasswordSetupCallback())) {
+        setRecoveryMode(true);
+      }
       setSession(nextSession);
       setLoading(true);
       setTimeout(() => loadProfile(nextSession?.user).finally(() => setLoading(false)), 0);
@@ -56,7 +65,10 @@ export function AuthProvider({ children }) {
     }),
     updatePassword: async password => {
       const result = await supabase.auth.updateUser({ password });
-      if (!result.error) setRecoveryMode(false);
+      if (!result.error) {
+        window.history.replaceState({}, document.title, '/login');
+        setRecoveryMode(false);
+      }
       return result;
     },
     signOut: () => supabase.auth.signOut(),
