@@ -190,18 +190,24 @@ export default function Dashboard() {
       clientTotals.set(clientKey, clientCurrent);
     });
 
-    const finishEconomicRow = row => ({
-      ...row,
-      margin: row.total - row.cost,
-      marginPercent: row.total > 0 ? ((row.total - row.cost) / row.total) * 100 : 0,
-      pendingCostUnits: Math.max(row.units - row.costedUnits, 0)
-    });
+    const finishEconomicRow = row => {
+      const tracedRevenue = row.units > 0 ? row.total * (row.costedUnits / row.units) : 0;
+      return {
+        ...row,
+        tracedRevenue,
+        margin: tracedRevenue - row.cost,
+        marginPercent: tracedRevenue > 0 ? ((tracedRevenue - row.cost) / tracedRevenue) * 100 : 0,
+        pendingCostUnits: Math.max(row.units - row.costedUnits, 0)
+      };
+    };
     const productSales = [...productTotals.values()].map(finishEconomicRow).sort((a, b) => b.total - a.total);
     const allClients = [...clientTotals.values()].map(finishEconomicRow).sort((a, b) => b.total - a.total);
     const tracedProducts = productSales.filter(item => item.costedUnits > 0);
     const mostProfitable = tracedProducts.slice().sort((a, b) => b.margin - a.margin)[0] || null;
     const totalCost = productSales.reduce((sum, item) => sum + item.cost, 0);
     const costedUnits = productSales.reduce((sum, item) => sum + item.costedUnits, 0);
+    const tracedRevenue = productSales.reduce((sum, item) => sum + item.tracedRevenue, 0);
+    const tracedMargin = productSales.reduce((sum, item) => sum + item.margin, 0);
 
     const lowStock = (articles || [])
       .map(article => ({
@@ -217,8 +223,8 @@ export default function Dashboard() {
       periodLabel: `${new Intl.DateTimeFormat('es-ES').format(new Date(`${selectedBounds.start}T12:00:00`))} – ${new Intl.DateTimeFormat('es-ES').format(new Date(`${selectedBounds.end}T12:00:00`))}`,
       monthSales,
       totalCost,
-      margin: monthSales - totalCost,
-      marginPercent: monthSales > 0 ? ((monthSales - totalCost) / monthSales) * 100 : 0,
+      margin: tracedMargin,
+      marginPercent: tracedRevenue > 0 ? (tracedMargin / tracedRevenue) * 100 : 0,
       costedUnits,
       mostProfitable,
       orderCount: periodOrders.length,
@@ -271,9 +277,8 @@ export default function Dashboard() {
     <div className="admin-dashboard">
       <header className="admin-welcome">
         <div>
-          <span className="admin-overline">RESUMEN DE NEGOCIO</span>
-          <h1>Buenos días, {companyProfile?.commercialName || companyProfile?.fiscalName || 'GreenCode'}</h1>
-          <p>Una vista clara del periodo {data.periodLabel}.</p>
+          <h1>Dashboard <span>{companyProfile?.commercialName || companyProfile?.fiscalName || 'GreenCode'}</span></h1>
+          <p>{data.periodLabel}</p>
         </div>
         <div className="admin-header-actions">
           <button className="admin-secondary-action" onClick={() => setDetailsOpen(true)}>Ver informe completo</button>

@@ -843,3 +843,34 @@ body {
 .admin-profit-highlight{background:linear-gradient(145deg,#fff 50%,#f5f3ff)}
 @media(max-width:1050px){.admin-insights-grid{grid-template-columns:1fr}.admin-insight-chart,.admin-donut-layout{height:210px}}
 @media(max-width:640px){.admin-insights-grid{grid-template-columns:1fr}.admin-donut-layout{grid-template-columns:145px minmax(0,1fr);height:200px;padding-inline:.35rem}.admin-insight-chart{height:200px}}
+
+@media(min-width:1051px){
+  .app-container .page-container{padding:.75rem 1.7rem 1.5rem}
+  .admin-dashboard{gap:.55rem}
+  .admin-welcome{min-height:42px;align-items:center}
+  .admin-welcome h1{margin:0;font-size:1.2rem;line-height:1.15}
+  .admin-welcome h1 span{color:#059669}
+  .admin-welcome p{margin:.12rem 0 0;font-size:.68rem}
+  .admin-header-actions button{min-height:38px;padding:.5rem .72rem;font-size:.76rem}
+  .admin-period-filter{min-height:44px;padding:.32rem .5rem}
+  .admin-period-tabs button{padding:.34rem .58rem;font-size:.69rem}
+  .admin-period-filter>input,.admin-period-filter>select,.admin-date-range input{padding:.32rem .48rem;font-size:.72rem}
+  .admin-alert{min-height:48px;padding:.42rem .75rem}
+  .admin-alert strong{font-size:.79rem}
+  .admin-alert span{font-size:.66rem}
+  .admin-metric{min-height:62px;padding:.48rem .62rem}
+  .admin-metric-icon{width:2rem;height:2rem}
+  .admin-metric-icon svg{width:17px}
+  .admin-metric span,.admin-metric small{font-size:.62rem}
+  .admin-metric strong{font-size:.95rem}
+  .admin-insights-grid{grid-template-rows:repeat(2,210px)}
+  .admin-insights-grid>.admin-panel{height:210px}
+  .admin-insights-grid .admin-panel-title{min-height:44px;padding:.55rem .75rem 0}
+  .admin-insights-grid .admin-panel-title h2{font-size:.78rem}
+  .admin-insights-grid .admin-panel-title p{margin-top:.08rem;font-size:.6rem}
+  .admin-insight-chart{height:160px;padding:.1rem .55rem .5rem}
+  .admin-donut-layout{height:160px;padding:0 .7rem .45rem}
+  .admin-donut-chart{height:156px}
+  .admin-donut-legend{gap:.28rem}
+  .admin-donut-legend span,.admin-donut-legend strong{font-size:.62rem}
+}
