@@ -1,4 +1,4 @@
-import React from 'react';
+import { useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import StockAlerts from '../components/StockAlerts';
 import { useAuth } from '../context/AuthContext';
@@ -6,6 +6,15 @@ import { useAuth } from '../context/AuthContext';
 export default function Hub() {
   const navigate = useNavigate();
   const { profile, hasPermission, signOut } = useAuth();
+
+  useEffect(() => {
+    const mobileEntry = window.matchMedia('(max-width: 768px)').matches;
+    const entryKey = `greencode-mobile-default-${profile?.id || profile?.email || 'user'}`;
+    if (mobileEntry && hasPermission('delivery') && !sessionStorage.getItem(entryKey)) {
+      sessionStorage.setItem(entryKey, 'delivery');
+      navigate('/repartidor', { replace: true });
+    }
+  }, [hasPermission, navigate, profile?.email, profile?.id]);
 
   return (
     <div className="hub-container">

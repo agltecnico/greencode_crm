@@ -52,7 +52,7 @@ export default function StockAlerts() {
   if (alerts.length === 0) return null;
 
   return (
-    <div style={{ background: '#fef2f2', border: '1px solid #fecaca', borderRadius: '12px', padding: '1.5rem', marginBottom: '2rem', display: 'flex', flexDirection: 'column', gap: '1rem', animation: 'fadeIn 0.5s ease' }}>
+    <div className="stock-alerts-panel" style={{ background: '#fef2f2', border: '1px solid #fecaca', borderRadius: '12px', padding: '1.5rem', marginBottom: '2rem', display: 'flex', flexDirection: 'column', gap: '1rem', animation: 'fadeIn 0.5s ease' }}>
       <h3 style={{ margin: 0, color: '#991b1b', display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '1.25rem' }}>
         <span>⚠️</span> Alertas de Inventario
       </h3>

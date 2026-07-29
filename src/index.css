@@ -809,3 +809,4 @@ body {
 @media(max-width:1050px){.admin-metrics,.admin-shortcuts{grid-template-columns:repeat(2,minmax(0,1fr))}.admin-dashboard-grid{grid-template-columns:1fr}.admin-company-form{grid-template-columns:repeat(2,minmax(0,1fr))}}
 @media(max-width:640px){.admin-welcome{align-items:stretch;flex-direction:column}.admin-primary-action{justify-content:center}.admin-metrics,.admin-shortcuts,.admin-company-form{grid-template-columns:1fr}.admin-company-actions{grid-column:auto}.app-container .page-container{padding:1rem}.admin-sales-chart{height:220px}}
 .admin-company-bank{grid-column:1/-1}.admin-company-bank input{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;letter-spacing:.04em}.admin-company-iban{margin-top:.2rem;color:#047857!important;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-weight:700}
+@media(max-width:768px){.stock-alerts-panel,.admin-alert{display:none!important}}
