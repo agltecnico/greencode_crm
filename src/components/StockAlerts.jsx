@@ -30,10 +30,6 @@ export default function StockAlerts() {
           totalConsumed += (Number(ct.substrateLiters) * Number(crop.traysCount || 1)); // Substrate stock assumed in Liters
         }
       });
-    } else if (article.type === 'ENVASE') {
-      const relatedCropTypes = cropTypes?.filter(ct => ct.containerId === article.id) || [];
-      // Containers are used upon harvest. Let's count them if crop is harvested?
-      // For now we skip auto-consume of containers to avoid complexity, or assume 1 per crop tray? No, 1 per tupper, but tuppers are not directly linked to tray count if they over-yield. Let's just do seeds and substrates.
     }
     
     const currentStock = totalIn - totalConsumed;
