@@ -11,6 +11,22 @@ const MODULES = [
 ];
 const blankPermissions = Object.fromEntries(MODULES.map(([key]) => [key, false]));
 
+const getFunctionErrorMessage = async (error, data) => {
+  let message = data?.error || '';
+  if (!message && error?.context) {
+    try {
+      const responseBody = await error.context.json();
+      message = responseBody?.error || '';
+    } catch {
+      // La respuesta no contenía JSON; se utiliza el mensaje general.
+    }
+  }
+  if (/email rate limit exceeded/i.test(message)) {
+    return 'Supabase ha alcanzado temporalmente el límite de correos. Espera antes de reenviar o configura un servidor SMTP propio.';
+  }
+  return message || error?.message || 'No se pudo completar la operación.';
+};
+
 const PermissionChecks = ({ permissions, onChange, disabled = false }) => (
   <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(150px,1fr))', gap: '.55rem' }}>
     {MODULES.map(([key, label]) => <label key={key} style={{ display: 'flex', gap: '.45rem', alignItems: 'center', fontSize: '.82rem', fontWeight: 700 }}>
@@ -38,7 +54,7 @@ export default function UserAccess() {
     setBusy(true);
     const { data, error } = await supabase.functions.invoke('manage-app-user', { body: form });
     setBusy(false);
-    if (error || data?.error) return Swal.fire('No se pudo invitar', data?.error || error.message, 'error');
+    if (error || data?.error) return Swal.fire('No se pudo invitar', await getFunctionErrorMessage(error, data), 'error');
     Swal.fire('Invitación enviada', 'El usuario recibirá un correo para establecer su contraseña.', 'success');
     setForm({ email: '', displayName: '', role: 'user', permissions: { ...blankPermissions } });
     load();
@@ -98,7 +114,7 @@ export default function UserAccess() {
     });
     setActionBusy('');
     if (error || data?.error) {
-      return Swal.fire('No se pudo completar', data?.error || error.message, 'error');
+      return Swal.fire('No se pudo completar', await getFunctionErrorMessage(error, data), 'error');
     }
 
     const messages = {
