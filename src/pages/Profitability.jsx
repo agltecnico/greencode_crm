@@ -18,6 +18,15 @@ const monthBounds = () => {
   return { start: localDate(start), end: localDate(end) };
 };
 
+const boundsForMonth = month => {
+  const [year, monthNumber] = month.split('-').map(Number);
+  const lastDay = new Date(year, monthNumber, 0).getDate();
+  return {
+    start: `${month}-01`,
+    end: `${month}-${String(lastDay).padStart(2, '0')}`
+  };
+};
+
 const StatCard = ({ icon, label, value, detail, tone = 'green' }) => (
   <article className={`profit-stat profit-stat-${tone}`}>
     <div className="profit-stat-icon">{icon}</div>
@@ -32,9 +41,14 @@ const StatCard = ({ icon, label, value, detail, tone = 'green' }) => (
 export default function Profitability() {
   const { orders, deliveryNotes, clients, products, productMovements, harvests } = useData();
   const [initialBounds] = useState(() => monthBounds());
+  const [filterMode, setFilterMode] = useState('month');
+  const [selectedMonth, setSelectedMonth] = useState(initialBounds.start.slice(0, 7));
   const [startDate, setStartDate] = useState(initialBounds.start);
   const [endDate, setEndDate] = useState(initialBounds.end);
   const [view, setView] = useState('products');
+  const selectedBounds = filterMode === 'month'
+    ? boundsForMonth(selectedMonth)
+    : { start: startDate, end: endDate };
 
   const report = useMemo(() => {
     const noteByOrder = new Map((deliveryNotes || []).map(note => [note.orderId, note]));
@@ -72,7 +86,10 @@ export default function Profitability() {
       .forEach(order => {
         const note = noteByOrder.get(order.id);
         const saleDate = String(note?.date || order.date || order.createdAt || '').slice(0, 10);
-        if ((startDate && saleDate < startDate) || (endDate && saleDate > endDate)) return;
+        if (
+          (selectedBounds.start && saleDate < selectedBounds.start)
+          || (selectedBounds.end && saleDate > selectedBounds.end)
+        ) return;
 
         const groupedItems = new Map();
         (order.items || []).forEach(item => {
@@ -142,7 +159,7 @@ export default function Profitability() {
       productRows: finishRows(productRows),
       clientRows: finishRows(clientRows)
     };
-  }, [clients, deliveryNotes, endDate, harvests, orders, productMovements, products, startDate]);
+  }, [clients, deliveryNotes, harvests, orders, productMovements, products, selectedBounds.end, selectedBounds.start]);
 
   const rows = view === 'products' ? report.productRows : report.clientRows;
 
@@ -155,8 +172,18 @@ export default function Profitability() {
           <p>Ingresos netos sin IVA y costes directos trazados de semilla, sustrato y envases.</p>
         </div>
         <div className="profit-filters">
-          <label>Desde<input type="date" value={startDate} onChange={event => setStartDate(event.target.value)} /></label>
-          <label>Hasta<input type="date" value={endDate} onChange={event => setEndDate(event.target.value)} /></label>
+          <div className="profit-filter-mode">
+            <button className={filterMode === 'month' ? 'active' : ''} onClick={() => setFilterMode('month')}>Mes</button>
+            <button className={filterMode === 'range' ? 'active' : ''} onClick={() => setFilterMode('range')}>Tramo de fechas</button>
+          </div>
+          {filterMode === 'month' ? (
+            <label>Seleccionar mes<input type="month" value={selectedMonth} onChange={event => setSelectedMonth(event.target.value)} /></label>
+          ) : (
+            <>
+              <label>Desde<input type="date" value={startDate} max={endDate} onChange={event => setStartDate(event.target.value)} /></label>
+              <label>Hasta<input type="date" value={endDate} min={startDate} onChange={event => setEndDate(event.target.value)} /></label>
+            </>
+          )}
         </div>
       </header>
 
