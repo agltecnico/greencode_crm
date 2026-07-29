@@ -188,12 +188,13 @@ export default function Dashboard() {
             <label>Dirección<input value={companyForm.address || ''} onChange={event => setCompanyForm({ ...companyForm, address: event.target.value })} /></label>
             <label>Localidad<input value={companyForm.city || ''} onChange={event => setCompanyForm({ ...companyForm, city: event.target.value })} /></label>
             <label>Provincia<input value={companyForm.province || ''} onChange={event => setCompanyForm({ ...companyForm, province: event.target.value })} /></label>
+            <label className="admin-company-bank">IBAN / CCC para facturas<input value={companyForm.bankAccount || ''} onChange={event => setCompanyForm({ ...companyForm, bankAccount: event.target.value })} placeholder="ES00 0000 0000 0000 0000 0000" /></label>
             <div className="admin-company-actions"><button type="button" onClick={() => setEditingCompany(false)}>Cancelar</button><button type="submit">Guardar cambios</button></div>
           </form>
         ) : (
           <div className="admin-company-summary">
             <Building2 size={28} />
-            <div><strong>{companyProfile?.fiscalName || 'Sin configurar'}</strong><span>{companyProfile?.ownerName} · {companyProfile?.nif}</span><small>{companyProfile?.address}, {companyProfile?.city}</small></div>
+            <div><strong>{companyProfile?.fiscalName || 'Sin configurar'}</strong><span>{companyProfile?.ownerName} · {companyProfile?.nif}</span><small>{companyProfile?.address}, {companyProfile?.city}</small>{companyProfile?.bankAccount && <small className="admin-company-iban">IBAN / CCC: {companyProfile.bankAccount}</small>}</div>
             <button onClick={() => { setCompanyForm(companyProfile || {}); setEditingCompany(true); }}>Editar</button>
           </div>
         )}
