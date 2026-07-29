@@ -69,6 +69,9 @@ export default function TraceabilityExplorer() {
     deliveryNotes, dailyLogs
   } = useData();
   const [query, setQuery] = useState('');
+  const [typeFilter, setTypeFilter] = useState('all');
+  const [dateStart, setDateStart] = useState('');
+  const [dateEnd, setDateEnd] = useState('');
   const [selection, setSelection] = useState(null);
   const [isGeneratingPdf, setIsGeneratingPdf] = useState(false);
 
@@ -84,9 +87,10 @@ export default function TraceabilityExplorer() {
 
   const candidates = useMemo(() => {
     const items = [];
-    const add = (type, id, title, subtitle, search) => items.push({
+    const add = (type, id, title, subtitle, search, date) => items.push({
       key: `${type}:${id}`, type, id, title, subtitle,
-      search: [title, subtitle, ...(search || [])].join(' ')
+      search: [title, subtitle, ...(search || [])].join(' '),
+      date: date ? String(date).slice(0, 10) : ''
     });
 
     (stockLots || []).forEach(lot => {
@@ -94,24 +98,24 @@ export default function TraceabilityExplorer() {
       const provider = indexes.providers.get(String(lot.providerId));
       const line = indexes.noteLines.get(String(lot.deliveryNoteLineId));
       const note = line && indexes.purchaseNotes.get(String(line.deliveryNoteId));
-      add('supplier', lot.id, lot.supplierBatch || lot.id, `${article?.name || 'Semilla'} · ${provider?.name || 'Proveedor'}`, [note?.number]);
+      add('supplier', lot.id, lot.supplierBatch || lot.id, `${article?.name || 'Semilla'} · ${provider?.name || 'Proveedor'}`, [note?.number], lot.receivedAt || note?.date);
     });
     (purchaseDeliveryNotes || []).forEach(note => {
       const provider = indexes.providers.get(String(note.providerId));
-      add('purchaseNote', note.id, note.number || note.id, provider?.name || 'Proveedor', [note.date]);
+      add('purchaseNote', note.id, note.number || note.id, provider?.name || 'Proveedor', [note.date], note.date);
     });
     (crops || []).forEach(crop => {
       const cropType = indexes.cropTypes.get(String(crop.cropTypeId));
-      add('crop', crop.id, crop.cultivationBatchNumber || crop.batchNumber || crop.id, `${cropType?.name || 'Cultivo'} · ${formatDate(crop.datePlanted)}`, [crop.seedSupplierBatch]);
+      add('crop', crop.id, crop.cultivationBatchNumber || crop.batchNumber || crop.id, `${cropType?.name || 'Cultivo'} · ${formatDate(crop.datePlanted)}`, [crop.seedSupplierBatch], crop.datePlanted);
     });
     (harvests || []).forEach(harvest => {
       const product = indexes.products.get(String(harvest.productId));
-      add('harvest', harvest.id, harvest.batchNumber || harvest.id, `${product?.name || 'Producto'} · ${formatDate(harvest.harvestDate)}`);
+      add('harvest', harvest.id, harvest.batchNumber || harvest.id, `${product?.name || 'Producto'} · ${formatDate(harvest.harvestDate)}`, [], harvest.harvestDate);
     });
     (deliveryNotes || []).forEach(note => {
       const number = note.deliveryNoteNumber || note.albaranNumber;
       const concluded = ['DELIVERED', 'DELIVERED_SIGNED', 'COMPLETED'].includes(String(note.status || '').toUpperCase());
-      if (number && concluded) add('deliveryNote', note.id, number, note.clientCommercialName || note.clientName || 'Cliente', [note.date]);
+      if (number && concluded) add('deliveryNote', note.id, number, note.clientCommercialName || note.clientName || 'Cliente', [note.date], note.date);
     });
     (clients || []).forEach(client => add('client', client.id, client.commercialName || client.name || client.id, 'Cliente', [client.name, client.clientNumber]));
     (articles || []).filter(article => article.type === 'SEMILLA').forEach(article => {
@@ -124,9 +128,24 @@ export default function TraceabilityExplorer() {
 
   const visibleCandidates = useMemo(() => {
     const term = normalize(query);
-    if (!term) return candidates.filter(item => ['supplier', 'harvest', 'deliveryNote'].includes(item.type)).slice().reverse().slice(0, 6);
-    return candidates.filter(item => normalize(item.search).includes(term)).slice(0, 24);
-  }, [candidates, query]);
+    const groups = {
+      origin: ['supplier', 'purchaseNote', 'seed'],
+      production: ['crop'],
+      harvest: ['harvest', 'product'],
+      sales: ['deliveryNote', 'client']
+    };
+    const filtered = candidates.filter(item => {
+      if (term && !normalize(item.search).includes(term)) return false;
+      if (typeFilter !== 'all' && !groups[typeFilter]?.includes(item.type)) return false;
+      if (dateStart && (!item.date || item.date < dateStart)) return false;
+      if (dateEnd && (!item.date || item.date > dateEnd)) return false;
+      return true;
+    });
+    if (!term && typeFilter === 'all' && !dateStart && !dateEnd) {
+      return filtered.filter(item => ['supplier', 'harvest', 'deliveryNote'].includes(item.type)).slice().reverse().slice(0, 6);
+    }
+    return filtered.slice().reverse().slice(0, 30);
+  }, [candidates, dateEnd, dateStart, query, typeFilter]);
 
   const trace = useMemo(() => {
     if (!selection) return null;
@@ -250,6 +269,19 @@ export default function TraceabilityExplorer() {
         {query && <button type="button" onClick={() => { setQuery(''); setSelection(null); }}><XCircle size={19} /> Limpiar</button>}
       </section>
 
+      <section className="trace-filter-bar">
+        <div className="trace-filter-types">
+          {[['all', 'Todo'], ['origin', 'Origen'], ['production', 'Cultivos'], ['harvest', 'Cosechas'], ['sales', 'Ventas']].map(([value, label]) => (
+            <button type="button" key={value} className={typeFilter === value ? 'is-active' : ''} onClick={() => setTypeFilter(value)}>{label}</button>
+          ))}
+        </div>
+        <div className="trace-date-filters">
+          <label>Desde<input type="date" value={dateStart} max={dateEnd || undefined} onChange={event => setDateStart(event.target.value)} /></label>
+          <label>Hasta<input type="date" value={dateEnd} min={dateStart || undefined} onChange={event => setDateEnd(event.target.value)} /></label>
+          {(dateStart || dateEnd || typeFilter !== 'all') && <button type="button" onClick={() => { setTypeFilter('all'); setDateStart(''); setDateEnd(''); }}>Restablecer</button>}
+        </div>
+      </section>
+
       <div className="trace-results">
         <div className="trace-results__title">
           <strong>{query ? `${visibleCandidates.length} coincidencias` : 'Registros recientes'}</strong>
@@ -270,7 +302,8 @@ export default function TraceabilityExplorer() {
       </div>
 
       {trace && (
-        <div className="trace-journey">
+        <div className="trace-detail-backdrop" role="presentation" onMouseDown={event => { if (event.target === event.currentTarget) setSelection(null); }}>
+        <div className="trace-journey" role="dialog" aria-modal="true" aria-label="Detalle completo de trazabilidad">
           <div className="trace-journey__summary">
             <div>
               <span>BÚSQUEDA: {TYPE_LABELS[selection.type]}</span>
@@ -282,6 +315,7 @@ export default function TraceabilityExplorer() {
                 <Download size={17} /> {isGeneratingPdf ? 'Generando...' : 'Descargar informe PDF'}
               </button>
               <div className="trace-score"><strong>{traceCompleteness}%</strong><span>cadena localizada</span></div>
+              <button type="button" className="trace-close-button" aria-label="Cerrar detalle" onClick={() => setSelection(null)}>×</button>
             </div>
           </div>
 
@@ -366,6 +400,7 @@ export default function TraceabilityExplorer() {
             <div><Waves /><span>Humedad</span><strong>{environmentalStats.humidity?.avg.toFixed(1) ?? '--'} %</strong><small>{environmentalStats.humidity ? `${environmentalStats.humidity.min}–${environmentalStats.humidity.max} %` : 'Sin registros'}</small></div>
             <div className="trace-environment__count"><CalendarDays /><strong>{trace.environmental.length}</strong><span>controles ambientales</span></div>
           </section>
+        </div>
         </div>
       )}
     </div>
