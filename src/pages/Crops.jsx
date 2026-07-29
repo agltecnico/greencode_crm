@@ -239,6 +239,12 @@ export default function Crops() {
 
   useEffect(() => {
     const action = searchParams.get('action');
+    const requestedTab = searchParams.get('tab');
+    if (requestedTab === 'trazabilidad') {
+      setActiveTab('trazabilidad');
+      setSearchParams({}, { replace: true });
+      return;
+    }
     if (action === 'sow') {
       const cId = searchParams.get('cropTypeId');
       const trays = searchParams.get('trays');

@@ -2,10 +2,10 @@ import { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   ArrowRight, Building2, CircleDollarSign, FileText, Package,
-  Receipt, Settings, ShoppingBag, TrendingUp, TriangleAlert, Users
+  Receipt, Settings, ShieldCheck, ShoppingBag, TrendingUp, TriangleAlert, Users
 } from 'lucide-react';
 import {
-  Area, AreaChart, CartesianGrid, ResponsiveContainer,
+  Area, AreaChart, Bar, BarChart, CartesianGrid, ResponsiveContainer,
   Tooltip, XAxis, YAxis
 } from 'recharts';
 import { useData } from '../context/DataContext';
@@ -43,6 +43,8 @@ const weekBounds = week => {
   return { start: localDate(monday), end: localDate(sunday) };
 };
 
+const yearBounds = year => ({ start: `${year}-01-01`, end: `${year}-12-31` });
+
 const Metric = ({ icon, label, value, detail, tone }) => (
   <article className={`admin-metric admin-metric-${tone}`}>
     <div className="admin-metric-icon">{icon}</div>
@@ -53,21 +55,26 @@ const Metric = ({ icon, label, value, detail, tone }) => (
 export default function Dashboard() {
   const {
     companyProfile, updateCompanyProfile, clients, orders, deliveryNotes,
-    expenses, products, articles, stockEntries
+    expenses, products, articles, stockEntries, harvests, productMovements
   } = useData();
   const navigate = useNavigate();
   const [today] = useState(() => new Date());
   const defaultMonth = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}`;
   const [filterMode, setFilterMode] = useState('month');
   const [selectedMonth, setSelectedMonth] = useState(defaultMonth);
+  const [selectedYear, setSelectedYear] = useState(String(today.getFullYear()));
   const [selectedWeek, setSelectedWeek] = useState(`${today.getFullYear()}-W${String(Math.ceil((((today - new Date(today.getFullYear(), 0, 1)) / 86400000) + new Date(today.getFullYear(), 0, 1).getDay() + 1) / 7)).padStart(2, '0')}`);
   const [rangeStart, setRangeStart] = useState(localDate(new Date(today.getFullYear(), today.getMonth(), 1)));
   const [rangeEnd, setRangeEnd] = useState(localDate(today));
   const [detailsOpen, setDetailsOpen] = useState(false);
+  const [reportView, setReportView] = useState('products');
+  const [reportQuery, setReportQuery] = useState('');
   const [companyForm, setCompanyForm] = useState(companyProfile || {});
   const [editingCompany, setEditingCompany] = useState(false);
   const selectedBounds = filterMode === 'month'
     ? monthBounds(selectedMonth)
+    : filterMode === 'year'
+      ? yearBounds(selectedYear)
     : filterMode === 'week'
       ? weekBounds(selectedWeek)
       : { start: rangeStart, end: rangeEnd };
@@ -78,12 +85,27 @@ export default function Dashboard() {
       return value && value >= selectedBounds.start && value <= selectedBounds.end;
     };
     const noteByOrder = new Map((deliveryNotes || []).map(note => [note.orderId, note]));
+    const harvestByBatch = new Map((harvests || []).map(harvest => [String(harvest.batchNumber), harvest]));
+    const movementCostByOrderProduct = new Map();
+    (productMovements || [])
+      .filter(movement => movement.type === 'ORDER' && movement.referenceId?.includes('|'))
+      .forEach(movement => {
+        const [orderId, batch] = movement.referenceId.split('|');
+        const harvest = harvestByBatch.get(String(batch));
+        const key = `${orderId}::${movement.productId}`;
+        const quantity = Math.abs(Number(movement.quantity || 0));
+        const unitCost = Number(harvest?.costPerTupper || 0);
+        const current = movementCostByOrderProduct.get(key) || { cost: 0, costedUnits: 0 };
+        current.cost += quantity * unitCost;
+        if (unitCost > 0) current.costedUnits += quantity;
+        movementCostByOrderProduct.set(key, current);
+      });
     const currentNotes = (deliveryNotes || []).filter(note => inPeriod(note.date));
     const periodOrders = (orders || []).filter(order => {
       if (order.status !== 'DELIVERED') return false;
       return inPeriod(noteByOrder.get(order.id)?.date || order.date);
     });
-    const monthSales = currentNotes.reduce((sum, note) => sum + Number(note.total || 0), 0);
+    const monthSales = periodOrders.reduce((sum, order) => sum + Number(order.total || 0), 0);
     const pendingOrders = (orders || []).filter(order => order.status !== 'DELIVERED');
     const pendingOrderValue = pendingOrders.reduce((sum, order) => sum + Number(order.total || 0), 0);
     const pendingCollection = currentNotes
@@ -93,38 +115,89 @@ export default function Dashboard() {
       .filter(expense => inPeriod(expense.date))
       .reduce((sum, expense) => sum + Number(expense.total ?? expense.amount ?? 0), 0);
 
-    const months = Array.from({ length: 12 }, (_, index) => {
-      const date = new Date(today.getFullYear(), today.getMonth() - (11 - index), 1);
-      return {
-        key: `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`,
-        name: new Intl.DateTimeFormat('es-ES', { month: 'short', year: '2-digit' }).format(date).replace('.', ''),
-        Ventas: 0
-      };
-    });
-    const monthMap = new Map(months.map(month => [month.key, month]));
-    (deliveryNotes || []).forEach(note => {
-      const item = monthMap.get(monthKey(note.date));
-      if (item) item.Ventas += Number(note.total || 0);
-    });
-
-    const clientTotals = new Map();
-    currentNotes.forEach(note => {
-      const name = note.clientCommercialName || note.clientName || 'Cliente sin nombre';
-      clientTotals.set(name, (clientTotals.get(name) || 0) + Number(note.total || 0));
+    const boundsStart = new Date(`${selectedBounds.start}T12:00:00`);
+    const boundsEnd = new Date(`${selectedBounds.end}T12:00:00`);
+    const periodDays = Math.max(Math.round((boundsEnd - boundsStart) / 86400000) + 1, 1);
+    const chart = [];
+    if (periodDays <= 62) {
+      for (let cursor = new Date(boundsStart); cursor <= boundsEnd; cursor.setDate(cursor.getDate() + 1)) {
+        const key = localDate(cursor);
+        chart.push({
+          key,
+          start: key,
+          end: key,
+          name: new Intl.DateTimeFormat('es-ES', { day: '2-digit', month: 'short' }).format(cursor).replace('.', ''),
+          Ventas: 0
+        });
+      }
+    } else {
+      const cursor = new Date(boundsStart.getFullYear(), boundsStart.getMonth(), 1);
+      while (cursor <= boundsEnd) {
+        const key = `${cursor.getFullYear()}-${String(cursor.getMonth() + 1).padStart(2, '0')}`;
+        chart.push({
+          key,
+          start: `${key}-01`,
+          end: monthBounds(key).end,
+          name: new Intl.DateTimeFormat('es-ES', { month: 'short', year: '2-digit' }).format(cursor).replace('.', ''),
+          Ventas: 0
+        });
+        cursor.setMonth(cursor.getMonth() + 1);
+      }
+    }
+    const chartMap = new Map(chart.map(item => [periodDays <= 62 ? item.key : item.key, item]));
+    periodOrders.forEach(order => {
+      const orderDate = noteByOrder.get(order.id)?.date || order.date;
+      const key = periodDays <= 62 ? String(orderDate || '').slice(0, 10) : monthKey(orderDate);
+      const item = chartMap.get(key);
+      if (item) item.Ventas += Number(order.total || 0);
     });
 
     const productTotals = new Map();
+    const clientTotals = new Map();
     periodOrders.forEach(order => {
+      const note = noteByOrder.get(order.id);
+      const clientName = note?.clientCommercialName || note?.clientName
+        || order.clientCommercialName || order.clientName || 'Cliente sin nombre';
+      const clientCurrent = clientTotals.get(order.clientId || clientName)
+        || { name: clientName, total: 0, cost: 0, units: 0, costedUnits: 0 };
+      const costAppliedProducts = new Set();
       (order.items || []).forEach(item => {
         const name = products.find(product => product.id === item.productId)?.name
           || item.name || 'Producto histórico';
-        const current = productTotals.get(item.productId || name) || { name, units: 0, total: 0 };
-        current.units += Number(item.quantity || 0);
-        current.total += Number(item.price || 0) * Number(item.quantity || 0)
+        const quantity = Number(item.quantity || 0);
+        const revenue = Number(item.price || 0) * quantity
           * (1 - Number(item.discount || 0) / 100);
+        const movementCost = costAppliedProducts.has(item.productId)
+          ? { cost: 0, costedUnits: 0 }
+          : (movementCostByOrderProduct.get(`${order.id}::${item.productId}`) || { cost: 0, costedUnits: 0 });
+        costAppliedProducts.add(item.productId);
+        const current = productTotals.get(item.productId || name)
+          || { id: item.productId || name, name, units: 0, total: 0, cost: 0, costedUnits: 0 };
+        current.units += quantity;
+        current.total += revenue;
+        current.cost += movementCost.cost;
+        current.costedUnits += Math.min(quantity, movementCost.costedUnits);
         productTotals.set(item.productId || name, current);
+        clientCurrent.total += revenue;
+        clientCurrent.cost += movementCost.cost;
+        clientCurrent.units += quantity;
+        clientCurrent.costedUnits += Math.min(quantity, movementCost.costedUnits);
       });
+      clientTotals.set(order.clientId || clientName, clientCurrent);
     });
+
+    const finishEconomicRow = row => ({
+      ...row,
+      margin: row.total - row.cost,
+      marginPercent: row.total > 0 ? ((row.total - row.cost) / row.total) * 100 : 0,
+      pendingCostUnits: Math.max(row.units - row.costedUnits, 0)
+    });
+    const productSales = [...productTotals.values()].map(finishEconomicRow).sort((a, b) => b.total - a.total);
+    const allClients = [...clientTotals.values()].map(finishEconomicRow).sort((a, b) => b.total - a.total);
+    const tracedProducts = productSales.filter(item => item.costedUnits > 0);
+    const mostProfitable = tracedProducts.slice().sort((a, b) => b.margin - a.margin)[0] || null;
+    const totalCost = productSales.reduce((sum, item) => sum + item.cost, 0);
+    const costedUnits = productSales.reduce((sum, item) => sum + item.costedUnits, 0);
 
     const lowStock = (articles || [])
       .map(article => ({
@@ -139,6 +212,11 @@ export default function Dashboard() {
     return {
       periodLabel: `${new Intl.DateTimeFormat('es-ES').format(new Date(`${selectedBounds.start}T12:00:00`))} – ${new Intl.DateTimeFormat('es-ES').format(new Date(`${selectedBounds.end}T12:00:00`))}`,
       monthSales,
+      totalCost,
+      margin: monthSales - totalCost,
+      marginPercent: monthSales > 0 ? ((monthSales - totalCost) / monthSales) * 100 : 0,
+      costedUnits,
+      mostProfitable,
       orderCount: periodOrders.length,
       units: [...productTotals.values()].reduce((sum, item) => sum + item.units, 0),
       averageTicket: periodOrders.length ? monthSales / periodOrders.length : 0,
@@ -146,12 +224,12 @@ export default function Dashboard() {
       pendingOrderValue,
       pendingCollection,
       monthExpenses,
-      chart: months,
-      allClients: [...clientTotals.entries()].map(([name, total]) => ({ name, total })).sort((a, b) => b.total - a.total),
-      productSales: [...productTotals.values()].sort((a, b) => b.total - a.total),
+      chart,
+      allClients,
+      productSales,
       lowStock
     };
-  }, [articles, deliveryNotes, expenses, orders, products, selectedBounds.end, selectedBounds.start, stockEntries, today]);
+  }, [articles, deliveryNotes, expenses, harvests, orders, productMovements, products, selectedBounds.end, selectedBounds.start, stockEntries]);
 
   const saveCompany = async event => {
     event.preventDefault();
@@ -161,9 +239,10 @@ export default function Dashboard() {
 
   const openChartPeriod = chartState => {
     const point = chartState?.activePayload?.[0]?.payload;
-    if (!point?.key) return;
-    setSelectedMonth(point.key);
-    setFilterMode('month');
+    if (!point?.start) return;
+    setRangeStart(point.start);
+    setRangeEnd(point.end);
+    setFilterMode('range');
     setDetailsOpen(true);
   };
 
@@ -171,8 +250,12 @@ export default function Dashboard() {
     { label: 'Nuevo pedido', detail: 'Registrar una venta', icon: <ShoppingBag />, path: '/admin/orders' },
     { label: 'Clientes', detail: `${clients.length} fichas`, icon: <Users />, path: '/admin/clients' },
     { label: 'Productos', detail: `${products.length} productos`, icon: <Package />, path: '/admin/products' },
-    { label: 'Rentabilidad', detail: 'Ver análisis', icon: <TrendingUp />, path: '/admin/profitability' }
+    { label: 'Rentabilidad', detail: 'Informes económicos', icon: <TrendingUp />, path: '/admin/profitability' },
+    { label: 'Trazabilidad', detail: 'Lotes y cadena sanitaria', icon: <ShieldCheck />, path: '/crops?tab=trazabilidad' }
   ];
+  const normalizedReportQuery = reportQuery.trim().toLocaleLowerCase('es');
+  const filteredReportProducts = data.productSales.filter(item => item.name.toLocaleLowerCase('es').includes(normalizedReportQuery));
+  const filteredReportClients = data.allClients.filter(item => item.name.toLocaleLowerCase('es').includes(normalizedReportQuery));
 
   return (
     <div className="admin-dashboard">
@@ -191,10 +274,12 @@ export default function Dashboard() {
       <section className="admin-period-filter">
         <div className="admin-period-tabs">
           <button className={filterMode === 'month' ? 'active' : ''} onClick={() => setFilterMode('month')}>Mes</button>
+          <button className={filterMode === 'year' ? 'active' : ''} onClick={() => setFilterMode('year')}>Año</button>
           <button className={filterMode === 'week' ? 'active' : ''} onClick={() => setFilterMode('week')}>Semana</button>
           <button className={filterMode === 'range' ? 'active' : ''} onClick={() => setFilterMode('range')}>Rango de fechas</button>
         </div>
         {filterMode === 'month' && <input aria-label="Mes del dashboard" type="month" value={selectedMonth} onChange={event => setSelectedMonth(event.target.value)} />}
+        {filterMode === 'year' && <select aria-label="Año del dashboard" value={selectedYear} onChange={event => setSelectedYear(event.target.value)}>{Array.from({ length: 6 }, (_, index) => String(today.getFullYear() - index)).map(year => <option key={year}>{year}</option>)}</select>}
         {filterMode === 'week' && <input aria-label="Semana del dashboard" type="week" value={selectedWeek} onChange={event => setSelectedWeek(event.target.value)} />}
         {filterMode === 'range' && <div className="admin-date-range"><input aria-label="Fecha inicial" type="date" value={rangeStart} max={rangeEnd} onChange={event => setRangeStart(event.target.value)} /><span>hasta</span><input aria-label="Fecha final" type="date" value={rangeEnd} min={rangeStart} onChange={event => setRangeEnd(event.target.value)} /></div>}
         <span className="admin-period-label">{data.periodLabel}</span>
@@ -213,6 +298,7 @@ export default function Dashboard() {
         <Metric icon={<FileText />} label="Ticket medio" value={money(data.averageTicket)} detail={`${data.orderCount} ventas realizadas`} tone="blue" />
         <Metric icon={<ShoppingBag />} label="Pedidos abiertos" value={data.pendingOrders} detail={money(data.pendingOrderValue)} tone="purple" />
         <Metric icon={<Receipt />} label="Gastos del periodo" value={money(data.monthExpenses)} detail={`${money(data.pendingCollection)} pendiente de cobro`} tone="amber" />
+        <Metric icon={<TrendingUp />} label="Margen trazado" value={money(data.margin)} detail={`${data.marginPercent.toFixed(1)} % · ${data.costedUnits}/${data.units} uds. con coste`} tone="green" />
       </section>
 
       <section className="admin-dashboard-grid">
@@ -245,6 +331,36 @@ export default function Dashboard() {
             ))}
             {!data.allClients.length && <p className="admin-empty-state">Todavía no hay ventas en este periodo.</p>}
           </div>
+        </article>
+      </section>
+
+      <section className="admin-analytics-grid">
+        <article className="admin-panel">
+          <div className="admin-panel-title"><div><h2>Ventas por producto</h2><p>Productos principales del periodo</p></div><button className="admin-panel-link" onClick={() => { setReportView('products'); setDetailsOpen(true); }}>Ver todos</button></div>
+          <div className="admin-product-chart">
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart data={data.productSales.slice(0, 10).map(item => ({ ...item, shortName: item.name.length > 18 ? `${item.name.slice(0, 17)}…` : item.name }))} layout="vertical" margin={{ top: 4, right: 18, left: 10, bottom: 4 }}>
+                <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="#e8eef3" />
+                <XAxis type="number" axisLine={false} tickLine={false} tick={{ fill: '#94a3b8', fontSize: 10 }} tickFormatter={value => `${value} €`} />
+                <YAxis type="category" dataKey="shortName" width={115} axisLine={false} tickLine={false} tick={{ fill: '#475569', fontSize: 10 }} />
+                <Tooltip formatter={value => money(value)} contentStyle={{ border: 0, borderRadius: 12, boxShadow: '0 12px 30px rgba(15,23,42,.12)' }} />
+                <Bar dataKey="total" name="Ventas" fill="#10b981" radius={[0, 6, 6, 0]} maxBarSize={18} />
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+        </article>
+        <article className="admin-panel admin-profit-highlight">
+          <div className="admin-panel-title"><div><h2>Producto más rentable</h2><p>Solo costes con trazabilidad completa</p></div></div>
+          {data.mostProfitable ? (
+            <div className="admin-profit-product">
+              <span>MEJOR MARGEN</span>
+              <h3>{data.mostProfitable.name}</h3>
+              <strong>{money(data.mostProfitable.margin)}</strong>
+              <p>{data.mostProfitable.marginPercent.toFixed(1)} % de margen · {data.mostProfitable.units} unidades</p>
+              <div><small>Ventas {money(data.mostProfitable.total)}</small><small>Coste {money(data.mostProfitable.cost)}</small></div>
+              <button onClick={() => navigate('/admin/profitability')}>Abrir análisis económico <ArrowRight size={15} /></button>
+            </div>
+          ) : <p className="admin-empty-state">La rentabilidad aparecerá con las nuevas cosechas y ventas trazadas.</p>}
         </article>
       </section>
 
@@ -287,31 +403,54 @@ export default function Dashboard() {
             </header>
             <div className="admin-report-summary">
               <div><span>Ventas</span><strong>{money(data.monthSales)}</strong></div>
-              <div><span>Unidades</span><strong>{data.units}</strong></div>
-              <div><span>Clientes</span><strong>{data.allClients.length}</strong></div>
-              <div><span>Productos</span><strong>{data.productSales.length}</strong></div>
+              <div><span>Coste trazado</span><strong>{money(data.totalCost)}</strong></div>
+              <div><span>Margen trazado</span><strong>{money(data.margin)}</strong></div>
+              <div><span>Ticket medio</span><strong>{money(data.averageTicket)}</strong></div>
             </div>
-            <div className="admin-report-columns">
-              <article>
-                <h3>Ventas por producto <span>{data.productSales.length}</span></h3>
+            <div className="admin-report-controls">
+              <div className="admin-report-tabs">
+                <button className={reportView === 'products' ? 'active' : ''} onClick={() => setReportView('products')}>Productos</button>
+                <button className={reportView === 'clients' ? 'active' : ''} onClick={() => setReportView('clients')}>Clientes</button>
+              </div>
+              <input value={reportQuery} onChange={event => setReportQuery(event.target.value)} placeholder={`Buscar ${reportView === 'products' ? 'producto' : 'cliente'}…`} />
+              <button className="admin-report-profitability" onClick={() => navigate('/admin/profitability')}>Rentabilidad avanzada <ArrowRight size={15} /></button>
+            </div>
+            <div className="admin-report-content">
+              {reportView === 'products' ? (
+                <article>
+                <h3>Ventas y rentabilidad por producto <span>{filteredReportProducts.length}</span></h3>
                 <div className="admin-report-table">
                   <table>
-                    <thead><tr><th>Producto</th><th>Unidades</th><th>Ventas</th></tr></thead>
-                    <tbody>{data.productSales.map(product => <tr key={product.name}><td>{product.name}</td><td>{product.units}</td><td>{money(product.total)}</td></tr>)}</tbody>
+                    <thead><tr><th>Producto</th><th>Uds.</th><th>Ventas</th><th>Coste</th><th>Margen</th><th>Cobertura</th></tr></thead>
+                    <tbody>{filteredReportProducts.map(product => (
+                      <tr key={product.id}>
+                        <td><strong>{product.name}</strong></td><td>{product.units}</td><td>{money(product.total)}</td>
+                        <td>{money(product.cost)}</td><td className={product.margin >= 0 ? 'positive' : 'negative'}>{money(product.margin)}</td>
+                        <td><span className={product.pendingCostUnits ? 'admin-cost-pending' : 'admin-cost-complete'}>{product.pendingCostUnits ? `${product.pendingCostUnits} uds. pendientes` : 'Completa'}</span></td>
+                      </tr>
+                    ))}</tbody>
                   </table>
-                  {!data.productSales.length && <p>No hay productos vendidos en este periodo.</p>}
+                  {!filteredReportProducts.length && <p>No hay productos que coincidan en este periodo.</p>}
                 </div>
               </article>
-              <article>
-                <h3>Ventas por cliente <span>{data.allClients.length}</span></h3>
+              ) : (
+                <article>
+                <h3>Ventas y rentabilidad por cliente <span>{filteredReportClients.length}</span></h3>
                 <div className="admin-report-table">
                   <table>
-                    <thead><tr><th>Cliente</th><th>Ventas</th></tr></thead>
-                    <tbody>{data.allClients.map(client => <tr key={client.name}><td>{client.name}</td><td>{money(client.total)}</td></tr>)}</tbody>
+                    <thead><tr><th>Cliente</th><th>Uds.</th><th>Ventas</th><th>Coste</th><th>Margen</th><th>Cobertura</th></tr></thead>
+                    <tbody>{filteredReportClients.map(client => (
+                      <tr key={client.name}>
+                        <td><strong>{client.name}</strong></td><td>{client.units}</td><td>{money(client.total)}</td>
+                        <td>{money(client.cost)}</td><td className={client.margin >= 0 ? 'positive' : 'negative'}>{money(client.margin)}</td>
+                        <td><span className={client.pendingCostUnits ? 'admin-cost-pending' : 'admin-cost-complete'}>{client.pendingCostUnits ? `${client.pendingCostUnits} uds. pendientes` : 'Completa'}</span></td>
+                      </tr>
+                    ))}</tbody>
                   </table>
-                  {!data.allClients.length && <p>No hay clientes con ventas en este periodo.</p>}
+                  {!filteredReportClients.length && <p>No hay clientes que coincidan en este periodo.</p>}
                 </div>
               </article>
+              )}
             </div>
           </section>
         </div>
