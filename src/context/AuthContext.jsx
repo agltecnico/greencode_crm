@@ -1,4 +1,5 @@
-import { createContext, useContext, useEffect, useMemo, useState } from 'react';
+import { createContext, useContext, useEffect, useMemo, useRef, useState } from 'react';
+import Swal from 'sweetalert2';
 import { supabase } from '../config/supabase';
 
 const AuthContext = createContext(null);
@@ -16,6 +17,7 @@ export function AuthProvider({ children }) {
   const [profile, setProfile] = useState(null);
   const [loading, setLoading] = useState(true);
   const [recoveryMode, setRecoveryMode] = useState(isPasswordSetupCallback);
+  const inactiveSignOutStarted = useRef(false);
 
   const loadProfile = async user => {
     if (!user) {
@@ -46,6 +48,61 @@ export function AuthProvider({ children }) {
     });
     return () => listener.subscription.unsubscribe();
   }, []);
+
+  useEffect(() => {
+    const userId = session?.user?.id;
+    if (!userId) {
+      inactiveSignOutStarted.current = false;
+      return undefined;
+    }
+
+    const handleProfile = async nextProfile => {
+      if (!nextProfile) return;
+      setProfile(nextProfile);
+      if (nextProfile.active !== false || inactiveSignOutStarted.current) return;
+
+      inactiveSignOutStarted.current = true;
+      await supabase.auth.signOut({ scope: 'local' });
+      await Swal.fire(
+        'Acceso desactivado',
+        'Tu usuario ha sido desactivado por un administrador.',
+        'warning'
+      );
+    };
+
+    const checkCurrentProfile = async () => {
+      const { data, error } = await supabase
+        .from('user_profiles')
+        .select('*')
+        .eq('id', userId)
+        .single();
+      if (!error) await handleProfile(data);
+    };
+
+    const channel = supabase
+      .channel(`user-profile-${userId}`)
+      .on(
+        'postgres_changes',
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'user_profiles',
+          filter: `id=eq.${userId}`
+        },
+        payload => handleProfile(payload.new)
+      )
+      .subscribe();
+
+    const intervalId = window.setInterval(checkCurrentProfile, 30000);
+    const handleFocus = () => checkCurrentProfile();
+    window.addEventListener('focus', handleFocus);
+
+    return () => {
+      window.clearInterval(intervalId);
+      window.removeEventListener('focus', handleFocus);
+      supabase.removeChannel(channel);
+    };
+  }, [session?.user?.id]);
 
   const hasPermission = permission =>
     profile?.active === true &&
