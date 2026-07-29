@@ -5,8 +5,8 @@ import {
   Receipt, Settings, ShieldCheck, ShoppingBag, TrendingUp, TriangleAlert, Users
 } from 'lucide-react';
 import {
-  Area, AreaChart, Bar, BarChart, CartesianGrid, ResponsiveContainer,
-  Tooltip, XAxis, YAxis
+  Area, AreaChart, Bar, BarChart, CartesianGrid, Cell, Pie, PieChart,
+  ResponsiveContainer, Tooltip, XAxis, YAxis
 } from 'recharts';
 import { useData } from '../context/DataContext';
 
@@ -156,9 +156,13 @@ export default function Dashboard() {
     const clientTotals = new Map();
     periodOrders.forEach(order => {
       const note = noteByOrder.get(order.id);
-      const clientName = note?.clientCommercialName || note?.clientName
-        || order.clientCommercialName || order.clientName || 'Cliente sin nombre';
-      const clientCurrent = clientTotals.get(order.clientId || clientName)
+      const clientId = order.clientId || note?.clientId;
+      const clientRecord = clients.find(client => client.id === clientId);
+      const clientName = clientRecord?.commercialName || clientRecord?.name
+        || note?.clientCommercialName || note?.clientName
+        || order.clientCommercialName || order.clientName || 'Cliente sin identificar';
+      const clientKey = clientId || clientName.trim().toLocaleLowerCase('es');
+      const clientCurrent = clientTotals.get(clientKey)
         || { name: clientName, total: 0, cost: 0, units: 0, costedUnits: 0 };
       const costAppliedProducts = new Set();
       (order.items || []).forEach(item => {
@@ -183,7 +187,7 @@ export default function Dashboard() {
         clientCurrent.units += quantity;
         clientCurrent.costedUnits += Math.min(quantity, movementCost.costedUnits);
       });
-      clientTotals.set(order.clientId || clientName, clientCurrent);
+      clientTotals.set(clientKey, clientCurrent);
     });
 
     const finishEconomicRow = row => ({
@@ -229,7 +233,7 @@ export default function Dashboard() {
       productSales,
       lowStock
     };
-  }, [articles, deliveryNotes, expenses, harvests, orders, productMovements, products, selectedBounds.end, selectedBounds.start, stockEntries]);
+  }, [articles, clients, deliveryNotes, expenses, harvests, orders, productMovements, products, selectedBounds.end, selectedBounds.start, stockEntries]);
 
   const saveCompany = async event => {
     event.preventDefault();
@@ -256,6 +260,12 @@ export default function Dashboard() {
   const normalizedReportQuery = reportQuery.trim().toLocaleLowerCase('es');
   const filteredReportProducts = data.productSales.filter(item => item.name.toLocaleLowerCase('es').includes(normalizedReportQuery));
   const filteredReportClients = data.allClients.filter(item => item.name.toLocaleLowerCase('es').includes(normalizedReportQuery));
+  const chartColors = ['#10b981', '#0ea5e9', '#8b5cf6', '#f59e0b', '#f43f5e', '#64748b'];
+  const productPieData = (() => {
+    const visible = data.productSales.slice(0, 5).map(item => ({ name: item.name, value: item.total }));
+    const otherValue = data.productSales.slice(5).reduce((sum, item) => sum + item.total, 0);
+    return otherValue > 0 ? [...visible, { name: 'Otros', value: otherValue }] : visible;
+  })();
 
   return (
     <div className="admin-dashboard">
@@ -301,21 +311,21 @@ export default function Dashboard() {
         <Metric icon={<TrendingUp />} label="Margen trazado" value={money(data.margin)} detail={`${data.marginPercent.toFixed(1)} % · ${data.costedUnits}/${data.units} uds. con coste`} tone="green" />
       </section>
 
-      <section className="admin-dashboard-grid">
+      <section className="admin-insights-grid">
         <article className="admin-panel admin-sales-panel">
-          <div className="admin-panel-title"><div><h2>Evolución de ventas</h2><p>Haz clic en un mes para abrir su informe</p></div><span>12 meses</span></div>
-          <div className="admin-sales-chart">
+          <div className="admin-panel-title"><div><h2>Evolución de ventas</h2><p>Haz clic para consultar el detalle</p></div><span>{money(data.monthSales)}</span></div>
+          <div className="admin-insight-chart">
             <ResponsiveContainer width="100%" height="100%">
-              <AreaChart data={data.chart} margin={{ top: 12, right: 12, left: 0, bottom: 0 }} onClick={openChartPeriod} style={{ cursor: 'pointer' }}>
+              <AreaChart data={data.chart} margin={{ top: 8, right: 8, left: -18, bottom: 0 }} onClick={openChartPeriod} style={{ cursor: 'pointer' }}>
                 <defs>
                   <linearGradient id="salesGradient" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="#10b981" stopOpacity={0.28} />
+                    <stop offset="5%" stopColor="#10b981" stopOpacity={0.35} />
                     <stop offset="95%" stopColor="#10b981" stopOpacity={0} />
                   </linearGradient>
                 </defs>
                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e8eef3" />
-                <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fill: '#64748b', fontSize: 12 }} />
-                <YAxis axisLine={false} tickLine={false} tick={{ fill: '#94a3b8', fontSize: 11 }} tickFormatter={value => `${value} €`} />
+                <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fill: '#64748b', fontSize: 10 }} minTickGap={18} />
+                <YAxis axisLine={false} tickLine={false} tick={{ fill: '#94a3b8', fontSize: 9 }} tickFormatter={value => `${value} €`} />
                 <Tooltip formatter={value => money(value)} contentStyle={{ border: 0, borderRadius: 12, boxShadow: '0 12px 30px rgba(15,23,42,.12)' }} />
                 <Area type="monotone" dataKey="Ventas" stroke="#10b981" strokeWidth={3} fill="url(#salesGradient)" />
               </AreaChart>
@@ -324,43 +334,51 @@ export default function Dashboard() {
         </article>
 
         <article className="admin-panel">
-          <div className="admin-panel-title"><div><h2>Mejores clientes</h2><p>Periodo seleccionado</p></div><button className="admin-panel-link" onClick={() => setDetailsOpen(true)}>Ver todos</button></div>
-          <div className="admin-client-list">
-            {data.allClients.slice(0, 5).map((client, index) => (
-              <div key={client.name}><i>{index + 1}</i><span>{client.name}</span><strong>{money(client.total)}</strong></div>
-            ))}
-            {!data.allClients.length && <p className="admin-empty-state">Todavía no hay ventas en este periodo.</p>}
-          </div>
-        </article>
-      </section>
-
-      <section className="admin-analytics-grid">
-        <article className="admin-panel">
-          <div className="admin-panel-title"><div><h2>Ventas por producto</h2><p>Productos principales del periodo</p></div><button className="admin-panel-link" onClick={() => { setReportView('products'); setDetailsOpen(true); }}>Ver todos</button></div>
-          <div className="admin-product-chart">
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={data.productSales.slice(0, 10).map(item => ({ ...item, shortName: item.name.length > 18 ? `${item.name.slice(0, 17)}…` : item.name }))} layout="vertical" margin={{ top: 4, right: 18, left: 10, bottom: 4 }}>
-                <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="#e8eef3" />
-                <XAxis type="number" axisLine={false} tickLine={false} tick={{ fill: '#94a3b8', fontSize: 10 }} tickFormatter={value => `${value} €`} />
-                <YAxis type="category" dataKey="shortName" width={115} axisLine={false} tickLine={false} tick={{ fill: '#475569', fontSize: 10 }} />
+          <div className="admin-panel-title"><div><h2>Mejores clientes</h2><p>Facturación en el periodo</p></div><button className="admin-panel-link" onClick={() => { setReportView('clients'); setDetailsOpen(true); }}>Ver todos</button></div>
+          <div className="admin-insight-chart">
+            {data.allClients.length ? <ResponsiveContainer width="100%" height="100%">
+              <BarChart data={data.allClients.slice(0, 5).map(item => ({ ...item, shortName: item.name.length > 22 ? `${item.name.slice(0, 21)}…` : item.name }))} layout="vertical" margin={{ top: 4, right: 18, left: 8, bottom: 4 }}>
+                <XAxis type="number" hide />
+                <YAxis type="category" dataKey="shortName" width={118} axisLine={false} tickLine={false} tick={{ fill: '#42534b', fontSize: 10 }} />
                 <Tooltip formatter={value => money(value)} contentStyle={{ border: 0, borderRadius: 12, boxShadow: '0 12px 30px rgba(15,23,42,.12)' }} />
-                <Bar dataKey="total" name="Ventas" fill="#10b981" radius={[0, 6, 6, 0]} maxBarSize={18} />
+                <Bar dataKey="total" name="Ventas" fill="#0ea5e9" radius={[0, 7, 7, 0]} maxBarSize={20} />
               </BarChart>
-            </ResponsiveContainer>
+            </ResponsiveContainer> : <p className="admin-empty-state">Todavía no hay ventas en este periodo.</p>}
           </div>
         </article>
-        <article className="admin-panel admin-profit-highlight">
-          <div className="admin-panel-title"><div><h2>Producto más rentable</h2><p>Solo costes con trazabilidad completa</p></div></div>
-          {data.mostProfitable ? (
-            <div className="admin-profit-product">
-              <span>MEJOR MARGEN</span>
-              <h3>{data.mostProfitable.name}</h3>
-              <strong>{money(data.mostProfitable.margin)}</strong>
-              <p>{data.mostProfitable.marginPercent.toFixed(1)} % de margen · {data.mostProfitable.units} unidades</p>
-              <div><small>Ventas {money(data.mostProfitable.total)}</small><small>Coste {money(data.mostProfitable.cost)}</small></div>
-              <button onClick={() => navigate('/admin/profitability')}>Abrir análisis económico <ArrowRight size={15} /></button>
+
+        <article className="admin-panel">
+          <div className="admin-panel-title"><div><h2>Ventas por producto</h2><p>Distribución de la facturación</p></div><button className="admin-panel-link" onClick={() => { setReportView('products'); setDetailsOpen(true); }}>Ver todos</button></div>
+          <div className="admin-donut-layout">
+            <div className="admin-donut-chart">
+              {productPieData.length ? <ResponsiveContainer width="100%" height="100%">
+                <PieChart>
+                  <Pie data={productPieData} dataKey="value" nameKey="name" innerRadius={48} outerRadius={76} paddingAngle={3} stroke="none">
+                    {productPieData.map((item, index) => <Cell key={item.name} fill={chartColors[index % chartColors.length]} />)}
+                  </Pie>
+                  <Tooltip formatter={value => money(value)} contentStyle={{ border: 0, borderRadius: 12, boxShadow: '0 12px 30px rgba(15,23,42,.12)' }} />
+                </PieChart>
+              </ResponsiveContainer> : <p className="admin-empty-state">Sin ventas en el periodo.</p>}
+              {productPieData.length > 0 && <div className="admin-donut-center"><strong>{data.units}</strong><span>unidades</span></div>}
             </div>
-          ) : <p className="admin-empty-state">La rentabilidad aparecerá con las nuevas cosechas y ventas trazadas.</p>}
+            <div className="admin-donut-legend">{productPieData.map((item, index) => (
+              <div key={item.name}><i style={{ background: chartColors[index % chartColors.length] }} /><span>{item.name}</span><strong>{data.monthSales ? `${((item.value / data.monthSales) * 100).toFixed(0)}%` : '0%'}</strong></div>
+            ))}</div>
+          </div>
+        </article>
+
+        <article className="admin-panel admin-profit-highlight">
+          <div className="admin-panel-title"><div><h2>Rentabilidad por producto</h2><p>Margen trazado del periodo</p></div>{data.mostProfitable && <span>{data.mostProfitable.name}</span>}</div>
+          <div className="admin-insight-chart">
+            {data.productSales.some(item => item.costedUnits > 0) ? <ResponsiveContainer width="100%" height="100%">
+              <BarChart data={data.productSales.filter(item => item.costedUnits > 0).slice().sort((a, b) => b.margin - a.margin).slice(0, 5).map(item => ({ ...item, shortName: item.name.length > 22 ? `${item.name.slice(0, 21)}…` : item.name }))} layout="vertical" margin={{ top: 4, right: 18, left: 8, bottom: 4 }}>
+                <XAxis type="number" hide />
+                <YAxis type="category" dataKey="shortName" width={118} axisLine={false} tickLine={false} tick={{ fill: '#42534b', fontSize: 10 }} />
+                <Tooltip formatter={value => money(value)} contentStyle={{ border: 0, borderRadius: 12, boxShadow: '0 12px 30px rgba(15,23,42,.12)' }} />
+                <Bar dataKey="margin" name="Margen" fill="#8b5cf6" radius={[0, 7, 7, 0]} maxBarSize={20} />
+              </BarChart>
+            </ResponsiveContainer> : <p className="admin-empty-state">La rentabilidad aparecerá con las nuevas ventas trazadas.</p>}
+          </div>
         </article>
       </section>
 
