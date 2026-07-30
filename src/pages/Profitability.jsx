@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { BarChart3, CircleDollarSign, Download, LayoutList, PackageCheck, Percent, ReceiptText, Sprout, TriangleAlert, WalletCards, X } from 'lucide-react';
+import { BarChart3, BrainCircuit, CircleDollarSign, Download, LayoutList, PackageCheck, Percent, ReceiptText, Sprout, TrendingUp, TriangleAlert, WalletCards, X } from 'lucide-react';
 import { jsPDF } from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import {
@@ -67,6 +67,8 @@ export default function Profitability({
   const [displayMode, setDisplayMode] = useState('visual');
   const [query, setQuery] = useState('');
   const [showExpenseForm, setShowExpenseForm] = useState(false);
+  const [intelligenceProductId, setIntelligenceProductId] = useState('');
+  const [intelligenceClientId, setIntelligenceClientId] = useState('');
   const [expenseForm, setExpenseForm] = useState({
     date: new Date().toISOString().slice(0, 10),
     category: 'SUMINISTROS',
@@ -81,13 +83,15 @@ export default function Profitability({
     : { start: startDate, end: endDate };
   const section = view === 'summary'
     ? 'summary'
+    : view === 'intelligence'
+      ? 'intelligence'
     : ['orders', 'products', 'clients'].includes(view)
       ? 'sales'
       : ['harvests', 'cultivations', 'production', 'expenses', 'packaging'].includes(view)
         ? 'costs'
         : 'treasury';
   const openSection = nextSection => {
-    const defaultViews = { summary: 'summary', sales: 'products', costs: 'harvests', treasury: 'treasury' };
+    const defaultViews = { summary: 'summary', sales: 'products', costs: 'harvests', treasury: 'treasury', intelligence: 'intelligence' };
     setView(defaultViews[nextSection]);
     setDisplayMode(nextSection === 'sales' ? 'visual' : 'detail');
     setQuery('');
@@ -393,6 +397,146 @@ export default function Profitability({
     };
   }, [articles, deliveryNotes, expenses, harvests, productMovements, products, providers, purchaseDeliveryNotes, report.cost, report.revenue, selectedBounds.end, selectedBounds.start, stockEntries]);
 
+  const intelligence = useMemo(() => {
+    const effectiveProductId = intelligenceProductId || report.productRows[0]?.id || products?.[0]?.id || '';
+    const product = (products || []).find(item => String(item.id) === String(effectiveProductId));
+    const noteByOrder = new Map((deliveryNotes || []).map(note => [String(note.orderId), note]));
+    const harvestByBatch = new Map((harvests || []).map(harvest => [String(harvest.batchNumber), harvest]));
+    const costByOrderProduct = new Map();
+    (productMovements || [])
+      .filter(movement => movement.type === 'ORDER' && movement.referenceId?.includes('|'))
+      .forEach(movement => {
+        const [orderId, batch] = movement.referenceId.split('|');
+        if (String(movement.productId) !== String(effectiveProductId)) return;
+        const harvest = harvestByBatch.get(String(batch));
+        const quantity = Math.abs(Number(movement.quantity || 0));
+        const key = `${orderId}::${effectiveProductId}`;
+        const current = costByOrderProduct.get(key) || { cost: 0, units: 0 };
+        if (Number(harvest?.costPerTupper || 0) > 0) {
+          current.cost += quantity * Number(harvest.costPerTupper);
+          current.units += quantity;
+        }
+        costByOrderProduct.set(key, current);
+      });
+
+    const sales = [];
+    (orders || []).filter(order => order.status === 'DELIVERED').forEach(order => {
+      if (intelligenceClientId && String(order.clientId) !== String(intelligenceClientId)) return;
+      const items = (order.items || []).filter(item => String(item.productId) === String(effectiveProductId));
+      if (!items.length) return;
+      const date = String(noteByOrder.get(String(order.id))?.date || order.date || order.createdAt || '').slice(0, 10);
+      const quantity = items.reduce((sum, item) => sum + Number(item.quantity || 0), 0);
+      const revenue = items.reduce((sum, item) => sum + Number(item.price || 0) * Number(item.quantity || 0) * (1 - Number(item.discount || 0) / 100), 0);
+      const client = (clients || []).find(item => String(item.id) === String(order.clientId));
+      const costRecord = costByOrderProduct.get(`${order.id}::${effectiveProductId}`) || { cost: 0, units: 0 };
+      sales.push({
+        orderId: order.id,
+        date,
+        clientId: order.clientId,
+        clientName: client?.commercialName || client?.name || order.clientCommercialName || order.clientName || 'Cliente sin identificar',
+        quantity,
+        revenue,
+        cost: costRecord.cost,
+        costedUnits: costRecord.units
+      });
+    });
+
+    const dates = sales.map(sale => sale.date).filter(Boolean).sort();
+    const anchor = dates.length ? new Date(`${dates[dates.length - 1]}T12:00:00`) : new Date();
+    const monday = date => {
+      const result = new Date(date);
+      const day = result.getDay() || 7;
+      result.setDate(result.getDate() - day + 1);
+      result.setHours(12, 0, 0, 0);
+      return result;
+    };
+    const localKey = date => {
+      const offset = date.getTimezoneOffset() * 60000;
+      return new Date(date.getTime() - offset).toISOString().slice(0, 10);
+    };
+    const anchorMonday = monday(anchor);
+    const weeks = Array.from({ length: 12 }, (_, index) => {
+      const start = new Date(anchorMonday);
+      start.setDate(start.getDate() - (11 - index) * 7);
+      const end = new Date(start);
+      end.setDate(end.getDate() + 6);
+      return {
+        key: localKey(start),
+        name: new Intl.DateTimeFormat('es-ES', { day: '2-digit', month: 'short' }).format(start).replace('.', ''),
+        start: localKey(start),
+        end: localKey(end),
+        units: 0,
+        revenue: 0,
+        orders: 0
+      };
+    });
+    sales.forEach(sale => {
+      const bucket = weeks.find(week => sale.date >= week.start && sale.date <= week.end);
+      if (bucket) {
+        bucket.units += sale.quantity;
+        bucket.revenue += sale.revenue;
+        bucket.orders += 1;
+      }
+    });
+    const recent = weeks.slice(-8);
+    const weightTotal = recent.reduce((sum, _week, index) => sum + index + 1, 0);
+    const weightedUnits = recent.reduce((sum, week, index) => sum + week.units * (index + 1), 0) / weightTotal;
+    const lastFour = recent.slice(-4).reduce((sum, week) => sum + week.units, 0) / 4;
+    const previousFour = recent.slice(0, 4).reduce((sum, week) => sum + week.units, 0) / 4;
+    const trend = previousFour > 0 ? (lastFour - previousFour) / previousFour : 0;
+    const forecastUnits = Math.max(Math.round(weightedUnits * (1 + Math.max(-0.25, Math.min(trend * 0.35, 0.35)))), 0);
+    const totalUnits = sales.reduce((sum, sale) => sum + sale.quantity, 0);
+    const totalRevenue = sales.reduce((sum, sale) => sum + sale.revenue, 0);
+    const totalCost = sales.reduce((sum, sale) => sum + sale.cost, 0);
+    const costedUnits = sales.reduce((sum, sale) => sum + sale.costedUnits, 0);
+    const averageOrder = sales.length ? totalUnits / sales.length : 0;
+    const averagePrice = totalUnits ? totalRevenue / totalUnits : 0;
+    const averageUnitCost = costedUnits ? totalCost / costedUnits : 0;
+    const profitPerUnit = averagePrice - averageUnitCost;
+    const relevantHarvests = (harvests || []).filter(harvest => String(harvest.productId) === String(effectiveProductId));
+    const producedUnits = relevantHarvests.reduce((sum, harvest) => sum + Number(harvest.tuppersCount || 0), 0);
+    const usedTrays = relevantHarvests.reduce((sum, harvest) => sum + Object.values(harvest.selectedCropUsages || {}).reduce((traySum, value) => traySum + Number(value || 0), 0), 0);
+    const unitsPerTray = usedTrays > 0 ? producedUnits / usedTrays : 0;
+    const recommendedTrays = unitsPerTray > 0 ? Math.ceil(forecastUnits / unitsPerTray) : 0;
+    const weeksWithSales = recent.filter(week => week.units > 0).length;
+    const confidence = weeksWithSales >= 7 ? 'Alta' : weeksWithSales >= 4 ? 'Media' : 'Inicial';
+    const clientMap = new Map();
+    sales.forEach(sale => {
+      const key = sale.clientId || sale.clientName;
+      const row = clientMap.get(key) || { id: key, name: sale.clientName, units: 0, revenue: 0, cost: 0, orders: 0 };
+      row.units += sale.quantity; row.revenue += sale.revenue; row.cost += sale.cost; row.orders += 1;
+      clientMap.set(key, row);
+    });
+    const clientRows = [...clientMap.values()].map(row => ({
+      ...row,
+      averagePrice: row.units ? row.revenue / row.units : 0,
+      profit: row.revenue - row.cost,
+      averageOrder: row.orders ? row.units / row.orders : 0
+    })).sort((a, b) => b.revenue - a.revenue);
+
+    return {
+      effectiveProductId,
+      product,
+      sales,
+      weeks,
+      totalUnits,
+      totalRevenue,
+      totalCost,
+      averageOrder,
+      averagePrice,
+      averageUnitCost,
+      profitPerUnit,
+      forecastUnits,
+      forecastOrders: averageOrder > 0 ? Math.ceil(forecastUnits / averageOrder) : 0,
+      unitsPerTray,
+      recommendedTrays,
+      confidence,
+      weeksWithSales,
+      trend,
+      clientRows
+    };
+  }, [clients, deliveryNotes, harvests, intelligenceClientId, intelligenceProductId, orders, productMovements, products, report.productRows]);
+
   const productionRows = (cropTypes || []).map(cropType => {
     const seedCost = latestVarietySeedCost(cropType.varietyId) * Number(cropType.seedGrams || 0);
     const substrateCost = latestArticleUnitCost(cropType.substrateId) * Number(cropType.substrateLiters || 0);
@@ -527,6 +671,20 @@ export default function Profitability({
           ['Tesorería estimada', money(financialControl.cashBalance)]
         ]
       },
+      intelligence: {
+        title: `Previsión y rentabilidad - ${intelligence.product?.name || 'Producto'}`,
+        head: [['Indicador', 'Resultado']],
+        body: [
+          ['Unidades vendidas históricas', intelligence.totalUnits],
+          ['Precio medio por unidad', money(intelligence.averagePrice)],
+          ['Coste medio trazado', money(intelligence.averageUnitCost)],
+          ['Beneficio medio por unidad', money(intelligence.profitPerUnit)],
+          ['Previsión próxima semana', `${intelligence.forecastUnits} unidades`],
+          ['Pedidos aproximados', intelligence.forecastOrders],
+          ['Bandejas recomendadas', intelligence.recommendedTrays || 'Sin rendimiento disponible'],
+          ['Confianza', intelligence.confidence]
+        ]
+      },
       products: {
         title: 'Rentabilidad completa por producto',
         head: [['Producto', 'Uds.', 'Ventas', 'Venta trazada', 'Coste', 'Margen', '%', 'Sin coste']],
@@ -628,6 +786,7 @@ export default function Profitability({
         <button className={section === 'sales' ? 'active' : ''} onClick={() => openSection('sales')}>Ventas</button>
         <button className={section === 'costs' ? 'active' : ''} onClick={() => openSection('costs')}>Costes y producción</button>
         <button className={section === 'treasury' ? 'active' : ''} onClick={() => openSection('treasury')}>Tesorería y stock</button>
+        <button className={section === 'intelligence' ? 'active intelligence' : 'intelligence'} onClick={() => openSection('intelligence')}><BrainCircuit size={16} /> Previsión</button>
       </nav>
 
       <section className="profit-stats profit-section-stats">
@@ -654,6 +813,12 @@ export default function Profitability({
           <StatCard icon={<ReceiptText size={22} />} label="Pagos registrados" value={money(financialControl.cashOut)} detail="Compras + gastos pagados" tone="amber" />
           <StatCard icon={<WalletCards size={22} />} label="Saldo estimado" value={money(financialControl.cashBalance)} detail="Cobros − pagos registrados" tone="purple" />
           <StatCard icon={<PackageCheck size={22} />} label="Valor total del stock" value={money(financialControl.totalStockValue)} detail={`Materiales ${money(financialControl.materialStockValue)}`} tone="blue" />
+        </>}
+        {section === 'intelligence' && <>
+          <StatCard icon={<CircleDollarSign size={22} />} label="Beneficio por unidad" value={money(intelligence.profitPerUnit)} detail={`Precio medio ${money(intelligence.averagePrice)}`} />
+          <StatCard icon={<TrendingUp size={22} />} label="Previsión próxima semana" value={`${intelligence.forecastUnits} uds.`} detail={`${intelligence.forecastOrders} pedidos aproximados`} tone="purple" />
+          <StatCard icon={<Sprout size={22} />} label="Cultivo recomendado" value={`${intelligence.recommendedTrays || '—'} bandejas`} detail={intelligence.unitsPerTray ? `${intelligence.unitsPerTray.toFixed(1)} uds. históricas/bandeja` : 'Falta rendimiento de cosechas'} tone="blue" />
+          <StatCard icon={<BrainCircuit size={22} />} label="Confianza de previsión" value={intelligence.confidence} detail={`${intelligence.weeksWithSales}/8 semanas con ventas`} tone="amber" />
         </>}
       </section>
 
@@ -682,7 +847,45 @@ export default function Profitability({
         </button>
       </section>}
 
-      {section !== 'summary' && <section className="premium-card profit-table-card">
+      {section === 'intelligence' && <section className="profit-intelligence">
+        <header className="profit-intelligence-query">
+          <div><span>CONSULTA CONCRETA</span><h2>¿Qué quieres analizar y prever?</h2><p>Selecciona un producto y, si quieres, limita el cálculo a un cliente.</p></div>
+          <label>Producto<select value={intelligence.effectiveProductId} onChange={event => setIntelligenceProductId(event.target.value)}>{(products || []).map(product => <option key={product.id} value={product.id}>{product.name}</option>)}</select></label>
+          <label>Cliente<select value={intelligenceClientId} onChange={event => setIntelligenceClientId(event.target.value)}><option value="">Todos los clientes</option>{(clients || []).map(client => <option key={client.id} value={client.id}>{client.commercialName || client.name}</option>)}</select></label>
+        </header>
+        <div className="profit-intelligence-grid">
+          <article className="profit-forecast-chart">
+            <div><h3>Ventas semanales de {intelligence.product?.name || 'producto'}</h3><p>Las ocho semanas más recientes pesan más en la previsión.</p></div>
+            <ResponsiveContainer width="100%" height={250}>
+              <BarChart data={intelligence.weeks} margin={{ top: 15, right: 10, left: -15, bottom: 5 }}>
+                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
+                <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fill: '#64748b', fontSize: 10 }} />
+                <YAxis axisLine={false} tickLine={false} tick={{ fill: '#94a3b8', fontSize: 10 }} />
+                <Tooltip formatter={(value, name) => [name === 'units' ? `${value} uds.` : money(value), name === 'units' ? 'Unidades' : 'Ventas']} />
+                <Bar dataKey="units" name="Unidades" fill="#10b981" radius={[5, 5, 0, 0]} maxBarSize={30} />
+              </BarChart>
+            </ResponsiveContainer>
+          </article>
+          <article className="profit-decision-card">
+            <span>RECOMENDACIÓN PRÓXIMA SEMANA</span>
+            <strong>{intelligence.forecastUnits} unidades</strong>
+            <p>Preparar aproximadamente <b>{intelligence.recommendedTrays || '—'} bandejas</b> para atender unos <b>{intelligence.forecastOrders} pedidos</b>.</p>
+            <div><span>Tendencia</span><strong>{intelligence.trend > 0 ? '+' : ''}{(intelligence.trend * 100).toFixed(0)} %</strong></div>
+            <div><span>Pedido medio</span><strong>{intelligence.averageOrder.toFixed(1)} uds.</strong></div>
+            <div><span>Beneficio estimado</span><strong>{money(intelligence.forecastUnits * intelligence.profitPerUnit)}</strong></div>
+            <small>Estimación estadística, no compromiso de venta. Mejorará al acumular semanas de datos trazados.</small>
+          </article>
+        </div>
+        <article className="profit-client-profitability">
+          <header><div><h3>Rentabilidad de {intelligence.product?.name || 'producto'} por cliente</h3><p>Precio, frecuencia, volumen y beneficio real de las ventas registradas.</p></div><strong>{intelligence.sales.length} pedidos analizados</strong></header>
+          <div className="table-container"><table><thead><tr><th>Cliente</th><th>Pedidos</th><th>Uds.</th><th>Pedido medio</th><th>Precio medio</th><th>Ventas</th><th>Coste trazado</th><th>Beneficio</th></tr></thead><tbody>
+            {intelligence.clientRows.map(row => <tr key={row.id}><td><strong>{row.name}</strong></td><td>{row.orders}</td><td>{row.units}</td><td>{row.averageOrder.toFixed(1)}</td><td>{money(row.averagePrice)}</td><td>{money(row.revenue)}</td><td>{money(row.cost)}</td><td className={row.profit >= 0 ? 'profit-positive' : 'profit-negative'}><strong>{money(row.profit)}</strong></td></tr>)}
+            {!intelligence.clientRows.length && <tr><td colSpan="8" className="profit-empty">Todavía no hay ventas entregadas para esta consulta.</td></tr>}
+          </tbody></table></div>
+        </article>
+      </section>}
+
+      {!['summary', 'intelligence'].includes(section) && <section className="premium-card profit-table-card">
         <div className="profit-table-heading">
           <div>
             <h2>Explorador económico</h2>
