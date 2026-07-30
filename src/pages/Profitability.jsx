@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { BarChart3, BrainCircuit, CircleDollarSign, Download, LayoutList, PackageCheck, Percent, ReceiptText, Sprout, TrendingUp, TriangleAlert, WalletCards, X } from 'lucide-react';
+import { BarChart3, BrainCircuit, CircleDollarSign, Download, LayoutList, PackageCheck, Percent, ReceiptText, Sprout, TrendingUp, TriangleAlert, Users, WalletCards, X } from 'lucide-react';
 import { jsPDF } from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import {
@@ -87,15 +87,19 @@ export default function Profitability({
     ? 'summary'
     : view === 'intelligence'
       ? 'intelligence'
+    : ['profit-products', 'profit-clients'].includes(view)
+      ? 'profitability'
     : ['orders', 'products', 'clients'].includes(view)
       ? 'sales'
-      : ['harvests', 'cultivations', 'varietycosts', 'clientcosts', 'production', 'expenses', 'packaging'].includes(view)
-        ? 'costs'
+      : ['harvests', 'cultivations', 'varietycosts', 'production', 'packaging'].includes(view)
+        ? 'production'
+      : view === 'expenses'
+        ? 'expenses'
         : 'treasury';
   const openSection = nextSection => {
-    const defaultViews = { summary: 'summary', sales: 'products', costs: 'harvests', treasury: 'receivables', intelligence: 'intelligence' };
+    const defaultViews = { summary: 'summary', sales: 'orders', production: 'harvests', expenses: 'expenses', profitability: 'profit-products', treasury: 'receivables', intelligence: 'intelligence' };
     setView(defaultViews[nextSection]);
-    setDisplayMode(nextSection === 'sales' ? 'visual' : 'detail');
+    setDisplayMode(['sales', 'profitability'].includes(nextSection) ? 'visual' : 'detail');
     setQuery('');
   };
   const saveExpense = async event => {
@@ -589,7 +593,7 @@ export default function Profitability({
         confidence: activeWeeks >= 7 ? 'Alta' : activeWeeks >= 4 ? 'Media' : 'Inicial',
         activeWeeks
       };
-    }).filter(row => row.forecastUnits > 0 || row.totalUnits > 0).sort((a, b) => b.forecastUnits - a.forecastUnits);
+    }).filter(row => row.forecastUnits > 0).sort((a, b) => b.forecastUnits - a.forecastUnits);
 
     return {
       isAllProducts,
@@ -736,9 +740,9 @@ export default function Profitability({
     .sort((a, b) => b.unitCost - a.unitCost);
   const baseRows = view === 'orders'
     ? report.orderRows
-    : view === 'products'
+    : ['products', 'profit-products'].includes(view)
       ? report.productRows
-    : view === 'clients'
+    : ['clients', 'profit-clients'].includes(view)
       ? report.clientRows
       : view === 'production'
         ? productionRows
@@ -815,23 +819,21 @@ export default function Profitability({
         ]
       },
       intelligence: {
-        title: `Previsión y rentabilidad - ${intelligence.product?.name || 'Producto'}`,
+        title: `Previsión semanal - ${intelligence.product?.name || 'Todos los productos'}`,
         head: [['Indicador', 'Resultado']],
         body: [
           ['Unidades vendidas históricas', intelligence.totalUnits],
-          ['Precio medio por unidad', money(intelligence.averagePrice)],
-          ['Coste medio trazado', money(intelligence.averageUnitCost)],
-          ['Beneficio medio por unidad', money(intelligence.profitPerUnit)],
           ['Previsión próxima semana', `${intelligence.forecastUnits} unidades`],
           ['Pedidos aproximados', intelligence.forecastOrders],
           ['Bandejas recomendadas', intelligence.recommendedTrays || 'Sin rendimiento disponible'],
+          ['Tendencia semanal', `${intelligence.trend > 0 ? '+' : ''}${(intelligence.trend * 100).toFixed(0)} %`],
           ['Confianza', intelligence.confidence]
         ]
       },
       products: {
-        title: 'Rentabilidad completa por producto',
-        head: [['Producto', 'Uds.', 'Ventas', 'Venta trazada', 'Coste', 'Margen', '%', 'Sin coste']],
-        body: rows.map(row => [row.name, row.units, money(row.revenue), money(row.tracedRevenue), money(row.cost), money(row.margin), `${row.marginPercent.toFixed(1)} %`, row.pendingUnits])
+        title: 'Ventas por producto',
+        head: [['Producto', 'Uds.', 'Ventas', 'Precio medio', 'Peso']],
+        body: rows.map(row => [row.name, row.units, money(row.revenue), money(row.units ? row.revenue / row.units : 0), `${report.revenue ? (row.revenue / report.revenue * 100).toFixed(1) : '0.0'} %`])
       },
       orders: {
         title: 'Ventas entregadas del periodo',
@@ -839,7 +841,17 @@ export default function Profitability({
         body: rows.map(row => [row.date, row.number, row.clientName, row.units, money(row.revenue), money(row.cost), money(row.margin), row.pendingUnits])
       },
       clients: {
-        title: 'Ventas y rentabilidad por cliente',
+        title: 'Ventas por cliente',
+        head: [['Cliente', 'Uds.', 'Ventas', 'Precio medio', 'Peso']],
+        body: rows.map(row => [row.name, row.units, money(row.revenue), money(row.units ? row.revenue / row.units : 0), `${report.revenue ? (row.revenue / report.revenue * 100).toFixed(1) : '0.0'} %`])
+      },
+      'profit-products': {
+        title: 'Rentabilidad completa por producto',
+        head: [['Producto', 'Uds.', 'Ventas', 'Venta trazada', 'Coste', 'Margen', '%', 'Sin coste']],
+        body: rows.map(row => [row.name, row.units, money(row.revenue), money(row.tracedRevenue), money(row.cost), money(row.margin), `${row.marginPercent.toFixed(1)} %`, row.pendingUnits])
+      },
+      'profit-clients': {
+        title: 'Rentabilidad completa por cliente',
         head: [['Cliente', 'Uds.', 'Ventas', 'Venta trazada', 'Coste', 'Margen', '%', 'Sin coste']],
         body: rows.map(row => [row.name, row.units, money(row.revenue), money(row.tracedRevenue), money(row.cost), money(row.margin), `${row.marginPercent.toFixed(1)} %`, row.pendingUnits])
       },
@@ -948,8 +960,10 @@ export default function Profitability({
       <nav className="profit-section-nav" aria-label="Apartados financieros">
         <button className={section === 'summary' ? 'active' : ''} onClick={() => openSection('summary')}><span>01</span><strong>Resumen</strong><small>Visión general</small></button>
         <button className={section === 'sales' ? 'active' : ''} onClick={() => openSection('sales')}><span>02</span><strong>Ventas</strong><small>Productos y clientes</small></button>
-        <button className={section === 'costs' ? 'active' : ''} onClick={() => openSection('costs')}><span>03</span><strong>Costes</strong><small>Producción y cultivos</small></button>
-        <button className={section === 'treasury' ? 'active' : ''} onClick={() => openSection('treasury')}><span>04</span><strong>Tesorería</strong><small>Cobros y existencias</small></button>
+        <button className={section === 'production' ? 'active' : ''} onClick={() => openSection('production')}><span>03</span><strong>Producción</strong><small>Cultivos y cosechas</small></button>
+        <button className={section === 'expenses' ? 'active' : ''} onClick={() => openSection('expenses')}><span>04</span><strong>Gastos</strong><small>Generales y operativos</small></button>
+        <button className={section === 'profitability' ? 'active' : ''} onClick={() => openSection('profitability')}><span>05</span><strong>Rentabilidad</strong><small>Margen y beneficio</small></button>
+        <button className={section === 'treasury' ? 'active' : ''} onClick={() => openSection('treasury')}><span>06</span><strong>Tesorería</strong><small>Cobros y existencias</small></button>
         <button className={section === 'intelligence' ? 'active intelligence' : 'intelligence'} onClick={() => openSection('intelligence')}><BrainCircuit size={16} /><strong>Previsión</strong><small>Demanda semanal</small></button>
       </nav>
 
@@ -962,15 +976,27 @@ export default function Profitability({
         </>}
         {section === 'sales' && <>
           <StatCard icon={<CircleDollarSign size={22} />} label="Ventas netas" value={money(report.revenue)} detail={`${report.units} unidades entregadas`} />
-          <StatCard icon={<PackageCheck size={22} />} label="Coste de lo vendido" value={money(report.cost)} detail={`${report.costedUnits} unidades trazadas`} tone="blue" />
-          <StatCard icon={<BarChart3 size={22} />} label="Beneficio de ventas" value={money(report.margin)} detail="Ventas trazadas − coste directo" tone="purple" />
-          <StatCard icon={<Percent size={22} />} label="Margen comercial" value={`${report.marginPercent.toFixed(1)} %`} detail={`${report.coverage.toFixed(1)} % con coste conocido`} tone="amber" />
+          <StatCard icon={<PackageCheck size={22} />} label="Unidades vendidas" value={report.units} detail={`${report.orderRows.length} entregas realizadas`} tone="blue" />
+          <StatCard icon={<ReceiptText size={22} />} label="Venta media" value={money(report.orderRows.length ? report.revenue / report.orderRows.length : 0)} detail="Importe medio por entrega" tone="purple" />
+          <StatCard icon={<Users size={22} />} label="Clientes con ventas" value={report.clientRows.length} detail="Clientes servidos en el periodo" tone="amber" />
         </>}
-        {section === 'costs' && <>
+        {section === 'production' && <>
           <StatCard icon={<Sprout size={22} />} label="Producción realizada" value={money(financialControl.productionCost)} detail={`${financialControl.producedUnits} unidades producidas`} tone="blue" />
           <StatCard icon={<PackageCheck size={22} />} label="Producto sin vender" value={money(financialControl.unsoldCost)} detail={`${financialControl.unsoldUnits} unidades terminadas`} tone="purple" />
-          <StatCard icon={<ReceiptText size={22} />} label="Gastos generales" value={money(financialControl.generalExpensesTotal)} detail={`${money(financialControl.pendingGeneralExpenses)} pendientes`} tone="amber" />
-          <StatCard icon={<BarChart3 size={22} />} label="Coste total del periodo" value={money(financialControl.totalPeriodCosts)} detail="Producción + gastos generales" tone="green" />
+          <StatCard icon={<Sprout size={22} />} label="Cultivos registrados" value={cultivationRows.length} detail="Lotes dentro del periodo" tone="amber" />
+          <StatCard icon={<PackageCheck size={22} />} label="Cosechas registradas" value={financialControl.harvestRows.length} detail="Producciones terminadas" tone="green" />
+        </>}
+        {section === 'expenses' && <>
+          <StatCard icon={<ReceiptText size={22} />} label="Gastos generales" value={money(financialControl.generalExpensesTotal)} detail={`${financialControl.generalExpenseRows.length} registros`} tone="amber" />
+          <StatCard icon={<CircleDollarSign size={22} />} label="Pagados" value={money(financialControl.paidGeneralExpenses)} detail="Salidas ya realizadas" />
+          <StatCard icon={<WalletCards size={22} />} label="Pendientes" value={money(financialControl.pendingGeneralExpenses)} detail="Pagos aún pendientes" tone="purple" />
+          <StatCard icon={<Percent size={22} />} label="Peso sobre ventas" value={`${report.revenue ? (financialControl.generalExpensesTotal / report.revenue * 100).toFixed(1) : '0.0'} %`} detail="Gastos generales / ventas" tone="blue" />
+        </>}
+        {section === 'profitability' && <>
+          <StatCard icon={<CircleDollarSign size={22} />} label="Ventas trazadas" value={money(report.tracedRevenue)} detail={`${report.costedUnits} unidades con coste`} />
+          <StatCard icon={<PackageCheck size={22} />} label="Coste vendido" value={money(report.cost)} detail="Coste directo trazado" tone="blue" />
+          <StatCard icon={<BarChart3 size={22} />} label="Beneficio trazado" value={money(report.margin)} detail="Ventas trazadas − coste directo" tone="purple" />
+          <StatCard icon={<Percent size={22} />} label="Margen" value={`${report.marginPercent.toFixed(1)} %`} detail={`${report.coverage.toFixed(1)} % con coste conocido`} tone="amber" />
         </>}
         {section === 'treasury' && <>
           <StatCard icon={<CircleDollarSign size={22} />} label="Facturas cobradas" value={money(financialControl.collected)} detail="Marcadas como pagadas" />
@@ -979,14 +1005,14 @@ export default function Profitability({
           <StatCard icon={<PackageCheck size={22} />} label="Valor total del stock" value={money(financialControl.totalStockValue)} detail={`Materiales ${money(financialControl.materialStockValue)}`} tone="blue" />
         </>}
         {section === 'intelligence' && <>
-          <StatCard icon={<CircleDollarSign size={22} />} label="Beneficio por unidad" value={intelligence.costedUnits ? money(intelligence.profitPerUnit) : 'Pendiente'} detail={intelligence.costedUnits ? `Precio medio ${money(intelligence.averagePrice)}` : 'Falta coste trazado de ventas'} />
           <StatCard icon={<TrendingUp size={22} />} label="Previsión próxima semana" value={`${intelligence.forecastUnits} uds.`} detail={`${intelligence.forecastOrders} pedidos aproximados`} tone="purple" />
           <StatCard icon={<Sprout size={22} />} label="Cultivo recomendado" value={`${intelligence.recommendedTrays || '—'} bandejas`} detail={intelligence.unitsPerTray ? `${intelligence.unitsPerTray.toFixed(1)} uds. históricas/bandeja` : 'Falta rendimiento de cosechas'} tone="blue" />
           <StatCard icon={<BrainCircuit size={22} />} label="Confianza de previsión" value={intelligence.confidence} detail={`${intelligence.weeksWithSales}/8 semanas con ventas`} tone="amber" />
+          <StatCard icon={<TrendingUp size={22} />} label="Tendencia semanal" value={`${intelligence.trend > 0 ? '+' : ''}${(intelligence.trend * 100).toFixed(0)} %`} detail="Variación frente a semanas anteriores" />
         </>}
       </section>
 
-      {section === 'sales' && report.pendingUnits > 0 && (
+      {section === 'profitability' && report.pendingUnits > 0 && (
         <div className="profit-warning">
           <TriangleAlert size={20} />
           <div>
@@ -1036,17 +1062,10 @@ export default function Profitability({
             <p>Preparar aproximadamente <b>{intelligence.recommendedTrays || '—'} bandejas</b> para atender unos <b>{intelligence.forecastOrders} pedidos</b>.</p>
             <div><span>Tendencia</span><strong>{intelligence.trend > 0 ? '+' : ''}{(intelligence.trend * 100).toFixed(0)} %</strong></div>
             <div><span>Pedido medio</span><strong>{intelligence.averageOrder.toFixed(1)} uds.</strong></div>
-            <div><span>Beneficio estimado</span><strong>{money(intelligence.forecastUnits * intelligence.profitPerUnit)}</strong></div>
+            <div><span>Semanas con ventas</span><strong>{intelligence.weeksWithSales} de 8</strong></div>
             <small>Estimación estadística, no compromiso de venta. Mejorará al acumular semanas de datos trazados.</small>
           </article>
         </div>
-        <article className="profit-client-profitability">
-          <header><div><h3>Rentabilidad de {intelligence.isAllProducts ? 'todos los productos' : intelligence.product?.name || 'producto'} por cliente</h3><p>Precio, frecuencia, volumen y beneficio real de las ventas registradas.</p></div><strong>{intelligence.sales.length} pedidos analizados</strong></header>
-          <div className="table-container"><table><thead><tr><th>Cliente</th><th>Pedidos</th><th>Uds.</th><th>Pedido medio</th><th>Precio medio</th><th>Ventas</th><th>Coste trazado</th><th>Beneficio</th></tr></thead><tbody>
-            {intelligence.clientRows.map(row => <tr key={row.id}><td><strong>{row.name}</strong></td><td>{row.orders}</td><td>{row.units}</td><td>{row.averageOrder.toFixed(1)}</td><td>{money(row.averagePrice)}</td><td>{money(row.revenue)}</td><td>{money(row.cost)}</td><td className={row.profit >= 0 ? 'profit-positive' : 'profit-negative'}><strong>{money(row.profit)}</strong></td></tr>)}
-            {!intelligence.clientRows.length && <tr><td colSpan="8" className="profit-empty">Todavía no hay ventas entregadas para esta consulta.</td></tr>}
-          </tbody></table></div>
-        </article>
         <article className="profit-client-profitability">
           <header><div><h3>Previsión detallada por producto y cliente</h3><p>Propuesta concreta de tuppers, pedidos y bandejas para la próxima semana.</p></div><button className="profit-save-forecast" onClick={saveWeeklyForecast}>Guardar previsión semanal</button></header>
           {forecastSaveState && <p className="profit-forecast-saved">{forecastSaveState}</p>}
@@ -1066,7 +1085,7 @@ export default function Profitability({
       {!['summary', 'intelligence'].includes(section) && <section className="premium-card profit-table-card">
         <div className="profit-table-heading">
           <div>
-            <h2>{section === 'sales' ? 'Consultas de ventas' : section === 'costs' ? 'Consultas de costes y producción' : 'Consultas de tesorería y existencias'}</h2>
+            <h2>{section === 'sales' ? 'Consultas de ventas' : section === 'production' ? 'Control de producción' : section === 'expenses' ? 'Control de gastos' : section === 'profitability' ? 'Análisis de rentabilidad' : 'Consultas de tesorería y existencias'}</h2>
             <p>Elige qué dato quieres consultar. Cada apartado mantiene el mismo periodo seleccionado.</p>
           </div>
           <div className={`profit-subsection-nav ${section}`}>
@@ -1075,14 +1094,17 @@ export default function Profitability({
                 <button className={view === 'products' ? 'active' : ''} onClick={() => setView('products')}><strong>Por producto</strong><small>Unidades, facturación y margen</small></button>
                 <button className={view === 'clients' ? 'active' : ''} onClick={() => setView('clients')}><strong>Por cliente</strong><small>Consumo, precios y rentabilidad</small></button>
               </>}
-              {section === 'costs' && <>
+              {section === 'production' && <>
                 <button className={view === 'harvests' ? 'active' : ''} onClick={() => { setView('harvests'); setDisplayMode('detail'); }}><strong>Producción terminada</strong><small>Cosechado, vendido y sin vender</small></button>
                 <button className={view === 'varietycosts' ? 'active' : ''} onClick={() => { setView('varietycosts'); setDisplayMode('detail'); }}><strong>Por variedad</strong><small>Coste total y por bandeja</small></button>
-                <button className={view === 'clientcosts' ? 'active' : ''} onClick={() => { setView('clientcosts'); setDisplayMode('detail'); }}><strong>Por cliente</strong><small>Coste servido y beneficio</small></button>
                 <button className={view === 'cultivations' ? 'active' : ''} onClick={() => { setView('cultivations'); setDisplayMode('detail'); }}><strong>Cada cultivo</strong><small>Consumo y coste de cada lote</small></button>
                 <button className={view === 'production' ? 'active' : ''} onClick={() => { setView('production'); setDisplayMode('detail'); }}><strong>Receta por bandeja</strong><small>Semilla, sustrato y soporte</small></button>
-                <button className={view === 'expenses' ? 'active' : ''} onClick={() => { setView('expenses'); setDisplayMode('detail'); }}><strong>Gastos generales</strong><small>Personal, luz, agua y otros</small></button>
                 <button className={view === 'packaging' ? 'active' : ''} onClick={() => { setView('packaging'); setDisplayMode('detail'); }}><strong>Envases y vivo</strong><small>Coste y existencias de formatos</small></button>
+              </>}
+              {section === 'expenses' && <button className="active"><strong>Gastos registrados</strong><small>Personal, suministros, transporte y otros</small></button>}
+              {section === 'profitability' && <>
+                <button className={view === 'profit-products' ? 'active' : ''} onClick={() => setView('profit-products')}><strong>Por producto</strong><small>Ventas, coste, beneficio y margen</small></button>
+                <button className={view === 'profit-clients' ? 'active' : ''} onClick={() => setView('profit-clients')}><strong>Por cliente</strong><small>Rentabilidad real de cada cliente</small></button>
               </>}
               {section === 'treasury' && <>
                 <button className={view === 'receivables' ? 'active' : ''} onClick={() => setView('receivables')}><strong>Cobros por cliente</strong><small>Pagado, pendiente y sin facturar</small></button>
@@ -1091,7 +1113,7 @@ export default function Profitability({
               </>}
           </div>
           <div className="profit-table-tools">
-            {(view === 'products' || view === 'clients') && <div className="profit-tabs">
+            {(['products', 'clients', 'profit-products', 'profit-clients'].includes(view)) && <div className="profit-tabs">
               <button className={displayMode === 'visual' ? 'active' : ''} onClick={() => setDisplayMode('visual')}><BarChart3 size={15} /> Gráficas</button>
               <button className={displayMode === 'detail' ? 'active' : ''} onClick={() => setDisplayMode('detail')}><LayoutList size={15} /> Detalle</button>
             </div>}
@@ -1117,10 +1139,10 @@ export default function Profitability({
           </form>
         )}
 
-        {displayMode === 'visual' && (view === 'products' || view === 'clients') ? (
+        {displayMode === 'visual' && ['products', 'clients', 'profit-products', 'profit-clients'].includes(view) ? (
           <div className="profit-charts">
             <article className="profit-chart-main">
-              <div><h3>Ventas frente a costes</h3><p>Principales {view === 'products' ? 'productos' : 'clientes'} del periodo</p></div>
+              <div><h3>{section === 'profitability' ? 'Ventas frente a costes' : 'Volumen de ventas'}</h3><p>Principales {view.includes('product') ? 'productos' : 'clientes'} del periodo</p></div>
               <div className="profit-chart-canvas">
                 <ResponsiveContainer width="100%" height="100%">
                   <BarChart data={chartRows} margin={{ top: 12, right: 12, left: 0, bottom: 8 }}>
@@ -1129,7 +1151,7 @@ export default function Profitability({
                     <YAxis axisLine={false} tickLine={false} tick={{ fill: '#94a3b8', fontSize: 11 }} tickFormatter={value => `${value} €`} />
                     <Tooltip formatter={value => money(value)} contentStyle={{ border: 0, borderRadius: 12, boxShadow: '0 12px 35px rgba(15,23,42,.12)' }} />
                     <Bar dataKey="Ventas" fill="#10b981" radius={[6, 6, 0, 0]} maxBarSize={34} />
-                    <Bar dataKey="Costes" fill="#cbd5e1" radius={[6, 6, 0, 0]} maxBarSize={34} />
+                    {section === 'profitability' && <Bar dataKey="Costes" fill="#cbd5e1" radius={[6, 6, 0, 0]} maxBarSize={34} />}
                   </BarChart>
                 </ResponsiveContainer>
               </div>
@@ -1157,14 +1179,17 @@ export default function Profitability({
         ) : <div className="table-container">
           <table>
             <thead>
-              {(view === 'products' || view === 'clients') && <tr>
-                <th>{view === 'products' ? 'Producto' : 'Cliente'}</th>
+              {(view === 'profit-products' || view === 'profit-clients') && <tr>
+                <th>{view === 'profit-products' ? 'Producto' : 'Cliente'}</th>
                 <th>Unidades</th>
                 <th>Ventas</th>
                 <th>Coste directo</th>
                 <th>Margen trazado</th>
                 <th>Margen</th>
                 <th>Cobertura</th>
+              </tr>}
+              {(view === 'products' || view === 'clients') && <tr>
+                <th>{view === 'products' ? 'Producto' : 'Cliente'}</th><th>Unidades</th><th>Ventas</th><th>Precio medio</th><th>Peso sobre ventas</th>
               </tr>}
               {view === 'orders' && <tr><th>Fecha</th><th>Albarán / pedido</th><th>Cliente</th><th>Unidades</th><th>Venta</th><th>Coste</th><th>Beneficio</th><th>Cobertura</th></tr>}
               {view === 'production' && <tr><th>Variedad / ficha</th><th>Semilla</th><th>Sustrato</th><th>Bandeja</th><th>Coste/bandeja</th><th>Coste/kg</th></tr>}
@@ -1179,7 +1204,7 @@ export default function Profitability({
               {view === 'packaging' && <tr><th>Formato de venta</th><th>Último coste unitario</th><th>Stock actual</th></tr>}
             </thead>
             <tbody>
-              {(view === 'products' || view === 'clients') && rows.map(row => (
+              {(view === 'profit-products' || view === 'profit-clients') && rows.map(row => (
                 <tr key={row.id}>
                   <td><strong>{row.name}</strong></td>
                   <td>{row.units}</td>
@@ -1192,6 +1217,12 @@ export default function Profitability({
                       ? <span className="badge badge-warning">{row.pendingUnits} sin coste</span>
                       : <span className="badge badge-success">Completa</span>}
                   </td>
+                </tr>
+              ))}
+              {(view === 'products' || view === 'clients') && rows.map(row => (
+                <tr key={row.id}>
+                  <td><strong>{row.name}</strong></td><td>{row.units}</td><td><strong>{money(row.revenue)}</strong></td>
+                  <td>{money(row.units ? row.revenue / row.units : 0)}</td><td>{report.revenue ? (row.revenue / report.revenue * 100).toFixed(1) : '0.0'} %</td>
                 </tr>
               ))}
               {view === 'orders' && rows.map(row => (

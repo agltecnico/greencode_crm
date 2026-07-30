@@ -336,7 +336,7 @@ export default function Dashboard() {
         <Metric icon={<FileText />} label="Ticket medio" value={money(data.averageTicket)} detail={`${data.orderCount} ventas realizadas`} tone="blue" onClick={() => openFinancial('clients')} />
         <Metric icon={<ShoppingBag />} label="Pedidos abiertos" value={data.pendingOrders} detail={money(data.pendingOrderValue)} tone="purple" onClick={() => navigate('/admin/orders')} />
         <Metric icon={<Receipt />} label="Gastos del periodo" value={money(data.monthExpenses)} detail={`Producción ${money(data.productionExpenses)} · Generales ${money(data.generalExpenses)}`} tone="amber" onClick={() => navigate('/admin/expenses')} />
-        <Metric icon={<TrendingUp />} label="Margen trazado" value={money(data.margin)} detail={`${data.marginPercent.toFixed(1)} % · ${data.costedUnits}/${data.units} uds. con coste`} tone="green" onClick={() => openFinancial('products')} />
+        <Metric icon={<TrendingUp />} label="Margen trazado" value={money(data.margin)} detail={`${data.marginPercent.toFixed(1)} % · ${data.costedUnits}/${data.units} uds. con coste`} tone="green" onClick={() => openFinancial('profit-products')} />
       </section>
 
       <section className="admin-insights-grid">
