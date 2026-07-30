@@ -11,8 +11,40 @@ import React from 'react';
 import Swal from 'sweetalert2';
 import { useAdminMode } from '../context/AdminModeContext';
 
-const createHarvestBatchNumber = () =>
-  `L-${Date.now().toString(36).toUpperCase()}-${crypto.randomUUID().slice(0, 4).toUpperCase()}`;
+const productLotInitials = productName => {
+  const cleanName = String(productName || 'LOTE')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/\([^)]*\)/g, ' ')
+    .replace(/[^A-Za-z0-9 ]/g, ' ')
+    .trim()
+    .toUpperCase();
+  const words = cleanName.split(/\s+/).filter(Boolean);
+  if (words.length === 1) return words[0].slice(0, 3);
+  return words.slice(0, 3).map(word => word[0]).join('');
+};
+
+const isoWeekNumber = dateValue => {
+  const date = new Date(dateValue);
+  const utcDate = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()));
+  const day = utcDate.getUTCDay() || 7;
+  utcDate.setUTCDate(utcDate.getUTCDate() + 4 - day);
+  const yearStart = new Date(Date.UTC(utcDate.getUTCFullYear(), 0, 1));
+  return Math.ceil((((utcDate - yearStart) / 86_400_000) + 1) / 7);
+};
+
+const createHarvestBatchNumber = (product, harvestDate, existingHarvests = []) => {
+  const date = new Date(harvestDate);
+  const initials = productLotInitials(product?.name);
+  const week = String(isoWeekNumber(date)).padStart(2, '0');
+  const dayMonth = `${String(date.getDate()).padStart(2, '0')}${String(date.getMonth() + 1).padStart(2, '0')}`;
+  const dateKey = toLocalDateKey(date);
+  const dailySequence = existingHarvests.filter(harvest =>
+    harvest.productId === product?.id
+    && toLocalDateKey(harvest.harvestDate || harvest.createdAt) === dateKey
+  ).length + 1;
+  return `${initials}-${week}-${dayMonth}-${String(dailySequence).padStart(2, '0')}`;
+};
 
 const toLocalDateTimeInputValue = (date = new Date()) => {
   const localDate = new Date(date.getTime() - date.getTimezoneOffset() * 60_000);
@@ -428,7 +460,7 @@ export default function Crops() {
       return;
     }
 
-    const batchNum = createHarvestBatchNumber();
+    const batchNum = createHarvestBatchNumber(product, selectedHarvestDate, harvests);
     const harvestResult = await registerHarvest({
       productId: newHarvest.productId,
       selectedCropUsages: newHarvest.selectedCropUsages,
