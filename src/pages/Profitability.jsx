@@ -56,7 +56,8 @@ export default function Profitability({
   const {
     orders, deliveryNotes, clients, products, productMovements, harvests,
     cropTypes, seedVarieties, articles, stockEntries, companyProfile,
-    expenses, purchaseDeliveryNotes, providers, crops, stockLots, addExpense
+    expenses, purchaseDeliveryNotes, providers, crops, stockLots, addExpense,
+    invoices, salesForecasts, saveSalesForecasts
   } = useData();
   const [initialBounds] = useState(() => monthBounds());
   const [filterMode, setFilterMode] = useState(initialStart && initialEnd ? 'range' : 'month');
@@ -67,8 +68,9 @@ export default function Profitability({
   const [displayMode, setDisplayMode] = useState('visual');
   const [query, setQuery] = useState('');
   const [showExpenseForm, setShowExpenseForm] = useState(false);
-  const [intelligenceProductId, setIntelligenceProductId] = useState('');
+  const [intelligenceProductId, setIntelligenceProductId] = useState('__ALL__');
   const [intelligenceClientId, setIntelligenceClientId] = useState('');
+  const [forecastSaveState, setForecastSaveState] = useState('');
   const [expenseForm, setExpenseForm] = useState({
     date: new Date().toISOString().slice(0, 10),
     category: 'SUMINISTROS',
@@ -87,11 +89,11 @@ export default function Profitability({
       ? 'intelligence'
     : ['orders', 'products', 'clients'].includes(view)
       ? 'sales'
-      : ['harvests', 'cultivations', 'production', 'expenses', 'packaging'].includes(view)
+      : ['harvests', 'cultivations', 'varietycosts', 'clientcosts', 'production', 'expenses', 'packaging'].includes(view)
         ? 'costs'
         : 'treasury';
   const openSection = nextSection => {
-    const defaultViews = { summary: 'summary', sales: 'products', costs: 'harvests', treasury: 'treasury', intelligence: 'intelligence' };
+    const defaultViews = { summary: 'summary', sales: 'products', costs: 'harvests', treasury: 'receivables', intelligence: 'intelligence' };
     setView(defaultViews[nextSection]);
     setDisplayMode(nextSection === 'sales' ? 'visual' : 'detail');
     setQuery('');
@@ -285,6 +287,7 @@ export default function Profitability({
     };
     const productById = new Map((products || []).map(product => [String(product.id), product]));
     const providerById = new Map((providers || []).map(provider => [String(provider.id), provider]));
+    const clientById = new Map((clients || []).map(client => [String(client.id), client]));
     const soldByBatch = new Map();
     (productMovements || [])
       .filter(movement => movement.type === 'ORDER' && movement.referenceId?.includes('|'))
@@ -351,12 +354,31 @@ export default function Profitability({
       .sort((a, b) => b.date.localeCompare(a.date));
 
     const periodNotes = (deliveryNotes || []).filter(note => inPeriod(note.date || note.createdAt));
-    const collected = periodNotes
-      .filter(note => note.isPaid === true)
-      .reduce((sum, note) => sum + Number(note.total || 0), 0);
-    const pendingCollection = periodNotes
-      .filter(note => note.isPaid !== true)
-      .reduce((sum, note) => sum + Number(note.total || 0), 0);
+    const periodInvoices = (invoices || []).filter(invoice => inPeriod(invoice.date || invoice.createdAt));
+    const invoicedNoteIds = new Set((invoices || []).flatMap(invoice => invoice.deliveryNoteIds || []).map(String));
+    const unbilledNotes = periodNotes.filter(note => !invoicedNoteIds.has(String(note.id)));
+    const collected = periodInvoices.filter(invoice => invoice.isPaid === true).reduce((sum, invoice) => sum + Number(invoice.total || 0), 0);
+    const pendingCollection = periodInvoices.filter(invoice => invoice.isPaid !== true).reduce((sum, invoice) => sum + Number(invoice.total || 0), 0);
+    const unbilledSales = unbilledNotes.reduce((sum, note) => sum + Number(note.total || 0), 0);
+    const billingClientMap = new Map();
+    const ensureBillingClient = (clientId, fallbackName) => {
+      const client = clientById.get(String(clientId));
+      const name = client?.commercialName || client?.name || fallbackName || 'Cliente sin identificar';
+      const key = clientId || name;
+      if (!billingClientMap.has(key)) billingClientMap.set(key, { id: key, name, invoiced: 0, paid: 0, pending: 0, unbilled: 0, documents: 0 });
+      return billingClientMap.get(key);
+    };
+    periodInvoices.forEach(invoice => {
+      const row = ensureBillingClient(invoice.clientId);
+      const total = Number(invoice.total || 0);
+      row.invoiced += total; row.documents += 1;
+      if (invoice.isPaid === true) row.paid += total;
+      else row.pending += total;
+    });
+    unbilledNotes.forEach(note => {
+      const row = ensureBillingClient(note.clientId, note.clientCommercialName || note.clientName);
+      row.unbilled += Number(note.total || 0);
+    });
     const generalExpensesTotal = generalExpenseRows.reduce((sum, row) => sum + row.total, 0);
     const paidGeneralExpenses = generalExpenseRows.filter(row => row.isPaid).reduce((sum, row) => sum + row.total, 0);
     const pendingGeneralExpenses = generalExpensesTotal - paidGeneralExpenses;
@@ -365,12 +387,14 @@ export default function Profitability({
     const unsoldUnits = harvestRows.reduce((sum, row) => sum + row.remainingUnits, 0);
     const unsoldCost = harvestRows.reduce((sum, row) => sum + row.unsoldCost, 0);
     const purchases = purchaseRows.reduce((sum, row) => sum + row.total, 0);
-    const materialStockValue = (articles || []).reduce((sum, article) => {
-      const quantity = (stockEntries || [])
-        .filter(entry => String(entry.articleId) === String(article.id))
-        .reduce((stock, entry) => stock + Number(entry.quantity || 0), 0);
-      return sum + Math.max(quantity, 0) * latestArticleUnitCost(article.id);
-    }, 0);
+    const stockValueRows = (articles || []).map(article => {
+      const lots = (stockLots || []).filter(lot => String(lot.articleId) === String(article.id) && Number(lot.remainingQuantity || 0) > 0);
+      const quantity = lots.reduce((sum, lot) => sum + Number(lot.remainingQuantity || 0), 0);
+      const total = lots.reduce((sum, lot) => sum + Number(lot.remainingQuantity || 0) * Number(lot.unitCost || 0), 0);
+      const unitCost = quantity > 0 ? total / quantity : latestArticleUnitCost(article.id);
+      return { id: article.id, name: article.name, type: article.type, quantity, unitCost, total };
+    }).filter(row => row.quantity > 0).sort((a, b) => b.total - a.total);
+    const materialStockValue = stockValueRows.reduce((sum, row) => sum + row.total, 0);
     const operatingProfit = report.revenue - report.cost - generalExpensesTotal;
     const cashOut = purchases + paidGeneralExpenses;
 
@@ -387,6 +411,9 @@ export default function Profitability({
       pendingGeneralExpenses,
       collected,
       pendingCollection,
+      unbilledSales,
+      billingClientRows: [...billingClientMap.values()].sort((a, b) => (b.pending + b.unbilled) - (a.pending + a.unbilled)),
+      stockValueRows,
       purchases,
       materialStockValue,
       totalStockValue: materialStockValue + unsoldCost,
@@ -395,10 +422,11 @@ export default function Profitability({
       cashOut,
       cashBalance: collected - cashOut
     };
-  }, [articles, deliveryNotes, expenses, harvests, productMovements, products, providers, purchaseDeliveryNotes, report.cost, report.revenue, selectedBounds.end, selectedBounds.start, stockEntries]);
+  }, [articles, clients, deliveryNotes, expenses, harvests, invoices, productMovements, products, providers, purchaseDeliveryNotes, report.cost, report.revenue, selectedBounds.end, selectedBounds.start, stockEntries, stockLots]);
 
   const intelligence = useMemo(() => {
-    const effectiveProductId = intelligenceProductId || report.productRows[0]?.id || products?.[0]?.id || '';
+    const isAllProducts = intelligenceProductId === '__ALL__';
+    const effectiveProductId = isAllProducts ? '' : (intelligenceProductId || report.productRows[0]?.id || products?.[0]?.id || '');
     const product = (products || []).find(item => String(item.id) === String(effectiveProductId));
     const noteByOrder = new Map((deliveryNotes || []).map(note => [String(note.orderId), note]));
     const harvestByBatch = new Map((harvests || []).map(harvest => [String(harvest.batchNumber), harvest]));
@@ -407,10 +435,9 @@ export default function Profitability({
       .filter(movement => movement.type === 'ORDER' && movement.referenceId?.includes('|'))
       .forEach(movement => {
         const [orderId, batch] = movement.referenceId.split('|');
-        if (String(movement.productId) !== String(effectiveProductId)) return;
         const harvest = harvestByBatch.get(String(batch));
         const quantity = Math.abs(Number(movement.quantity || 0));
-        const key = `${orderId}::${effectiveProductId}`;
+        const key = `${orderId}::${movement.productId}`;
         const current = costByOrderProduct.get(key) || { cost: 0, units: 0 };
         if (Number(harvest?.costPerTupper || 0) > 0) {
           current.cost += quantity * Number(harvest.costPerTupper);
@@ -422,13 +449,18 @@ export default function Profitability({
     const sales = [];
     (orders || []).filter(order => order.status === 'DELIVERED').forEach(order => {
       if (intelligenceClientId && String(order.clientId) !== String(intelligenceClientId)) return;
-      const items = (order.items || []).filter(item => String(item.productId) === String(effectiveProductId));
+      const items = (order.items || []).filter(item => isAllProducts || String(item.productId) === String(effectiveProductId));
       if (!items.length) return;
       const date = String(noteByOrder.get(String(order.id))?.date || order.date || order.createdAt || '').slice(0, 10);
       const quantity = items.reduce((sum, item) => sum + Number(item.quantity || 0), 0);
       const revenue = items.reduce((sum, item) => sum + Number(item.price || 0) * Number(item.quantity || 0) * (1 - Number(item.discount || 0) / 100), 0);
       const client = (clients || []).find(item => String(item.id) === String(order.clientId));
-      const costRecord = costByOrderProduct.get(`${order.id}::${effectiveProductId}`) || { cost: 0, units: 0 };
+      const costRecord = items.reduce((result, item) => {
+        const itemCost = costByOrderProduct.get(`${order.id}::${item.productId}`) || { cost: 0, units: 0 };
+        result.cost += itemCost.cost;
+        result.units += itemCost.units;
+        return result;
+      }, { cost: 0, units: 0 });
       sales.push({
         orderId: order.id,
         date,
@@ -493,7 +525,7 @@ export default function Profitability({
     const averagePrice = totalUnits ? totalRevenue / totalUnits : 0;
     const averageUnitCost = costedUnits ? totalCost / costedUnits : 0;
     const profitPerUnit = costedUnits > 0 ? averagePrice - averageUnitCost : 0;
-    const relevantHarvests = (harvests || []).filter(harvest => String(harvest.productId) === String(effectiveProductId));
+    const relevantHarvests = (harvests || []).filter(harvest => isAllProducts || String(harvest.productId) === String(effectiveProductId));
     const producedUnits = relevantHarvests.reduce((sum, harvest) => sum + Number(harvest.tuppersCount || 0), 0);
     const usedTrays = relevantHarvests.reduce((sum, harvest) => sum + Object.values(harvest.selectedCropUsages || {}).reduce((traySum, value) => traySum + Number(value || 0), 0), 0);
     const unitsPerTray = usedTrays > 0 ? producedUnits / usedTrays : 0;
@@ -514,7 +546,53 @@ export default function Profitability({
       averageOrder: row.orders ? row.units / row.orders : 0
     })).sort((a, b) => b.revenue - a.revenue);
 
+    const forecastMatrix = new Map();
+    (orders || []).filter(order => order.status === 'DELIVERED').forEach(order => {
+      const date = String(noteByOrder.get(String(order.id))?.date || order.date || order.createdAt || '').slice(0, 10);
+      const client = (clients || []).find(item => String(item.id) === String(order.clientId));
+      (order.items || []).forEach(item => {
+        if (!item.productId || Number(item.quantity || 0) <= 0) return;
+        if (!isAllProducts && String(item.productId) !== String(effectiveProductId)) return;
+        if (intelligenceClientId && String(order.clientId) !== String(intelligenceClientId)) return;
+        const key = `${item.productId}|${order.clientId || 'UNKNOWN'}`;
+        const row = forecastMatrix.get(key) || {
+          productId: item.productId,
+          productName: (products || []).find(productItem => String(productItem.id) === String(item.productId))?.name || item.name || 'Producto',
+          clientId: order.clientId || null,
+          clientKey: order.clientId || 'UNKNOWN',
+          clientName: client?.commercialName || client?.name || order.clientCommercialName || order.clientName || 'Cliente sin identificar',
+          weekUnits: new Map(),
+          orders: 0,
+          totalUnits: 0
+        };
+        const saleWeek = localKey(monday(new Date(`${date}T12:00:00`)));
+        row.weekUnits.set(saleWeek, (row.weekUnits.get(saleWeek) || 0) + Number(item.quantity || 0));
+        row.orders += 1;
+        row.totalUnits += Number(item.quantity || 0);
+        forecastMatrix.set(key, row);
+      });
+    });
+    const forecastRows = [...forecastMatrix.values()].map(row => {
+      const recentValues = recent.map(week => Number(row.weekUnits.get(week.key) || 0));
+      const weighted = recentValues.reduce((sum, value, index) => sum + value * (index + 1), 0) / weightTotal;
+      const productHarvests = (harvests || []).filter(harvest => String(harvest.productId) === String(row.productId));
+      const productUnits = productHarvests.reduce((sum, harvest) => sum + Number(harvest.tuppersCount || 0), 0);
+      const productTrays = productHarvests.reduce((sum, harvest) => sum + Object.values(harvest.selectedCropUsages || {}).reduce((traySum, value) => traySum + Number(value || 0), 0), 0);
+      const productUnitsPerTray = productTrays ? productUnits / productTrays : 0;
+      const forecast = Math.max(Math.round(weighted), 0);
+      const activeWeeks = recentValues.filter(Boolean).length;
+      return {
+        ...row,
+        forecastUnits: forecast,
+        forecastOrders: row.totalUnits > 0 ? Math.max(Math.ceil(forecast / (row.totalUnits / row.orders)), forecast > 0 ? 1 : 0) : 0,
+        recommendedTrays: productUnitsPerTray ? Math.ceil(forecast / productUnitsPerTray) : 0,
+        confidence: activeWeeks >= 7 ? 'Alta' : activeWeeks >= 4 ? 'Media' : 'Inicial',
+        activeWeeks
+      };
+    }).filter(row => row.forecastUnits > 0 || row.totalUnits > 0).sort((a, b) => b.forecastUnits - a.forecastUnits);
+
     return {
+      isAllProducts,
       effectiveProductId,
       product,
       sales,
@@ -534,9 +612,55 @@ export default function Profitability({
       confidence,
       weeksWithSales,
       trend,
-      clientRows
+      clientRows,
+      forecastRows
     };
   }, [clients, deliveryNotes, harvests, intelligenceClientId, intelligenceProductId, orders, productMovements, products, report.productRows]);
+
+  const forecastHistory = useMemo(() => {
+    const noteByOrder = new Map((deliveryNotes || []).map(note => [String(note.orderId), note]));
+    return (salesForecasts || []).slice(0, 40).map(forecast => {
+      const start = new Date(`${forecast.weekStart}T12:00:00`);
+      const end = new Date(start);
+      end.setDate(end.getDate() + 6);
+      const endKey = end.toISOString().slice(0, 10);
+      let actualUnits = 0;
+      let actualOrders = 0;
+      (orders || []).filter(order => order.status === 'DELIVERED').forEach(order => {
+        if (String(order.clientId || 'UNKNOWN') !== String(forecast.clientKey)) return;
+        const date = String(noteByOrder.get(String(order.id))?.date || order.date || order.createdAt || '').slice(0, 10);
+        if (date < forecast.weekStart || date > endKey) return;
+        const units = (order.items || []).filter(item => String(item.productId) === String(forecast.productId)).reduce((sum, item) => sum + Number(item.quantity || 0), 0);
+        if (units > 0) { actualUnits += units; actualOrders += 1; }
+      });
+      const error = Number(forecast.forecastUnits || 0) > 0
+        ? Math.abs(actualUnits - Number(forecast.forecastUnits)) / Number(forecast.forecastUnits) * 100
+        : 0;
+      return { ...forecast, actualUnits, actualOrders, error };
+    });
+  }, [deliveryNotes, orders, salesForecasts]);
+
+  const saveWeeklyForecast = async () => {
+    const today = new Date();
+    const day = today.getDay() || 7;
+    const nextMonday = new Date(today);
+    nextMonday.setDate(today.getDate() + (8 - day));
+    const offset = nextMonday.getTimezoneOffset() * 60000;
+    const weekStart = new Date(nextMonday.getTime() - offset).toISOString().slice(0, 10);
+    const payload = intelligence.forecastRows.map(row => ({
+      weekStart,
+      productId: String(row.productId),
+      clientKey: String(row.clientKey),
+      clientId: row.clientId || null,
+      forecastUnits: row.forecastUnits,
+      forecastOrders: row.forecastOrders,
+      recommendedTrays: row.recommendedTrays,
+      confidence: row.confidence,
+      updatedAt: new Date().toISOString()
+    }));
+    const saved = await saveSalesForecasts(payload);
+    setForecastSaveState(saved ? `Previsión guardada para la semana del ${new Date(`${weekStart}T12:00:00`).toLocaleDateString('es-ES')}` : 'No se pudo guardar la previsión');
+  };
 
   const productionRows = (cropTypes || []).map(cropType => {
     const seedCost = latestVarietySeedCost(cropType.varietyId) * Number(cropType.seedGrams || 0);
@@ -591,13 +715,23 @@ export default function Profitability({
       };
     })
     .sort((a, b) => b.date.localeCompare(a.date));
+  const varietyCostRows = [...cultivationRows.reduce((map, row) => {
+    const current = map.get(row.name) || { id: row.name, name: row.name, crops: 0, trays: 0, harvestedTrays: 0, discardedTrays: 0, total: 0 };
+    current.crops += 1;
+    current.trays += row.totalTrays;
+    current.harvestedTrays += row.harvestedTrays;
+    current.discardedTrays += row.discardedTrays;
+    current.total += row.total;
+    map.set(row.name, current);
+    return map;
+  }, new Map()).values()].map(row => ({ ...row, costPerTray: row.trays ? row.total / row.trays : 0 })).sort((a, b) => b.total - a.total);
   const packagingRows = (articles || [])
     .filter(article => ['ENVASE', 'BANDEJA'].includes(article.type))
     .map(article => ({
       id: article.id,
       name: article.name,
       unitCost: latestArticleUnitCost(article.id),
-      stock: (stockEntries || []).filter(entry => entry.articleId === article.id).reduce((sum, entry) => sum + Number(entry.quantity || 0), 0)
+      stock: (stockLots || []).filter(lot => lot.articleId === article.id).reduce((sum, lot) => sum + Number(lot.remainingQuantity || 0), 0)
     }))
     .sort((a, b) => b.unitCost - a.unitCost);
   const baseRows = view === 'orders'
@@ -612,6 +746,14 @@ export default function Profitability({
           ? packagingRows
           : view === 'cultivations'
             ? cultivationRows
+          : view === 'varietycosts'
+            ? varietyCostRows
+          : view === 'clientcosts'
+            ? report.clientRows.map(row => ({ ...row, total: row.cost }))
+          : view === 'receivables'
+            ? financialControl.billingClientRows.map(row => ({ ...row, total: row.pending + row.unbilled }))
+          : view === 'stockvalue'
+            ? financialControl.stockValueRows
           : view === 'harvests'
             ? financialControl.harvestRows
             : view === 'expenses'
@@ -711,6 +853,16 @@ export default function Profitability({
         head: [['Fecha', 'Cultivo', 'Lote', 'Bandejas', 'Cosechadas', 'Activas', 'Perdidas', 'Coste/bandeja', 'Coste total']],
         body: rows.map(row => [row.date, row.name, row.batchNumber, row.totalTrays, row.harvestedTrays, row.remainingTrays, row.discardedTrays, money(row.costPerTray), money(row.total)])
       },
+      varietycosts: {
+        title: 'Costes totales por variedad',
+        head: [['Variedad', 'Cultivos', 'Bandejas', 'Cosechadas', 'Perdidas', 'Coste/bandeja', 'Coste total']],
+        body: rows.map(row => [row.name, row.crops, row.trays, row.harvestedTrays, row.discardedTrays, money(row.costPerTray), money(row.total)])
+      },
+      clientcosts: {
+        title: 'Costes y beneficio por cliente',
+        head: [['Cliente', 'Uds.', 'Ventas', 'Coste', 'Beneficio', 'Sin coste']],
+        body: rows.map(row => [row.name, row.units, money(row.revenue), money(row.cost), money(row.margin), row.pendingUnits])
+      },
       packaging: {
         title: 'Costes y existencias de formatos de venta',
         head: [['Formato', 'Último coste unitario', 'Stock actual']],
@@ -730,6 +882,16 @@ export default function Profitability({
         title: 'Compras de stock y tesorería',
         head: [['Fecha', 'Proveedor', 'Documento', 'Importe']],
         body: rows.map(row => [row.date, row.provider, row.number, money(row.total)])
+      },
+      receivables: {
+        title: 'Cobros y facturación por cliente',
+        head: [['Cliente', 'Facturado', 'Pagado', 'Pendiente', 'Sin facturar', 'Documentos']],
+        body: rows.map(row => [row.name, money(row.invoiced), money(row.paid), money(row.pending), money(row.unbilled), row.documents])
+      },
+      stockvalue: {
+        title: 'Valor económico del inventario',
+        head: [['Tipo', 'Artículo', 'Stock', 'Coste unitario', 'Valor']],
+        body: rows.map(row => [row.type, row.name, row.quantity, money(row.unitCost), money(row.total)])
       }
     };
     const selected = configurations[view];
@@ -810,9 +972,9 @@ export default function Profitability({
           <StatCard icon={<BarChart3 size={22} />} label="Coste total del periodo" value={money(financialControl.totalPeriodCosts)} detail="Producción + gastos generales" tone="green" />
         </>}
         {section === 'treasury' && <>
-          <StatCard icon={<CircleDollarSign size={22} />} label="Cobrado" value={money(financialControl.collected)} detail={`${money(financialControl.pendingCollection)} pendiente`} />
-          <StatCard icon={<ReceiptText size={22} />} label="Pagos registrados" value={money(financialControl.cashOut)} detail="Compras + gastos pagados" tone="amber" />
-          <StatCard icon={<WalletCards size={22} />} label="Saldo estimado" value={money(financialControl.cashBalance)} detail="Cobros − pagos registrados" tone="purple" />
+          <StatCard icon={<CircleDollarSign size={22} />} label="Facturas cobradas" value={money(financialControl.collected)} detail="Marcadas como pagadas" />
+          <StatCard icon={<ReceiptText size={22} />} label="Facturas pendientes" value={money(financialControl.pendingCollection)} detail={`${money(financialControl.unbilledSales)} entregado sin facturar`} tone="amber" />
+          <StatCard icon={<WalletCards size={22} />} label="Saldo estimado" value={money(financialControl.cashBalance)} detail={`Salidas registradas ${money(financialControl.cashOut)}`} tone="purple" />
           <StatCard icon={<PackageCheck size={22} />} label="Valor total del stock" value={money(financialControl.totalStockValue)} detail={`Materiales ${money(financialControl.materialStockValue)}`} tone="blue" />
         </>}
         {section === 'intelligence' && <>
@@ -828,7 +990,7 @@ export default function Profitability({
           <TriangleAlert size={20} />
           <div>
             <strong>{report.pendingUnits} unidades vendidas todavía no tienen coste trazable.</strong>
-            <span>Se incluyen en ventas, pero quedan fuera del margen hasta conocer su coste real.</span>
+            <span>El producto, cliente, unidades y precio sí están vinculados. Estas ventas históricas se registraron antes de enlazar cosecha y lote, por eso no se inventa su coste ni se incluyen todavía en el margen.</span>
           </div>
         </div>
       )}
@@ -851,12 +1013,12 @@ export default function Profitability({
       {section === 'intelligence' && <section className="profit-intelligence">
         <header className="profit-intelligence-query">
           <div><span>CONSULTA CONCRETA</span><h2>¿Qué quieres analizar y prever?</h2><p>Selecciona un producto y, si quieres, limita el cálculo a un cliente.</p></div>
-          <label>Producto<select value={intelligence.effectiveProductId} onChange={event => setIntelligenceProductId(event.target.value)}>{(products || []).map(product => <option key={product.id} value={product.id}>{product.name}</option>)}</select></label>
+          <label>Producto<select value={intelligenceProductId} onChange={event => setIntelligenceProductId(event.target.value)}><option value="__ALL__">Todas las variedades / productos</option>{(products || []).map(product => <option key={product.id} value={product.id}>{product.name}</option>)}</select></label>
           <label>Cliente<select value={intelligenceClientId} onChange={event => setIntelligenceClientId(event.target.value)}><option value="">Todos los clientes</option>{(clients || []).map(client => <option key={client.id} value={client.id}>{client.commercialName || client.name}</option>)}</select></label>
         </header>
         <div className="profit-intelligence-grid">
           <article className="profit-forecast-chart">
-            <div><h3>Ventas semanales de {intelligence.product?.name || 'producto'}</h3><p>Las ocho semanas más recientes pesan más en la previsión.</p></div>
+            <div><h3>Ventas semanales de {intelligence.isAllProducts ? 'todos los productos' : intelligence.product?.name || 'producto'}</h3><p>Las ocho semanas más recientes pesan más en la previsión.</p></div>
             <ResponsiveContainer width="100%" height={250}>
               <BarChart data={intelligence.weeks} margin={{ top: 15, right: 10, left: -15, bottom: 5 }}>
                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
@@ -878,12 +1040,26 @@ export default function Profitability({
           </article>
         </div>
         <article className="profit-client-profitability">
-          <header><div><h3>Rentabilidad de {intelligence.product?.name || 'producto'} por cliente</h3><p>Precio, frecuencia, volumen y beneficio real de las ventas registradas.</p></div><strong>{intelligence.sales.length} pedidos analizados</strong></header>
+          <header><div><h3>Rentabilidad de {intelligence.isAllProducts ? 'todos los productos' : intelligence.product?.name || 'producto'} por cliente</h3><p>Precio, frecuencia, volumen y beneficio real de las ventas registradas.</p></div><strong>{intelligence.sales.length} pedidos analizados</strong></header>
           <div className="table-container"><table><thead><tr><th>Cliente</th><th>Pedidos</th><th>Uds.</th><th>Pedido medio</th><th>Precio medio</th><th>Ventas</th><th>Coste trazado</th><th>Beneficio</th></tr></thead><tbody>
             {intelligence.clientRows.map(row => <tr key={row.id}><td><strong>{row.name}</strong></td><td>{row.orders}</td><td>{row.units}</td><td>{row.averageOrder.toFixed(1)}</td><td>{money(row.averagePrice)}</td><td>{money(row.revenue)}</td><td>{money(row.cost)}</td><td className={row.profit >= 0 ? 'profit-positive' : 'profit-negative'}><strong>{money(row.profit)}</strong></td></tr>)}
             {!intelligence.clientRows.length && <tr><td colSpan="8" className="profit-empty">Todavía no hay ventas entregadas para esta consulta.</td></tr>}
           </tbody></table></div>
         </article>
+        <article className="profit-client-profitability">
+          <header><div><h3>Previsión detallada por producto y cliente</h3><p>Propuesta concreta de tuppers, pedidos y bandejas para la próxima semana.</p></div><button className="profit-save-forecast" onClick={saveWeeklyForecast}>Guardar previsión semanal</button></header>
+          {forecastSaveState && <p className="profit-forecast-saved">{forecastSaveState}</p>}
+          <div className="table-container"><table><thead><tr><th>Producto</th><th>Cliente</th><th>Previsión</th><th>Pedidos aprox.</th><th>Bandejas</th><th>Confianza</th></tr></thead><tbody>
+            {intelligence.forecastRows.map(row => <tr key={`${row.productId}-${row.clientKey}`}><td><strong>{row.productName}</strong></td><td>{row.clientName}</td><td><strong>{row.forecastUnits} uds.</strong></td><td>{row.forecastOrders}</td><td>{row.recommendedTrays || '—'}</td><td><span className={`forecast-confidence ${row.confidence.toLowerCase()}`}>{row.confidence}</span></td></tr>)}
+            {!intelligence.forecastRows.length && <tr><td colSpan="6" className="profit-empty">Faltan ventas históricas para generar una previsión.</td></tr>}
+          </tbody></table></div>
+        </article>
+        {forecastHistory.length > 0 && <article className="profit-client-profitability">
+          <header><div><h3>¿Está acertando el sistema?</h3><p>Comparación de previsiones guardadas frente a las ventas reales de cada semana.</p></div><strong>{forecastHistory.length} comprobaciones</strong></header>
+          <div className="table-container"><table><thead><tr><th>Semana</th><th>Producto</th><th>Cliente</th><th>Previsto</th><th>Real</th><th>Error</th></tr></thead><tbody>
+            {forecastHistory.map(row => <tr key={row.id}><td>{new Date(`${row.weekStart}T12:00:00`).toLocaleDateString('es-ES')}</td><td>{(products || []).find(product => String(product.id) === String(row.productId))?.name || row.productId}</td><td>{(clients || []).find(client => String(client.id) === String(row.clientId))?.commercialName || (clients || []).find(client => String(client.id) === String(row.clientId))?.name || 'Cliente'}</td><td>{row.forecastUnits}</td><td>{row.actualUnits}</td><td>{row.error.toFixed(0)} %</td></tr>)}
+          </tbody></table></div>
+        </article>}
       </section>}
 
       {!['summary', 'intelligence'].includes(section) && <section className="premium-card profit-table-card">
@@ -901,12 +1077,18 @@ export default function Profitability({
               </>}
               {section === 'costs' && <>
                 <button className={view === 'harvests' ? 'active' : ''} onClick={() => { setView('harvests'); setDisplayMode('detail'); }}>Producción terminada</button>
+                <button className={view === 'varietycosts' ? 'active' : ''} onClick={() => { setView('varietycosts'); setDisplayMode('detail'); }}>Por variedad</button>
+                <button className={view === 'clientcosts' ? 'active' : ''} onClick={() => { setView('clientcosts'); setDisplayMode('detail'); }}>Por cliente</button>
                 <button className={view === 'cultivations' ? 'active' : ''} onClick={() => { setView('cultivations'); setDisplayMode('detail'); }}>Cada cultivo</button>
                 <button className={view === 'production' ? 'active' : ''} onClick={() => { setView('production'); setDisplayMode('detail'); }}>Coste por bandeja</button>
                 <button className={view === 'expenses' ? 'active' : ''} onClick={() => { setView('expenses'); setDisplayMode('detail'); }}>Gastos generales</button>
                 <button className={view === 'packaging' ? 'active' : ''} onClick={() => { setView('packaging'); setDisplayMode('detail'); }}>Envases y vivo</button>
               </>}
-              {section === 'treasury' && <button className="active">Movimientos de tesorería y compras</button>}
+              {section === 'treasury' && <>
+                <button className={view === 'receivables' ? 'active' : ''} onClick={() => setView('receivables')}>Cobros por cliente</button>
+                <button className={view === 'stockvalue' ? 'active' : ''} onClick={() => setView('stockvalue')}>Valor del stock</button>
+                <button className={view === 'treasury' ? 'active' : ''} onClick={() => setView('treasury')}>Compras de stock</button>
+              </>}
             </div>
             {(view === 'products' || view === 'clients') && <div className="profit-tabs">
               <button className={displayMode === 'visual' ? 'active' : ''} onClick={() => setDisplayMode('visual')}><BarChart3 size={15} /> Gráficas</button>
@@ -986,9 +1168,13 @@ export default function Profitability({
               {view === 'orders' && <tr><th>Fecha</th><th>Albarán / pedido</th><th>Cliente</th><th>Unidades</th><th>Venta</th><th>Coste</th><th>Beneficio</th><th>Cobertura</th></tr>}
               {view === 'production' && <tr><th>Variedad / ficha</th><th>Semilla</th><th>Sustrato</th><th>Bandeja</th><th>Coste/bandeja</th><th>Coste/kg</th></tr>}
               {view === 'cultivations' && <tr><th>Fecha</th><th>Cultivo / lote</th><th>Estado</th><th>Bandejas totales</th><th>Cosechadas</th><th>Activas</th><th>Perdidas</th><th>Semilla/bdj.</th><th>Sustrato/bdj.</th><th>Bandeja</th><th>Coste/bdj.</th><th>Coste total</th></tr>}
+              {view === 'varietycosts' && <tr><th>Variedad</th><th>Cultivos</th><th>Bandejas</th><th>Cosechadas</th><th>Perdidas</th><th>Coste/bandeja</th><th>Coste total</th></tr>}
+              {view === 'clientcosts' && <tr><th>Cliente</th><th>Uds.</th><th>Ventas</th><th>Coste trazado</th><th>Beneficio</th><th>Cobertura</th></tr>}
               {view === 'harvests' && <tr><th>Fecha</th><th>Producto / lote</th><th>Bandejas</th><th>Producido</th><th>Vendido</th><th>Sin vender</th><th>Semilla</th><th>Sustrato</th><th>Envases</th><th>Coste total</th><th>Coste/ud.</th></tr>}
               {view === 'expenses' && <tr><th>Fecha</th><th>Categoría</th><th>Concepto</th><th>Importe</th><th>Estado</th><th>Forma de pago</th></tr>}
               {view === 'treasury' && <tr><th>Fecha</th><th>Proveedor</th><th>Documento</th><th>Compra de stock</th></tr>}
+              {view === 'receivables' && <tr><th>Cliente</th><th>Facturado</th><th>Pagado</th><th>Pendiente</th><th>Entregado sin facturar</th><th>Documentos</th></tr>}
+              {view === 'stockvalue' && <tr><th>Tipo</th><th>Artículo</th><th>Stock actual</th><th>Coste unitario</th><th>Valor total</th></tr>}
               {view === 'packaging' && <tr><th>Formato de venta</th><th>Último coste unitario</th><th>Stock actual</th></tr>}
             </thead>
             <tbody>
@@ -1021,6 +1207,12 @@ export default function Profitability({
                   <td><strong>{money(row.costPerTray)}</strong></td><td><strong>{money(row.total)}</strong></td>
                 </tr>
               ))}
+              {view === 'varietycosts' && rows.map(row => (
+                <tr key={row.id}><td><strong>{row.name}</strong></td><td>{row.crops}</td><td>{row.trays}</td><td>{row.harvestedTrays}</td><td>{row.discardedTrays}</td><td>{money(row.costPerTray)}</td><td><strong>{money(row.total)}</strong></td></tr>
+              ))}
+              {view === 'clientcosts' && rows.map(row => (
+                <tr key={row.id}><td><strong>{row.name}</strong></td><td>{row.units}</td><td>{money(row.revenue)}</td><td>{money(row.cost)}</td><td className={row.margin >= 0 ? 'profit-positive' : 'profit-negative'}><strong>{money(row.margin)}</strong></td><td>{row.pendingUnits ? `${row.pendingUnits} uds. sin coste` : 'Completa'}</td></tr>
+              ))}
               {view === 'harvests' && rows.map(row => (
                 <tr key={row.id}>
                   <td>{row.date}</td><td><strong>{row.name}</strong><small className="profit-cell-note">{row.batchNumber}</small></td>
@@ -1034,6 +1226,12 @@ export default function Profitability({
               ))}
               {view === 'treasury' && rows.map(row => (
                 <tr key={row.id}><td>{row.date}</td><td><strong>{row.provider}</strong></td><td>{row.number}</td><td>{money(row.total)}</td></tr>
+              ))}
+              {view === 'receivables' && rows.map(row => (
+                <tr key={row.id}><td><strong>{row.name}</strong></td><td>{money(row.invoiced)}</td><td className="profit-positive">{money(row.paid)}</td><td className={row.pending > 0 ? 'profit-negative' : ''}>{money(row.pending)}</td><td>{money(row.unbilled)}</td><td>{row.documents}</td></tr>
+              ))}
+              {view === 'stockvalue' && rows.map(row => (
+                <tr key={row.id}><td><span className="expense-category">{row.type}</span></td><td><strong>{row.name}</strong></td><td>{row.quantity}</td><td>{money(row.unitCost)}</td><td><strong>{money(row.total)}</strong></td></tr>
               ))}
               {view === 'packaging' && rows.map(row => (
                 <tr key={row.id}><td><strong>{row.name}</strong></td><td>{money(row.unitCost)}</td><td>{row.stock}</td></tr>

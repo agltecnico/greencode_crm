@@ -31,6 +31,7 @@ export const DataProvider = ({ children }) => {
   const [deliveryNotes, setDeliveryNotes] = useState([]);
   const [invoices, setInvoices] = useState([]);
   const [expenses, setExpenses] = useState([]);
+  const [salesForecasts, setSalesForecasts] = useState([]);
   const [companyProfile, setCompanyProfile] = useState(() => {
     const defaults = {
       fiscalName: 'GREENCODE',
@@ -91,6 +92,7 @@ export const DataProvider = ({ children }) => {
           supabase.from('delivery_notes').select('*').order('createdAt', { ascending: true }),
           supabase.from('invoices').select('*').order('createdAt', { ascending: true }),
           supabase.from('expenses').select('*').order('createdAt', { ascending: true }),
+          supabase.from('sales_forecasts').select('*').order('weekStart', { ascending: false }),
           supabase.from('company_profile').select('*').limit(1),
           supabase.from('providers').select('*'),
           supabase.from('seed_varieties').select('*').order('name'),
@@ -118,6 +120,7 @@ export const DataProvider = ({ children }) => {
           { data: notesData },
           { data: invoicesData },
           { data: expensesData },
+          { data: salesForecastsData },
           { data: profileData },
           { data: providersData },
           { data: seedVarietiesData },
@@ -165,6 +168,7 @@ export const DataProvider = ({ children }) => {
             });
             setExpenses(mappedExpenses);
           }
+        if (salesForecastsData) setSalesForecasts(salesForecastsData);
         
         if (providersData) setProviders(providersData);
         if (seedVarietiesData) setSeedVarieties(seedVarietiesData);
@@ -1469,6 +1473,26 @@ export const DataProvider = ({ children }) => {
     }
   };
 
+  const saveSalesForecasts = async forecastRows => {
+    if (!Array.isArray(forecastRows) || forecastRows.length === 0) return false;
+    const { data, error } = await persistOrReload(
+      () => supabase
+        .from('sales_forecasts')
+        .upsert(forecastRows, { onConflict: 'weekStart,productId,clientKey' })
+        .select(),
+      'guardar la previsión semanal'
+    );
+    if (error) return false;
+    if (data) {
+      setSalesForecasts(previous => {
+        const map = new Map(previous.map(row => [`${row.weekStart}|${row.productId}|${row.clientKey}`, row]));
+        data.forEach(row => map.set(`${row.weekStart}|${row.productId}|${row.clientKey}`, row));
+        return [...map.values()].sort((a, b) => String(b.weekStart).localeCompare(String(a.weekStart)));
+      });
+    }
+    return true;
+  };
+
   const sortedClients = alphabetically(clients, client => client?.commercialName || client?.name);
   const sortedProviders = alphabetically(providers);
   const sortedProducts = alphabetically(products);
@@ -1503,6 +1527,7 @@ export const DataProvider = ({ children }) => {
       deliveryNotes, updateDeliveryNote, deleteDeliveryNote,
       invoices, addInvoice, deleteInvoice, importData, markInvoiceAsPaid,
       expenses, addExpense, updateExpense, deleteExpense, markExpenseAsPaid,
+      salesForecasts, saveSalesForecasts,
       refreshData
     }}>
       {children}
