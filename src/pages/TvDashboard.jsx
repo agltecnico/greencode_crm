@@ -291,7 +291,7 @@ export default function TvDashboard() {
                 <span className="tv-eyebrow">PRODUCTO TERMINADO</span>
                 <h2>Control de disponibilidad</h2>
               </div>
-              <span className="tv-summary-badge muted">Stock de nevera</span>
+              <span className="tv-summary-badge muted">Actualización automática · 30 s</span>
             </div>
             <div className="tv-info-grid stock">
               {(() => {
@@ -303,7 +303,9 @@ export default function TvDashboard() {
                   const envasados = movements.reduce((sum, m) => sum + Number(m.quantity || 0), 0);
                   
                   // 2. Tuppers en Pedidos (Pendientes de entrega)
-                  const pendingOrders = orders?.filter(o => o.status === 'PENDIENTE' || o.status === 'PREPARED' || o.status === 'IN_TRANSIT') || [];
+                  const pendingOrders = orders?.filter(o =>
+                    ['PENDING', 'PENDIENTE', 'PREPARED', 'IN_TRANSIT'].includes(o.status)
+                  ) || [];
                   let enPedidos = 0;
                   pendingOrders.forEach(o => {
                     if (o.items) {
@@ -341,9 +343,21 @@ export default function TvDashboard() {
                         </div>
                       )}
                       <div className="tv-stock-metrics">
-                        <div><span>Envasados</span><strong>{envasados}</strong></div>
-                        <div><span>En pedidos</span><strong>{enPedidos}</strong></div>
-                        <div className={sobran >= 0 ? 'positive' : 'negative'}><span>Disponibles</span><strong>{sobran}</strong></div>
+                        <div className="physical">
+                          <span>Stock total en nevera</span>
+                          <strong>{envasados}</strong>
+                          <small>Físico</small>
+                        </div>
+                        <div className="reserved">
+                          <span>Reservado en pedidos</span>
+                          <strong>{enPedidos}</strong>
+                          <small>Pendiente de entregar</small>
+                        </div>
+                        <div className={`available ${sobran >= 0 ? 'positive' : 'negative'}`}>
+                          <span>Disponible para venta</span>
+                          <strong>{sobran}</strong>
+                          <small>Stock libre</small>
+                        </div>
                       </div>
                     </div>
                   );
