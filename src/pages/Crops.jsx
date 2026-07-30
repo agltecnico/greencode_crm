@@ -1070,8 +1070,8 @@ export default function Crops() {
       </div>
 
       {harvestTab === 'inventario' && (
-      <div className="premium-card mb-6" style={{ background: 'linear-gradient(135deg, #1e293b, #0f172a)', color: 'white', border: '1px solid #334155', borderRadius: '16px', overflow: 'hidden', boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.2)' }}>
-        <h3 className="premium-card-title" style={{ margin: 0, color: 'white', background: 'rgba(255,255,255,0.05)', borderBottom: '1px solid #334155', padding: '1.25rem 1.5rem', display: 'flex', alignItems: 'center', gap: '0.75rem', fontSize: '1.25rem' }}>
+      <div className="premium-card mb-6" style={{ background: '#ffffff', color: '#1e293b', border: '1px solid #e2e8f0', borderRadius: '16px', overflow: 'hidden', boxShadow: '0 4px 10px rgba(15,23,42,0.06)' }}>
+        <h3 className="premium-card-title" style={{ margin: 0, color: '#1e293b', background: '#f8fafc', borderBottom: '1px solid #e2e8f0', padding: '1.1rem 1.35rem', display: 'flex', alignItems: 'center', gap: '0.75rem', fontSize: '1.2rem' }}>
           <span style={{ fontSize: '1.5rem' }}>📦</span> Inventario de Producto Terminado y Reservas
         </h3>
         
@@ -1079,7 +1079,7 @@ export default function Crops() {
           {products?.map(product => {
             const harvested = productMovements?.filter(m => m.productId === product.id && m.type === 'HARVEST').reduce((acc, curr) => acc + Number(curr.quantity || 0), 0) || 0;
             const sold = productMovements?.filter(m => m.productId === product.id && m.type === 'ORDER').reduce((acc, curr) => acc + Math.abs(Number(curr.quantity || 0)), 0) || 0;
-            const physicalStock = harvested - sold;
+            const physicalStock = Math.max(0, harvested - sold);
             const formatStocks = packagingArticlesForProduct(product).map(article => {
               const formatHarvested = productMovements?.filter(m => m.productId === product.id && m.type === 'HARVEST' && m.packagingArticleId === article.id).reduce((sum, movement) => sum + Number(movement.quantity || 0), 0) || 0;
               const formatSold = productMovements?.filter(m => m.productId === product.id && m.type === 'ORDER' && m.packagingArticleId === article.id).reduce((sum, movement) => sum + Math.abs(Number(movement.quantity || 0)), 0) || 0;
@@ -1092,22 +1092,23 @@ export default function Crops() {
               return acc + (item ? item.quantity : 0);
             }, 0);
 
-            const available = physicalStock - reserved;
+            const available = Math.max(0, physicalStock - reserved);
+            const shortage = Math.max(0, reserved - physicalStock);
 
             if (physicalStock <= 0 && reserved <= 0) return null;
 
             return (
-              <div key={product.id} className="p-4 rounded-xl" style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)' }}>
+              <div key={product.id} className="p-4 rounded-xl" style={{ background: '#f8fafc', border: '1px solid #dbe6e0', boxShadow: '0 2px 5px rgba(15,23,42,0.04)' }}>
                 <div className="flex justify-between items-center mb-3">
-                  <h4 className="font-bold text-lg" style={{ color: '#e2e8f0' }}>{product.name}</h4>
-                  <div className="text-xs px-2 py-1 rounded" style={{ background: '#334155', color: '#94a3b8' }}>
-                    Físico: <span style={{ color: 'white', fontWeight: 'bold' }}>{physicalStock}</span>
+                  <h4 className="font-bold text-lg" style={{ color: '#0f172a' }}>{product.name}</h4>
+                  <div className="text-xs px-2 py-1 rounded" style={{ background: '#e0f2fe', color: '#0369a1', border: '1px solid #bae6fd' }}>
+                    Físico: <span style={{ color: '#075985', fontWeight: 'bold' }}>{physicalStock}</span>
                   </div>
                 </div>
                 {formatStocks.length > 0 && (
                   <div className="flex flex-wrap gap-2 mb-3">
                     {formatStocks.map(format => (
-                      <span key={format.id} className="badge" style={{ background: '#334155', color: '#e2e8f0' }}>
+                      <span key={format.id} className="badge" style={{ background: '#eef2ff', color: '#4338ca', border: '1px solid #c7d2fe' }}>
                         {format.name}: {format.stock}
                       </span>
                     ))}
@@ -1115,30 +1116,30 @@ export default function Crops() {
                 )}
                 
                 <div className="flex justify-between items-center mb-2">
-                  <span style={{ color: '#94a3b8', fontSize: '0.9rem' }}>Cosechado (Total producido)</span>
-                  <span className="font-bold text-lg" style={{ color: '#e2e8f0' }}>{harvested}</span>
+                  <span style={{ color: '#64748b', fontSize: '0.9rem' }}>Cosechado (Total producido)</span>
+                  <span className="font-bold text-lg" style={{ color: '#334155' }}>{harvested}</span>
                 </div>
 
                 <div className="flex justify-between items-center mb-2">
-                  <span style={{ color: '#94a3b8', fontSize: '0.9rem' }}>Entregado (Pedidos finalizados)</span>
-                  <span className="font-bold text-lg" style={{ color: '#38bdf8' }}>{sold}</span>
+                  <span style={{ color: '#64748b', fontSize: '0.9rem' }}>Entregado (Pedidos finalizados)</span>
+                  <span className="font-bold text-lg" style={{ color: '#0284c7' }}>{sold}</span>
                 </div>
 
                 <div className="flex justify-between items-center mb-2">
-                  <span style={{ color: '#94a3b8', fontSize: '0.9rem' }}>Reservado (Pedidos pendientes)</span>
-                  <span className="font-bold text-lg" style={{ color: '#f59e0b' }}>{reserved}</span>
+                  <span style={{ color: '#64748b', fontSize: '0.9rem' }}>Reservado (Pedidos pendientes)</span>
+                  <span className="font-bold text-lg" style={{ color: '#d97706' }}>{reserved}</span>
                 </div>
 
-                <div className="flex justify-between items-center pt-2" style={{ borderTop: '1px dashed #334155' }}>
-                  <span style={{ color: '#94a3b8', fontSize: '0.9rem' }}>Disponible</span>
-                  <span className={`font-bold text-xl ${available < 0 ? 'text-red-400' : 'text-emerald-400'}`}>
+                <div className="flex justify-between items-center pt-2" style={{ borderTop: '1px dashed #cbd5e1' }}>
+                  <span style={{ color: '#64748b', fontSize: '0.9rem' }}>Disponible</span>
+                  <span className="font-bold text-xl" style={{ color: '#059669' }}>
                     {available}
                   </span>
                 </div>
                 
-                {available < 0 && (
-                  <div className="mt-3 text-xs font-bold p-2 rounded" style={{ background: 'rgba(239, 68, 68, 0.2)', color: '#fca5a5', border: '1px solid rgba(239, 68, 68, 0.3)' }}>
-                    ⚠️ Faltan {Math.abs(available)} tuppers
+                {shortage > 0 && (
+                  <div className="mt-3 text-xs font-bold p-2 rounded" style={{ background: '#fef2f2', color: '#b91c1c', border: '1px solid #fecaca' }}>
+                    ⚠️ Faltan producir {shortage} unidades para cubrir los pedidos
                   </div>
                 )}
       {harvestTab === 'historico' && (
