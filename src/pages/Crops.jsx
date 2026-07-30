@@ -2258,12 +2258,15 @@ export default function Crops() {
                 <span style={{ fontSize: '1.5rem' }}>{format.type === 'BANDEJA' ? '🌱' : '📦'}</span>
                 <div style={{ flex: 1 }}>
                   <strong style={{ color: '#1e293b' }}>{format.type === 'BANDEJA' ? `Vivo · ${format.name}` : format.name}</strong>
-                  <div style={{ color: availableStock > 0 ? '#64748b' : '#dc2626', fontSize: '0.75rem' }}>Stock disponible: {availableStock} unidades</div>
+                  <div style={{ color: availableStock >= 0 ? '#64748b' : '#b45309', fontSize: '0.75rem' }}>
+                    {availableStock < 0
+                      ? `Stock pendiente de regularizar: ${availableStock} unidades (no bloquea la cosecha)`
+                      : `Stock disponible: ${availableStock} unidades`}
+                  </div>
                 </div>
                 <input
                   type="number"
                   min="0"
-                  max={Math.max(0, availableStock)}
                   className="premium-input"
                   style={{ width: '100px', padding: '0.7rem', textAlign: 'center', fontWeight: 900 }}
                   value={newHarvest.packagingQuantities?.[format.id] || 0}
