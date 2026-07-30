@@ -71,9 +71,10 @@ export const generateLabelPDF = ({
     doc.setFontSize(9);
     doc.text('GREENCODE', labelWidth / 2, 4.2, { align: 'center' });
 
-    doc.setTextColor(65, 65, 65);
+    doc.setTextColor(155, 72, 15);
+    doc.setFont('helvetica', 'bold');
     doc.setFontSize(6.5);
-    doc.text('TRAZABILIDAD DEL PRODUCTO', labelWidth / 2, 7.4, { align: 'center' });
+    doc.text('LAVAR ANTES DE CONSUMIR', labelWidth / 2, 7.4, { align: 'center' });
 
     const row = (label, value, y) => {
       doc.setTextColor(35, 35, 35);
