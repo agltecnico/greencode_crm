@@ -1018,6 +1018,89 @@ export default function Crops() {
     );
   };
 
+  const renderFinishedProductInventory = () => {
+    const pendingOrders = orders?.filter(order =>
+      ['PENDING', 'PENDIENTE', 'PREPARED', 'IN_TRANSIT'].includes(order.status)
+    ) || [];
+
+    const rows = (products || []).map(product => {
+      const movements = productMovements?.filter(movement => movement.productId === product.id) || [];
+      const harvested = movements
+        .filter(movement => movement.type === 'HARVEST')
+        .reduce((sum, movement) => sum + Number(movement.quantity || 0), 0);
+      const delivered = movements
+        .filter(movement => movement.type === 'ORDER')
+        .reduce((sum, movement) => sum + Math.abs(Number(movement.quantity || 0)), 0);
+      const physical = Math.max(0, harvested - delivered);
+      const reserved = pendingOrders.reduce((sum, order) =>
+        sum + (order.items || [])
+          .filter(item => item.productId === product.id)
+          .reduce((itemSum, item) => itemSum + Number(item.quantity || 0), 0)
+      , 0);
+      const available = Math.max(0, physical - reserved);
+      const shortage = Math.max(0, reserved - physical);
+      const formats = packagingArticlesForProduct(product).map(format => format.name).join(', ');
+
+      return { product, formats, harvested, delivered, physical, reserved, available, shortage };
+    })
+      .filter(row => row.physical > 0 || row.reserved > 0)
+      .sort((a, b) => String(a.product.name).localeCompare(String(b.product.name), 'es', { sensitivity: 'base', numeric: true }));
+
+    return (
+      <div className="premium-card mb-6" style={{ background: '#fff', border: '1px solid #e2e8f0', borderRadius: '16px', overflow: 'hidden', boxShadow: '0 4px 10px rgba(15,23,42,0.06)' }}>
+        <div style={{ padding: '1rem 1.25rem', background: '#f8fafc', borderBottom: '1px solid #e2e8f0', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '1rem', flexWrap: 'wrap' }}>
+          <div>
+            <h3 style={{ margin: 0, color: '#0f172a', fontSize: '1.15rem' }}>Inventario de producto terminado</h3>
+            <span style={{ color: '#64748b', fontSize: '0.8rem' }}>Nevera, reservas y disponibilidad comercial</span>
+          </div>
+          <span style={{ padding: '0.35rem 0.7rem', borderRadius: '999px', background: '#ecfdf5', color: '#047857', fontSize: '0.78rem', fontWeight: 900 }}>
+            {rows.length} productos
+          </span>
+        </div>
+
+        <div className="table-container" style={{ margin: 0, border: 0, borderRadius: 0 }}>
+          <table className="admin-table" style={{ minWidth: '980px' }}>
+            <thead>
+              <tr>
+                <th>Producto / variedad</th>
+                <th>Formato</th>
+                <th style={{ textAlign: 'center' }}>Cosechado</th>
+                <th style={{ textAlign: 'center' }}>Entregado</th>
+                <th style={{ textAlign: 'center' }}>Físico</th>
+                <th style={{ textAlign: 'center' }}>Reservado</th>
+                <th style={{ textAlign: 'center' }}>Disponible</th>
+                <th>Estado</th>
+              </tr>
+            </thead>
+            <tbody>
+              {rows.map(row => (
+                <tr key={row.product.id}>
+                  <td><strong style={{ color: '#0f172a' }}>{row.product.name}</strong></td>
+                  <td style={{ color: '#64748b', fontSize: '0.82rem' }}>{row.formats || 'Sin formato asignado'}</td>
+                  <td style={{ textAlign: 'center', fontWeight: 800, color: '#475569' }}>{row.harvested}</td>
+                  <td style={{ textAlign: 'center', fontWeight: 800, color: '#0284c7' }}>{row.delivered}</td>
+                  <td style={{ textAlign: 'center', fontWeight: 900, color: '#075985' }}>{row.physical}</td>
+                  <td style={{ textAlign: 'center', fontWeight: 900, color: '#d97706' }}>{row.reserved}</td>
+                  <td style={{ textAlign: 'center', fontWeight: 900, color: '#059669', fontSize: '1.05rem' }}>{row.available}</td>
+                  <td>
+                    {row.shortage > 0
+                      ? <span className="badge" style={{ background: '#fef2f2', color: '#b91c1c', border: '1px solid #fecaca' }}>Faltan {row.shortage}</span>
+                      : row.available > 0
+                        ? <span className="badge" style={{ background: '#ecfdf5', color: '#047857', border: '1px solid #a7f3d0' }}>Disponible</span>
+                        : <span className="badge" style={{ background: '#f1f5f9', color: '#64748b', border: '1px solid #cbd5e1' }}>Sin stock libre</span>}
+                  </td>
+                </tr>
+              ))}
+              {rows.length === 0 && (
+                <tr><td colSpan="8" style={{ padding: '2rem', textAlign: 'center', color: '#94a3b8' }}>No hay producto terminado ni reservas pendientes.</td></tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    );
+  };
+
   const renderCosechas = () => (
     <div style={{ animation: 'fadeIn 0.3s ease' }}>
       <div className="flex justify-between items-center mb-6">
@@ -1069,7 +1152,7 @@ export default function Crops() {
         </button>
       </div>
 
-      {harvestTab === 'inventario' && (
+      {false && harvestTab === 'inventario' && (
       <div className="premium-card mb-6" style={{ background: '#ffffff', color: '#1e293b', border: '1px solid #e2e8f0', borderRadius: '16px', overflow: 'hidden', boxShadow: '0 4px 10px rgba(15,23,42,0.06)' }}>
         <h3 className="premium-card-title" style={{ margin: 0, color: '#1e293b', background: '#f8fafc', borderBottom: '1px solid #e2e8f0', padding: '1.1rem 1.35rem', display: 'flex', alignItems: 'center', gap: '0.75rem', fontSize: '1.2rem' }}>
           <span style={{ fontSize: '1.5rem' }}>📦</span> Inventario de Producto Terminado y Reservas
@@ -1206,6 +1289,7 @@ export default function Crops() {
       </div>
       )}
 
+      {harvestTab === 'inventario' && renderFinishedProductInventory()}
       {harvestTab === 'historico' && renderHarvestHistory()}
       
       {harvestTab === 'cosechar' && (
