@@ -976,8 +976,8 @@ export default function Crops() {
         
         <div style={{ padding: '1.5rem', display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '1.25rem' }}>
           {products?.map(product => {
-            const harvested = productMovements?.filter(m => m.productId === product.id && m.type === 'HARVEST').reduce((acc, curr) => acc + curr.quantity, 0) || 0;
-            const sold = productMovements?.filter(m => m.productId === product.id && m.type === 'ORDER').reduce((acc, curr) => acc + Math.abs(curr.quantity), 0) || 0;
+            const harvested = productMovements?.filter(m => m.productId === product.id && m.type === 'HARVEST').reduce((acc, curr) => acc + Number(curr.quantity || 0), 0) || 0;
+            const sold = productMovements?.filter(m => m.productId === product.id && m.type === 'ORDER').reduce((acc, curr) => acc + Math.abs(Number(curr.quantity || 0)), 0) || 0;
             const physicalStock = harvested - sold;
             const formatStocks = packagingArticlesForProduct(product).map(article => {
               const formatHarvested = productMovements?.filter(m => m.productId === product.id && m.type === 'HARVEST' && m.packagingArticleId === article.id).reduce((sum, movement) => sum + Number(movement.quantity || 0), 0) || 0;
@@ -1014,7 +1014,17 @@ export default function Crops() {
                 )}
                 
                 <div className="flex justify-between items-center mb-2">
-                  <span style={{ color: '#94a3b8', fontSize: '0.9rem' }}>Reservado (Pedidos)</span>
+                  <span style={{ color: '#94a3b8', fontSize: '0.9rem' }}>Cosechado (Total producido)</span>
+                  <span className="font-bold text-lg" style={{ color: '#e2e8f0' }}>{harvested}</span>
+                </div>
+
+                <div className="flex justify-between items-center mb-2">
+                  <span style={{ color: '#94a3b8', fontSize: '0.9rem' }}>Entregado (Pedidos finalizados)</span>
+                  <span className="font-bold text-lg" style={{ color: '#38bdf8' }}>{sold}</span>
+                </div>
+
+                <div className="flex justify-between items-center mb-2">
+                  <span style={{ color: '#94a3b8', fontSize: '0.9rem' }}>Reservado (Pedidos pendientes)</span>
                   <span className="font-bold text-lg" style={{ color: '#f59e0b' }}>{reserved}</span>
                 </div>
 
