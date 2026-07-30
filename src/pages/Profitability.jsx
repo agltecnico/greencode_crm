@@ -1065,31 +1065,31 @@ export default function Profitability({
       {!['summary', 'intelligence'].includes(section) && <section className="premium-card profit-table-card">
         <div className="profit-table-heading">
           <div>
-            <h2>Explorador económico</h2>
-            <p>Selecciona una perspectiva para profundizar sin perder el periodo elegido.</p>
+            <h2>{section === 'sales' ? 'Consultas de ventas' : section === 'costs' ? 'Consultas de costes y producción' : 'Consultas de tesorería y existencias'}</h2>
+            <p>Elige qué dato quieres consultar. Cada apartado mantiene el mismo periodo seleccionado.</p>
           </div>
-          <div className="profit-heading-actions">
-            <div className="profit-tabs profit-tabs-scroll">
+          <div className={`profit-subsection-nav ${section}`}>
               {section === 'sales' && <>
-                <button className={view === 'orders' ? 'active' : ''} onClick={() => { setView('orders'); setDisplayMode('detail'); }}>Todas las ventas</button>
-                <button className={view === 'products' ? 'active' : ''} onClick={() => setView('products')}>Por producto</button>
-                <button className={view === 'clients' ? 'active' : ''} onClick={() => setView('clients')}>Por cliente</button>
+                <button className={view === 'orders' ? 'active' : ''} onClick={() => { setView('orders'); setDisplayMode('detail'); }}><strong>Todas las ventas</strong><small>Pedidos entregados y sus importes</small></button>
+                <button className={view === 'products' ? 'active' : ''} onClick={() => setView('products')}><strong>Por producto</strong><small>Unidades, facturación y margen</small></button>
+                <button className={view === 'clients' ? 'active' : ''} onClick={() => setView('clients')}><strong>Por cliente</strong><small>Consumo, precios y rentabilidad</small></button>
               </>}
               {section === 'costs' && <>
-                <button className={view === 'harvests' ? 'active' : ''} onClick={() => { setView('harvests'); setDisplayMode('detail'); }}>Producción terminada</button>
-                <button className={view === 'varietycosts' ? 'active' : ''} onClick={() => { setView('varietycosts'); setDisplayMode('detail'); }}>Por variedad</button>
-                <button className={view === 'clientcosts' ? 'active' : ''} onClick={() => { setView('clientcosts'); setDisplayMode('detail'); }}>Por cliente</button>
-                <button className={view === 'cultivations' ? 'active' : ''} onClick={() => { setView('cultivations'); setDisplayMode('detail'); }}>Cada cultivo</button>
-                <button className={view === 'production' ? 'active' : ''} onClick={() => { setView('production'); setDisplayMode('detail'); }}>Coste por bandeja</button>
-                <button className={view === 'expenses' ? 'active' : ''} onClick={() => { setView('expenses'); setDisplayMode('detail'); }}>Gastos generales</button>
-                <button className={view === 'packaging' ? 'active' : ''} onClick={() => { setView('packaging'); setDisplayMode('detail'); }}>Envases y vivo</button>
+                <button className={view === 'harvests' ? 'active' : ''} onClick={() => { setView('harvests'); setDisplayMode('detail'); }}><strong>Producción terminada</strong><small>Cosechado, vendido y sin vender</small></button>
+                <button className={view === 'varietycosts' ? 'active' : ''} onClick={() => { setView('varietycosts'); setDisplayMode('detail'); }}><strong>Por variedad</strong><small>Coste total y por bandeja</small></button>
+                <button className={view === 'clientcosts' ? 'active' : ''} onClick={() => { setView('clientcosts'); setDisplayMode('detail'); }}><strong>Por cliente</strong><small>Coste servido y beneficio</small></button>
+                <button className={view === 'cultivations' ? 'active' : ''} onClick={() => { setView('cultivations'); setDisplayMode('detail'); }}><strong>Cada cultivo</strong><small>Consumo y coste de cada lote</small></button>
+                <button className={view === 'production' ? 'active' : ''} onClick={() => { setView('production'); setDisplayMode('detail'); }}><strong>Receta por bandeja</strong><small>Semilla, sustrato y soporte</small></button>
+                <button className={view === 'expenses' ? 'active' : ''} onClick={() => { setView('expenses'); setDisplayMode('detail'); }}><strong>Gastos generales</strong><small>Personal, luz, agua y otros</small></button>
+                <button className={view === 'packaging' ? 'active' : ''} onClick={() => { setView('packaging'); setDisplayMode('detail'); }}><strong>Envases y vivo</strong><small>Coste y existencias de formatos</small></button>
               </>}
               {section === 'treasury' && <>
-                <button className={view === 'receivables' ? 'active' : ''} onClick={() => setView('receivables')}>Cobros por cliente</button>
-                <button className={view === 'stockvalue' ? 'active' : ''} onClick={() => setView('stockvalue')}>Valor del stock</button>
-                <button className={view === 'treasury' ? 'active' : ''} onClick={() => setView('treasury')}>Compras de stock</button>
+                <button className={view === 'receivables' ? 'active' : ''} onClick={() => setView('receivables')}><strong>Cobros por cliente</strong><small>Pagado, pendiente y sin facturar</small></button>
+                <button className={view === 'stockvalue' ? 'active' : ''} onClick={() => setView('stockvalue')}><strong>Valor del almacén</strong><small>Existencias actuales valoradas</small></button>
+                <button className={view === 'treasury' ? 'active' : ''} onClick={() => setView('treasury')}><strong>Compras de stock</strong><small>Entradas y pagos a proveedores</small></button>
               </>}
-            </div>
+          </div>
+          <div className="profit-table-tools">
             {(view === 'products' || view === 'clients') && <div className="profit-tabs">
               <button className={displayMode === 'visual' ? 'active' : ''} onClick={() => setDisplayMode('visual')}><BarChart3 size={15} /> Gráficas</button>
               <button className={displayMode === 'detail' ? 'active' : ''} onClick={() => setDisplayMode('detail')}><LayoutList size={15} /> Detalle</button>
