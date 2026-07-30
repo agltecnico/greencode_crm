@@ -1046,6 +1046,7 @@ export const DataProvider = ({ children }) => {
   };
 
   const updateOrderList = async (id, updatedFields) => {
+    const traceabilityPending = [];
     // ---------------- PRODUCT MOVEMENTS INTERCEPTION ----------------
     if (updatedFields.status === 'DELIVERED') {
       const order = orders.find(o => o.id === id);
@@ -1054,33 +1055,6 @@ export const DataProvider = ({ children }) => {
         // Comprobar si ya restamos el stock de este pedido para no duplicar
         const existingMovements = productMovements.filter(m => m.type === 'ORDER' && (m.referenceId === id || m.referenceId.startsWith(id + '|')));
           if (existingMovements.length === 0) {
-            const requestedByProduct = effectiveOrder.items.reduce((totals, item) => {
-              if (item.productId && Number(item.quantity) > 0) {
-                totals[item.productId] = (totals[item.productId] || 0) + Number(item.quantity);
-              }
-              return totals;
-            }, {});
-
-            for (const [productId, requestedQuantity] of Object.entries(requestedByProduct)) {
-              const harvestedQuantity = productMovements
-                .filter(m => m.type === 'HARVEST' && m.productId === productId)
-                .reduce((sum, movement) => sum + Number(movement.quantity || 0), 0);
-              const deliveredQuantity = productMovements
-                .filter(m => m.type === 'ORDER' && m.productId === productId)
-                .reduce((sum, movement) => sum + Math.abs(Number(movement.quantity || 0)), 0);
-              const traceableAvailable = harvestedQuantity - deliveredQuantity;
-
-              if (traceableAvailable < requestedQuantity) {
-                const productName = products.find(product => product.id === productId)?.name || 'el producto';
-                await Swal.fire({
-                  title: 'Stock trazable insuficiente',
-                  text: `No se puede entregar ${productName}. Hay ${traceableAvailable} unidades con lote de cosecha y el pedido necesita ${requestedQuantity}. Registra primero la cosecha para conservar la trazabilidad sanitaria.`,
-                  icon: 'warning'
-                });
-                return null;
-              }
-            }
-
             for (const item of effectiveOrder.items) {
               if (item.productId && item.quantity > 0) {
                 let quantityToFulfill = item.quantity;
@@ -1126,7 +1100,19 @@ export const DataProvider = ({ children }) => {
                   quantityToFulfill -= consumeQty;
                 }
                 
-                if (quantityToFulfill > 0) return null;
+                if (quantityToFulfill > 0) {
+                  const pendingMovementId = await addProductMovement({
+                    productId: item.productId,
+                    quantity: -quantityToFulfill,
+                    type: 'ORDER',
+                    referenceId: `${effectiveOrder.id}|PENDING-TRACEABILITY`
+                  });
+                  if (!pendingMovementId) return null;
+                  traceabilityPending.push({
+                    productName: products.find(product => product.id === item.productId)?.name || item.name || 'Producto',
+                    quantity: quantityToFulfill
+                  });
+                }
               }
             }
           }
@@ -1140,6 +1126,18 @@ export const DataProvider = ({ children }) => {
       'actualizar el pedido'
     );
     if (orderResult.error) return null;
+    if (traceabilityPending.length > 0) {
+      const summary = traceabilityPending.map(item => `${item.productName}: ${item.quantity} uds.`).join(' · ');
+      Swal.fire({
+        toast: true,
+        position: 'top-end',
+        timer: 4500,
+        showConfirmButton: false,
+        title: 'Pedido entregado',
+        text: `Trazabilidad pendiente: ${summary}`,
+        icon: 'info'
+      });
+    }
     
     // Automatically keep the corresponding Delivery Note in sync
     if (updatedFields.items || updatedFields.total !== undefined || updatedFields.clientId || updatedFields.deliveredTo !== undefined) {
