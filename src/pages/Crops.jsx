@@ -181,7 +181,7 @@ export default function Crops() {
     harvests, registerHarvest, editHarvestPackaging,
     productMovements,
     products, packagingFormats,
-    orders, clients, updateOrderList
+    orders, clients, updateOrderList, companyProfile
   } = useData();
 
   const cropVarietyId = (crop) => {
@@ -490,7 +490,7 @@ export default function Crops() {
         cancelButtonText: 'Cerrar'
       }).then((result) => {
         if (result.isConfirmed) {
-          handlePrintLabelsSafe(product, batchNum, totalTuppers);
+          handlePrintLabelsSafe(product, batchNum, totalTuppers, selectedHarvestDate);
         }
         if (wasBatchHarvest && remainingHarvestQueue.length > 0) {
           openHarvestModalForCrop(remainingHarvestQueue[0]);
@@ -586,33 +586,15 @@ export default function Crops() {
   };
 
   
-  const getVarietiesText = (recipeSeeds) => {
+  const handlePrintLabelsSafe = (product, batchNum, tuppersCount, packingDate) => {
     try {
-      if (!Array.isArray(recipeSeeds)) return '';
-      if (recipeSeeds.length === 0) return '';
-      return recipeSeeds.map(rs => {
-        // We use stockEntries or articles if seeds is not available, but since seeds isn't in useData
-        // we will just return empty string or we can find it in articles.
-        const s = articles?.find(x => x.id === rs.seedId);
-        return s ? s.name : '';
-      }).filter(Boolean).join(', ');
-    } catch (e) {
-      console.error("Error en getVarietiesText:", e);
-      return '';
-    }
-  };
-
-  const handlePrintLabelsSafe = (product, batchNum, tuppersCount) => {
-    try {
-      generateLabelPDF(
-        product?.name || 'Desconocido', 
-        batchNum, 
-        product?.shelfLifeDays || 10, 
-        tuppersCount, 
-        product?.nutritionalInfo, 
-        (productVarietyIds(product).map(id => seedVarieties?.find(v => v.id === id)?.name).filter(Boolean).join(', ')
-          || getVarietiesText(product?.recipeSeeds))
-      );
+      generateLabelPDF({
+        batchNumber: batchNum,
+        shelfLifeDays: product?.shelfLifeDays,
+        count: tuppersCount,
+        packingDate,
+        companyProfile
+      });
     } catch (e) {
       console.error("Error llamando a generateLabelPDF:", e);
       Swal.fire('Error', 'Hubo un error al preparar la etiqueta: ' + e.message, 'error');
@@ -1044,7 +1026,7 @@ export default function Crops() {
                         </div>
                         <div style={{ display: 'flex', gap: '0.45rem', justifyContent: 'flex-end', flexWrap: 'wrap' }}>
                           <button type="button" className="btn btn-secondary" onClick={() => openHarvestPackagingEditor(harvest)}>Corregir envases</button>
-                          <button type="button" className="btn btn-secondary" onClick={() => handlePrintLabelsSafe(product, harvest.batchNumber, harvest.tuppersCount)}>Reimprimir PDF</button>
+                          <button type="button" className="btn btn-secondary" onClick={() => handlePrintLabelsSafe(product, harvest.batchNumber, harvest.tuppersCount, harvest.harvestDate || harvest.createdAt)}>Reimprimir PDF</button>
                         </div>
                       </article>
                     );
@@ -1504,7 +1486,7 @@ export default function Crops() {
                     style={{ backgroundColor: 'white', border: '1px solid #cbd5e1', padding: '0.75rem 1.25rem', borderRadius: '8px', cursor: 'pointer', fontWeight: 'bold', color: '#334155', display: 'flex', alignItems: 'center', gap: '0.5rem', boxShadow: '0 1px 2px rgba(0,0,0,0.05)', transition: 'all 0.2s', marginLeft: '1rem' }}
                     onMouseOver={e => { e.currentTarget.style.borderColor = '#94a3b8'; e.currentTarget.style.backgroundColor = '#f8fafc'; }}
                     onMouseOut={e => { e.currentTarget.style.borderColor = '#cbd5e1'; e.currentTarget.style.backgroundColor = 'white'; }}
-                    onClick={() => handlePrintLabelsSafe(product, h.batchNumber, h.tuppersCount)}
+                    onClick={() => handlePrintLabelsSafe(product, h.batchNumber, h.tuppersCount, h.harvestDate || h.createdAt)}
                   >
                     <span>🖨️</span> Re-Imprimir PDF
                   </button>
