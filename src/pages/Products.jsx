@@ -24,7 +24,9 @@ export default function Products() {
   const [editingId, setEditingId] = useState(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [formData, setFormData] = useState(emptyForm);
-  const packagingArticles = articles?.filter(article => article.type === 'ENVASE' && article.active !== false) || [];
+  const packagingArticles = articles?.filter(article =>
+    ['ENVASE', 'BANDEJA'].includes(article.type) && article.active !== false
+  ) || [];
 
   const recipeFor = (product) => {
     if (Array.isArray(product.recipeVarieties) && product.recipeVarieties.length) return product.recipeVarieties;
@@ -180,16 +182,16 @@ export default function Products() {
             </div>
 
             <div className="form-group mt-4">
-              <label className="form-label">Envases permitidos para la venta</label>
+              <label className="form-label">Formato de venta</label>
               <div className="grid grid-cols-2 gap-2">
                 {packagingArticles.map(article => (
                   <label key={article.id} className="premium-card" style={{ padding: '0.75rem', cursor: 'pointer' }}>
                     <input type="checkbox" checked={formData.packagingArticleIds.includes(article.id)} onChange={() => togglePackagingArticle(article.id)} />{' '}
-                    {article.name}
+                    {article.type === 'BANDEJA' ? `🌱 Vivo · ${article.name}` : `📦 Envasado · ${article.name}`}
                   </label>
                 ))}
               </div>
-              {!packagingArticles.length && <p className="text-muted text-sm mt-2">Primero crea un artículo de tipo Envase en Producción → Stock.</p>}
+              {!packagingArticles.length && <p className="text-muted text-sm mt-2">Primero crea un Envase o una Bandeja de cultivo en Producción → Stock.</p>}
             </div>
 
             <div className="flex gap-2 justify-end mt-4">
@@ -219,7 +221,7 @@ export default function Products() {
               <div className="flex flex-wrap gap-2 mt-3">
                 {(product.packagingArticleIds || []).map(articleId => {
                   const article = articles?.find(item => item.id === articleId);
-                  return article ? <span key={articleId} className="badge badge-primary">📦 {article.name}</span> : null;
+                  return article ? <span key={articleId} className="badge badge-primary">{article.type === 'BANDEJA' ? '🌱 Vivo' : '📦'} {article.name}</span> : null;
                 })}
                 {!(product.packagingArticleIds || []).length && <span className="badge badge-warning">Envase pendiente de asignar</span>}
               </div>

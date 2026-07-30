@@ -222,7 +222,7 @@ export default function Profitability({ modal = false, onClose }) {
     };
   }).sort((a, b) => b.total - a.total);
   const packagingRows = (articles || [])
-    .filter(article => article.type === 'ENVASE')
+    .filter(article => ['ENVASE', 'BANDEJA'].includes(article.type))
     .map(article => ({
       id: article.id,
       name: article.name,
@@ -295,8 +295,8 @@ export default function Profitability({ modal = false, onClose }) {
         body: rows.map(row => [row.name, money(row.seedCost), money(row.substrateCost), money(row.trayCost), money(row.total), money(row.costPerKg)])
       },
       packaging: {
-        title: 'Costes y existencias de envases',
-        head: [['Envase', 'Último coste unitario', 'Stock actual']],
+        title: 'Costes y existencias de formatos de venta',
+        head: [['Formato', 'Último coste unitario', 'Stock actual']],
         body: rows.map(row => [row.name, money(row.unitCost), row.stock])
       }
     };
@@ -378,7 +378,7 @@ export default function Profitability({ modal = false, onClose }) {
               <button className={view === 'products' ? 'active' : ''} onClick={() => setView('products')}>Por producto</button>
               <button className={view === 'clients' ? 'active' : ''} onClick={() => setView('clients')}>Por cliente</button>
               <button className={view === 'production' ? 'active' : ''} onClick={() => { setView('production'); setDisplayMode('detail'); }}>Coste variedades</button>
-              <button className={view === 'packaging' ? 'active' : ''} onClick={() => { setView('packaging'); setDisplayMode('detail'); }}>Envases</button>
+              <button className={view === 'packaging' ? 'active' : ''} onClick={() => { setView('packaging'); setDisplayMode('detail'); }}>Envases y vivo</button>
             </div>
             {(view === 'products' || view === 'clients') && <div className="profit-tabs">
               <button className={displayMode === 'visual' ? 'active' : ''} onClick={() => setDisplayMode('visual')}><BarChart3 size={15} /> Gráficas</button>
@@ -438,7 +438,7 @@ export default function Profitability({ modal = false, onClose }) {
                 <th>Cobertura</th>
               </tr>}
               {view === 'production' && <tr><th>Variedad / ficha</th><th>Semilla</th><th>Sustrato</th><th>Bandeja</th><th>Coste/bandeja</th><th>Coste/kg</th></tr>}
-              {view === 'packaging' && <tr><th>Envase</th><th>Último coste unitario</th><th>Stock actual</th></tr>}
+              {view === 'packaging' && <tr><th>Formato de venta</th><th>Último coste unitario</th><th>Stock actual</th></tr>}
             </thead>
             <tbody>
               {(view === 'products' || view === 'clients') && rows.map(row => (

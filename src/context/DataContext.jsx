@@ -10,6 +10,10 @@ export const useData = () => useContext(DataContext);
 const createId = () => crypto.randomUUID();
 const BACKGROUND_REFRESH_MS = 60_000;
 const ACTIVE_REFRESH_THROTTLE_MS = 10_000;
+const alphabetically = (items, label = item => item?.name) =>
+  [...(items || [])].sort((a, b) =>
+    String(label(a) || '').localeCompare(String(label(b) || ''), 'es', { sensitivity: 'base', numeric: true })
+  );
 
 export const DataProvider = ({ children }) => {
 
@@ -1465,16 +1469,23 @@ export const DataProvider = ({ children }) => {
     }
   };
 
+  const sortedClients = alphabetically(clients, client => client?.commercialName || client?.name);
+  const sortedProviders = alphabetically(providers);
+  const sortedProducts = alphabetically(products);
+  const sortedSeedVarieties = alphabetically(seedVarieties);
+  const sortedArticles = alphabetically(articles);
+  const sortedCropTypes = alphabetically(cropTypes);
+
   return (
     <DataContext.Provider value={{
       companyProfile, updateCompanyProfile, companyLogo, updateCompanyLogo,
 
-      providers, addProvider, updateProvider, deleteProvider,
-        seedVarieties, addSeedVariety, updateSeedVariety, deleteSeedVariety,
-        articles, stockEntries, stockLots, purchaseDeliveryNotes, purchaseDeliveryNoteLines,
+      providers: sortedProviders, addProvider, updateProvider, deleteProvider,
+        seedVarieties: sortedSeedVarieties, addSeedVariety, updateSeedVariety, deleteSeedVariety,
+        articles: sortedArticles, stockEntries, stockLots, purchaseDeliveryNotes, purchaseDeliveryNoteLines,
         addArticle, updateArticle, deleteArticle, addStockEntry, updateStockEntry, deleteStockEntry,
         receivePurchaseDeliveryNote, updatePurchaseDeliveryNote, deletePurchaseDeliveryNote,
-        cropTypes, addCropType, updateCropType, deleteCropType,
+        cropTypes: sortedCropTypes, addCropType, updateCropType, deleteCropType,
         seeds, addSeed, updateSeed, deleteSeed,
         seedInventory, addSeedInventory, updateSeedInventory, deleteSeedInventory,
         substrates, addSubstrate, deleteSubstrate,
@@ -1484,10 +1495,10 @@ export const DataProvider = ({ children }) => {
       harvests, addHarvest, registerHarvest, updateHarvest, deleteHarvest,
       dailyLogs, addDailyLog, updateDailyLog, deleteDailyLog,
 
-      clients, addClient, updateClient, deleteClient,
+      clients: sortedClients, addClient, updateClient, deleteClient,
       productMovements, addProductMovement,
       packagingFormats, addPackagingFormat, updatePackagingFormat, deletePackagingFormat,
-        products, addProduct, updateProduct, deleteProduct,
+        products: sortedProducts, addProduct, updateProduct, deleteProduct,
       orders, addOrder, updateOrderList, deleteOrder, markOrderAsDelivered, saveSignedDeliveryNote,
       deliveryNotes, updateDeliveryNote, deleteDeliveryNote,
       invoices, addInvoice, deleteInvoice, importData, markInvoiceAsPaid,

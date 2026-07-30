@@ -155,7 +155,11 @@ export default function Crops() {
 
   const packagingArticlesForProduct = product =>
     (product?.packagingArticleIds || [])
-      .map(articleId => articles?.find(article => article.id === articleId && article.type === 'ENVASE' && article.active !== false))
+      .map(articleId => articles?.find(article =>
+        article.id === articleId
+        && ['ENVASE', 'BANDEJA'].includes(article.type)
+        && article.active !== false
+      ))
       .filter(Boolean);
 
   const articlePhysicalStock = articleId =>
@@ -2194,9 +2198,9 @@ export default function Crops() {
               const availableStock = articlePhysicalStock(format.id);
               return (
               <div key={format.id} style={{ display: 'flex', alignItems: 'center', gap: '1rem', background: 'white', border: '1px solid #e2e8f0', borderRadius: '0.6rem', padding: '0.75rem' }}>
-                <span style={{ fontSize: '1.5rem' }}>📦</span>
+                <span style={{ fontSize: '1.5rem' }}>{format.type === 'BANDEJA' ? '🌱' : '📦'}</span>
                 <div style={{ flex: 1 }}>
-                  <strong style={{ color: '#1e293b' }}>{format.name}</strong>
+                  <strong style={{ color: '#1e293b' }}>{format.type === 'BANDEJA' ? `Vivo · ${format.name}` : format.name}</strong>
                   <div style={{ color: availableStock > 0 ? '#64748b' : '#dc2626', fontSize: '0.75rem' }}>Stock disponible: {availableStock} unidades</div>
                 </div>
                 <input
@@ -2214,7 +2218,7 @@ export default function Crops() {
               </div>
             );})}
             {packagingArticlesForProduct(products?.find(product => product.id === newHarvest.productId)).length === 0 && (
-              <div style={{ color: '#ef4444', fontWeight: 600 }}>Este producto no tiene envases asignados. Edítalo en Administración → Productos.</div>
+              <div style={{ color: '#ef4444', fontWeight: 600 }}>Este producto no tiene un formato de venta asignado. Edítalo en Administración → Productos.</div>
             )}
             <div style={{ textAlign: 'right', color: '#334155', fontWeight: 800 }}>
               Total: {Object.values(newHarvest.packagingQuantities || {}).reduce((sum, value) => sum + Number(value || 0), 0)} unidades
