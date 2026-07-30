@@ -44,7 +44,15 @@ const StatCard = ({ icon, label, value, detail, tone = 'green' }) => (
   </article>
 );
 
-export default function Profitability({ modal = false, onClose, initialView = 'products', initialStart, initialEnd }) {
+export default function Profitability({
+  modal = false,
+  onClose,
+  initialView = 'products',
+  initialStart,
+  initialEnd,
+  title = 'Centro financiero GreenCode',
+  description = 'Producción, ventas, existencias, gastos, beneficio y tesorería conectados por trazabilidad.'
+}) {
   const {
     orders, deliveryNotes, clients, products, productMovements, harvests,
     cropTypes, seedVarieties, articles, stockEntries, companyProfile,
@@ -557,8 +565,8 @@ export default function Profitability({ modal = false, onClose, initialView = 'p
       <header className="profit-header">
         <div>
           <p className="profit-eyebrow">CONTROL ECONÓMICO</p>
-          <h1>Centro financiero GreenCode</h1>
-          <p>Producción, ventas, existencias, gastos, beneficio y tesorería conectados por trazabilidad.</p>
+          <h1>{title}</h1>
+          <p>{description}</p>
         </div>
         <div className="profit-header-right">
           <div className="profit-filters">

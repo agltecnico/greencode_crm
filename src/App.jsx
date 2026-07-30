@@ -8,6 +8,7 @@ import Products from './pages/Products';
 import Orders from './pages/Orders';
 import DeliveryNotes from './pages/DeliveryNotes';
 import Invoices from './pages/Invoices';
+import Expenses from './pages/Expenses';
 import Crops from './pages/Crops';
 import TvDashboard from './pages/TvDashboard';
 import DriverView from './pages/DriverView';
@@ -45,6 +46,7 @@ function App() {
         <Route path="orders" element={<Orders />} />
         <Route path="delivery-notes" element={<DeliveryNotes />} />
         <Route path="invoices" element={<Invoices />} />
+        <Route path="expenses" element={<Expenses />} />
         <Route path="users" element={<PermissionGate permission="users"><UserAccess /></PermissionGate>} />
                       </Route>
       <Route path="/crops" element={<PermissionGate permission={['stock', 'tasks', 'crops', 'harvest', 'planner', 'traceability']}><Crops /></PermissionGate>} />

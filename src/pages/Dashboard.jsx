@@ -335,7 +335,7 @@ export default function Dashboard() {
         <Metric icon={<CircleDollarSign />} label="Ventas del periodo" value={money(data.monthSales)} detail={`${data.orderCount} entregas · ${data.units} unidades`} tone="green" onClick={() => openFinancial('orders')} />
         <Metric icon={<FileText />} label="Ticket medio" value={money(data.averageTicket)} detail={`${data.orderCount} ventas realizadas`} tone="blue" onClick={() => openFinancial('clients')} />
         <Metric icon={<ShoppingBag />} label="Pedidos abiertos" value={data.pendingOrders} detail={money(data.pendingOrderValue)} tone="purple" onClick={() => navigate('/admin/orders')} />
-        <Metric icon={<Receipt />} label="Gastos del periodo" value={money(data.monthExpenses)} detail={`Producción ${money(data.productionExpenses)} · Generales ${money(data.generalExpenses)}`} tone="amber" onClick={() => openFinancial('harvests')} />
+        <Metric icon={<Receipt />} label="Gastos del periodo" value={money(data.monthExpenses)} detail={`Producción ${money(data.productionExpenses)} · Generales ${money(data.generalExpenses)}`} tone="amber" onClick={() => navigate('/admin/expenses')} />
         <Metric icon={<TrendingUp />} label="Margen trazado" value={money(data.margin)} detail={`${data.marginPercent.toFixed(1)} % · ${data.costedUnits}/${data.units} uds. con coste`} tone="green" onClick={() => openFinancial('products')} />
       </section>
 
