@@ -42,7 +42,10 @@ export const generateLabelPDF = ({
     throw new Error('La cosecha no tiene unidades envasadas para imprimir.');
   }
 
-  const operatorName = companyProfile?.fiscalName || companyProfile?.commercialName;
+  const operatorName = companyProfile?.fiscalName || companyProfile?.ownerName || companyProfile?.commercialName;
+  const operatorIdentity = [operatorName, companyProfile?.nif && `NIF ${companyProfile.nif}`]
+    .filter(Boolean)
+    .join(' · ');
   const operatorAddress = companyAddress(companyProfile);
   if (!operatorName || !operatorAddress) {
     throw new Error('Completa la razón social y la dirección de GreenCode en Datos de empresa.');
@@ -89,7 +92,7 @@ export const generateLabelPDF = ({
     doc.setFont('helvetica', 'normal');
     doc.setFontSize(5.8);
     doc.setTextColor(75, 75, 75);
-    const operatorLines = doc.splitTextToSize(`${operatorName} · ${operatorAddress}`, labelWidth - 6);
+    const operatorLines = doc.splitTextToSize(`${operatorIdentity} · ${operatorAddress}`, labelWidth - 6);
     doc.text(operatorLines.slice(0, 2), labelWidth / 2, 26.2, {
       align: 'center',
       lineHeightFactor: 1.05

@@ -34,7 +34,8 @@ export const DataProvider = ({ children }) => {
   const [salesForecasts, setSalesForecasts] = useState([]);
   const [companyProfile, setCompanyProfile] = useState(() => {
     const defaults = {
-      fiscalName: 'GREENCODE',
+      commercialName: 'GreenCode',
+      fiscalName: 'Antonio José Gómez López',
       ownerName: 'ANTONIO JOSÉ GÓMEZ LÓPEZ',
       nif: '48351348N',
       address: 'CALLE SANTA FAZ 41',
