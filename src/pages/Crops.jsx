@@ -62,6 +62,15 @@ const formatSowingDateTime = (dateValue) => {
   }).format(date);
 };
 
+const startOfHarvestWeek = dateValue => {
+  const date = new Date(dateValue);
+  if (Number.isNaN(date.getTime())) return null;
+  const day = date.getDay();
+  date.setHours(0, 0, 0, 0);
+  date.setDate(date.getDate() - (day === 0 ? 6 : day - 1));
+  return date;
+};
+
 const getCropCycleOffsets = (cropType) => {
   const soak = Number(cropType?.soakingHours || 0) > 0 ? Math.max(1, Math.ceil(Number(cropType.soakingHours) / 24)) : 0;
   const germination = Number(cropType?.germinationDays || 0);
@@ -206,6 +215,7 @@ export default function Crops() {
   const [activeTab, setActiveTab] = useState('menu');
   const [sowTab, setSowTab] = useState('activos');
   const [harvestTab, setHarvestTab] = useState('cosechar');
+  const [harvestHistoryPage, setHarvestHistoryPage] = useState(1);
   const [statusFilter, setStatusFilter] = useState('ALL');
   const [historySearch, setHistorySearch] = useState('');
   const [historyPage, setHistoryPage] = useState(1);
@@ -920,6 +930,94 @@ export default function Crops() {
       </div>
     );
   };
+  const renderHarvestHistory = () => {
+    const weekMap = new Map();
+    [...(harvests || [])]
+      .sort((a, b) => new Date(b.harvestDate || b.createdAt) - new Date(a.harvestDate || a.createdAt))
+      .forEach(harvest => {
+        const weekStart = startOfHarvestWeek(harvest.harvestDate || harvest.createdAt);
+        if (!weekStart) return;
+        const key = weekStart.toISOString().slice(0, 10);
+        if (!weekMap.has(key)) weekMap.set(key, { key, weekStart, harvests: [] });
+        weekMap.get(key).harvests.push(harvest);
+      });
+
+    const weeks = [...weekMap.values()].sort((a, b) => b.weekStart - a.weekStart);
+    const weeksPerPage = 4;
+    const totalPages = Math.max(1, Math.ceil(weeks.length / weeksPerPage));
+    const currentPage = Math.min(harvestHistoryPage, totalPages);
+    const visibleWeeks = weeks.slice((currentPage - 1) * weeksPerPage, currentPage * weeksPerPage);
+
+    return (
+      <div className="premium-card mb-6" style={{ background: 'white', border: '1px solid #e2e8f0', borderRadius: '16px', overflow: 'hidden', boxShadow: '0 4px 10px rgba(15,23,42,0.06)' }}>
+        <div style={{ padding: '1rem 1.25rem', background: '#f8fafc', borderBottom: '1px solid #e2e8f0', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '1rem', flexWrap: 'wrap' }}>
+          <div>
+            <h3 style={{ margin: 0, color: '#0f172a', fontSize: '1.15rem' }}>Cosechas realizadas</h3>
+            <span style={{ color: '#64748b', fontSize: '0.8rem' }}>{harvests?.length || 0} registros agrupados por semana</span>
+          </div>
+          {weeks.length > 0 && <span style={{ color: '#64748b', fontSize: '0.8rem' }}>Página {currentPage} de {totalPages}</span>}
+        </div>
+
+        <div style={{ padding: '1rem', display: 'grid', gap: '1rem' }}>
+          {visibleWeeks.map(week => {
+            const weekEnd = new Date(week.weekStart);
+            weekEnd.setDate(weekEnd.getDate() + 6);
+            const totalUnits = week.harvests.reduce((sum, harvest) => sum + Number(harvest.tuppersCount || 0), 0);
+            return (
+              <section key={week.key} style={{ border: '1px solid #dbe6e0', borderRadius: '12px', overflow: 'hidden' }}>
+                <div style={{ padding: '0.65rem 0.9rem', background: '#ecfdf5', color: '#065f46', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
+                  <strong>
+                    Semana del {week.weekStart.toLocaleDateString('es-ES', { day: '2-digit', month: 'short' })}
+                    {' '}al {weekEnd.toLocaleDateString('es-ES', { day: '2-digit', month: 'short', year: 'numeric' })}
+                  </strong>
+                  <span style={{ fontSize: '0.78rem', fontWeight: 800 }}>{week.harvests.length} cosechas · {totalUnits} unidades</span>
+                </div>
+                <div style={{ padding: '0.75rem', display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '0.65rem' }}>
+                  {week.harvests.map(harvest => {
+                    const product = products?.find(item => item.id === harvest.productId);
+                    return (
+                      <article key={harvest.id} style={{ border: '1px solid #e2e8f0', borderRadius: '10px', padding: '0.8rem', display: 'grid', gap: '0.5rem', background: '#fff' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', gap: '0.75rem' }}>
+                          <strong style={{ color: '#0f172a' }}>{product?.name || 'Producto desconocido'}</strong>
+                          <span style={{ color: '#64748b', fontSize: '0.76rem' }}>{new Date(harvest.harvestDate).toLocaleDateString('es-ES')}</span>
+                        </div>
+                        <div style={{ color: '#475569', fontSize: '0.8rem', display: 'flex', justifyContent: 'space-between', gap: '0.75rem' }}>
+                          <span>Lote <strong>{harvest.batchNumber}</strong></span>
+                          <span><strong>{harvest.tuppersCount}</strong> unidades</span>
+                        </div>
+                        <div style={{ display: 'flex', gap: '0.4rem', flexWrap: 'wrap' }}>
+                          {(harvest.packagingBreakdown || []).filter(item => Number(item.quantity) > 0).map(item => {
+                            const format = articles?.find(candidate => candidate.id === item.articleId)
+                              || packagingFormats?.find(candidate => candidate.id === item.formatId);
+                            return <span key={item.articleId || item.formatId} className="badge badge-primary">{format?.name || 'Formato'}: {item.quantity}</span>;
+                          })}
+                        </div>
+                        <div style={{ display: 'flex', gap: '0.45rem', justifyContent: 'flex-end', flexWrap: 'wrap' }}>
+                          <button type="button" className="btn btn-secondary" onClick={() => openHarvestPackagingEditor(harvest)}>Corregir envases</button>
+                          <button type="button" className="btn btn-secondary" onClick={() => handlePrintLabelsSafe(product, harvest.batchNumber, harvest.tuppersCount)}>Reimprimir PDF</button>
+                        </div>
+                      </article>
+                    );
+                  })}
+                </div>
+              </section>
+            );
+          })}
+
+          {weeks.length === 0 && <div style={{ textAlign: 'center', color: '#94a3b8', padding: '2rem' }}>No hay cosechas registradas.</div>}
+        </div>
+
+        {totalPages > 1 && (
+          <div style={{ padding: '0.85rem 1rem', borderTop: '1px solid #e2e8f0', display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '0.65rem' }}>
+            <button type="button" className="btn btn-secondary" disabled={currentPage === 1} onClick={() => setHarvestHistoryPage(page => Math.max(1, page - 1))}>Anterior</button>
+            <strong style={{ color: '#334155', fontSize: '0.85rem' }}>{currentPage} / {totalPages}</strong>
+            <button type="button" className="btn btn-secondary" disabled={currentPage === totalPages} onClick={() => setHarvestHistoryPage(page => Math.min(totalPages, page + 1))}>Siguiente</button>
+          </div>
+        )}
+      </div>
+    );
+  };
+
   const renderCosechas = () => (
     <div style={{ animation: 'fadeIn 0.3s ease' }}>
       <div className="flex justify-between items-center mb-6">
@@ -956,7 +1054,10 @@ export default function Crops() {
           📦 Producto Terminado
         </button>
         <button 
-          onClick={() => setHarvestTab('historico')}
+          onClick={() => {
+            setHarvestHistoryPage(1);
+            setHarvestTab('historico');
+          }}
           style={{ 
             background: 'none', border: 'none', padding: '0.5rem 1rem', cursor: 'pointer', fontSize: '1.1rem', fontWeight: 'bold',
             color: harvestTab === 'historico' ? '#0f172a' : '#64748b',
@@ -1104,6 +1205,7 @@ export default function Crops() {
       </div>
       )}
 
+      {harvestTab === 'historico' && renderHarvestHistory()}
       
       {harvestTab === 'cosechar' && (
       <>
@@ -1159,7 +1261,7 @@ export default function Crops() {
         </div>
       </div>
 
-      <div className="premium-card mt-6" style={{ background: '#ffffff', borderRadius: '16px', border: '1px solid #e2e8f0', boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.05)', overflow: 'hidden', marginTop: '2rem' }}>
+      <div className="premium-card mt-6" style={{ display: 'none', background: '#ffffff', borderRadius: '16px', border: '1px solid #e2e8f0', boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.05)', overflow: 'hidden', marginTop: '2rem' }}>
         <h3 className="premium-card-title" style={{ margin: 0, padding: '1.25rem 1.5rem', background: '#f8fafc', borderBottom: '1px solid #e2e8f0', display: 'flex', alignItems: 'center', gap: '0.75rem', color: '#1e293b', fontSize: '1.25rem' }}>
           <span style={{ fontSize: '1.5rem' }}>🏷️</span> Histórico de Ventas
         </h3>
