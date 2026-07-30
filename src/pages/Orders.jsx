@@ -4,7 +4,10 @@ import { useData } from '../context/DataContext';
 import { usePagination } from '../hooks/usePagination';
 
 export default function Orders() {
-  const { clients, products, orders, addOrder, markOrderAsDelivered, deleteOrder, updateOrderList } = useData();
+  const {
+    clients, products, orders, deliveryNotes, invoices, productMovements,
+    addOrder, deleteOrder, updateOrderList
+  } = useData();
   const [isAdding, setIsAdding] = useState(false);
   const [expandedOrderId, setExpandedOrderId] = useState(null);
   
@@ -16,9 +19,6 @@ export default function Orders() {
   const [quantity, setQuantity] = useState(1);
   const [discount, setDiscount] = useState(0);
   const [isFree, setIsFree] = useState(false);
-  
-  const [deliveringOrderId, setDeliveringOrderId] = useState(null);
-  const [deliveredToName, setDeliveredToName] = useState('');
   
   const [orderDate, setOrderDate] = useState(new Date().toISOString().split('T')[0]);
 
@@ -43,12 +43,21 @@ export default function Orders() {
   const [editNewIsFree, setEditNewIsFree] = useState(false);
 
   const openEditModal = (order) => {
+    const associatedNotes = deliveryNotes.filter(note => note.orderId === order.id);
+    const isBilled = associatedNotes.some(note => note.status === 'BILLED')
+      || invoices.some(invoice => invoice.deliveryNoteIds?.some(id => associatedNotes.some(note => note.id === id)));
+    if (isBilled) {
+      Swal.fire({
+        title: 'Pedido ya facturado',
+        text: 'Para modificarlo debes anular primero la factura asociada. Así evitamos que pedido, albarán y factura tengan importes distintos.',
+        icon: 'warning',
+        confirmButtonColor: '#059669'
+      });
+      return;
+    }
     setEditingOrder(order);
     
-    let parsedDate = '';
-    try {
-      parsedDate = order.date ? order.date.split('T')[0] : new Date().toISOString().split('T')[0];
-    } catch(e) { parsedDate = ''; }
+    const parsedDate = String(order.date || '').slice(0, 10) || new Date().toISOString().split('T')[0];
 
     setEditFormData({
       date: parsedDate,
@@ -69,7 +78,7 @@ export default function Orders() {
     setEditNewItemProduct(pId);
     if (pId) {
       const prod = products.find(p => p.id === pId);
-      if (prod) setEditNewItemPrice(prod.price);
+      if (prod) setEditNewItemPrice(prod.salePrice ?? prod.price ?? 0);
     } else {
       setEditNewItemPrice('');
     }
@@ -82,7 +91,7 @@ export default function Orders() {
     const newItem = {
       productId: prod.id,
       name: editNewIsFree ? `${prod.name} (Sin cargo)` : prod.name,
-      price: editNewIsFree ? 0 : (editNewItemPrice !== '' ? Number(editNewItemPrice) : prod.price),
+      price: editNewIsFree ? 0 : (editNewItemPrice !== '' ? Number(editNewItemPrice) : Number(prod.salePrice ?? prod.price ?? 0)),
       quantity: Number(editNewItemQuantity),
       discount: editNewIsFree ? 0 : Number(editNewItemDiscount)
     };
@@ -103,26 +112,38 @@ export default function Orders() {
     setEditFormData({ ...editFormData, items: updatedItems });
   };
 
-  const handleSaveEdit = () => {
+  const handleSaveEdit = async () => {
+    if (!editFormData.clientId || editFormData.items.length === 0) {
+      await Swal.fire('Faltan datos', 'Selecciona un cliente y añade al menos un producto.', 'warning');
+      return;
+    }
+    const invalidItem = editFormData.items.some(item =>
+      !item.productId || Number(item.quantity) <= 0 || Number(item.price) < 0
+      || Number(item.discount) < 0 || Number(item.discount) > 100
+    );
+    if (invalidItem) {
+      await Swal.fire('Revisa las líneas', 'Las cantidades, precios o descuentos no son válidos.', 'warning');
+      return;
+    }
     const newTotal = editFormData.items.reduce((sum, item) => {
       const lineTotal = (item.price * item.quantity) * (1 - item.discount / 100);
       return sum + lineTotal;
     }, 0);
 
-    let safeDate = new Date().toISOString();
-    try {
-      if (editFormData.date) safeDate = new Date(editFormData.date).toISOString();
-    } catch(e) {}
+    const parsedDate = new Date(editFormData.date);
+    const safeDate = Number.isNaN(parsedDate.getTime()) ? new Date().toISOString() : parsedDate.toISOString();
 
-    updateOrderList(editingOrder.id, {
+    const saved = await updateOrderList(editingOrder.id, {
       date: safeDate,
       clientId: editFormData.clientId,
       items: editFormData.items,
       total: newTotal,
       deliveredTo: editFormData.deliveredTo
     });
+    if (!saved) return;
     setEditingOrder(null);
     setEditFormData(null);
+    await Swal.fire({ title: 'Pedido actualizado', text: 'Los cambios se han guardado y el albarán asociado se ha sincronizado.', icon: 'success', timer: 1800, showConfirmButton: false });
   };
 
   const handleClientChange = (e) => {
@@ -169,7 +190,7 @@ export default function Orders() {
     setSelectedProductId(pId);
     if (pId) {
       const product = products.find(p => p.id === pId);
-      if (product) setCustomPrice(product.price);
+      if (product) setCustomPrice(product.salePrice ?? product.price ?? 0);
     } else {
       setCustomPrice('');
     }
@@ -186,10 +207,8 @@ export default function Orders() {
     e.preventDefault();
     if (!clientId || orderItems.length === 0) return;
 
-    let safeDate = new Date().toISOString();
-    try {
-      if (orderDate) safeDate = new Date(orderDate).toISOString();
-    } catch(e) {}
+    const parsedDate = new Date(orderDate);
+    const safeDate = Number.isNaN(parsedDate.getTime()) ? new Date().toISOString() : parsedDate.toISOString();
 
     const newOrder = {
       clientId,
@@ -241,6 +260,12 @@ export default function Orders() {
   });
 
   const { currentData: paginatedData, currentPage, totalPages, nextPage, prevPage, goToPage } = usePagination(heavilyFilteredOrders, 10);
+  const editingInventoryLocked = editingOrder
+    ? productMovements.some(movement =>
+        movement.type === 'ORDER'
+        && (movement.referenceId === editingOrder.id || movement.referenceId?.startsWith(`${editingOrder.id}|`))
+      )
+    : false;
   
   return (
     <div className="admin-container">
@@ -411,17 +436,77 @@ export default function Orders() {
         </div>
       )}
 
-      {/* Editing Modal rendering omitted here for brevity, usually it's rendered conditionally inside or via a portal */}
-      {editingOrder && (
-         <div className="modal-backdrop" style={{position:'fixed', top:0, left:0, right:0, bottom:0, background:'rgba(0,0,0,0.5)', zIndex:50, display:'flex', alignItems:'center', justifyContent:'center'}}>
-            <div className="card" style={{width:'90%', maxWidth:'800px', maxHeight:'90vh', overflowY:'auto'}}>
-              <h3 className="font-bold mb-4">Editar Pedido {editingOrder.id.slice(-6)}</h3>
-              <div className="flex flex-col gap-4">
-                 <p className="text-muted">La edición de pedidos está temporalmente en mantenimiento gráfico, pero funciona internamente.</p>
-                 <button className="btn btn-secondary" onClick={() => setEditingOrder(null)}>Cerrar</button>
+      {editingOrder && editFormData && (
+        <div className="order-edit-backdrop" onMouseDown={event => { if (event.target === event.currentTarget) setEditingOrder(null); }}>
+          <section className="order-edit-modal" role="dialog" aria-modal="true" aria-label={`Editar pedido ${editingOrder.id.slice(-6)}`}>
+            <header>
+              <div><span>EDICIÓN DE PEDIDO</span><h3>Pedido #{editingOrder.id.slice(-6)}</h3><p>Los cambios se sincronizan con el albarán asociado.</p></div>
+              <button type="button" aria-label="Cerrar" onClick={() => setEditingOrder(null)}>×</button>
+            </header>
+
+            {editingInventoryLocked && (
+              <div className="order-edit-warning">
+                Este pedido ya descontó producto con trazabilidad. Puedes corregir cliente, fecha, entrega, precios y descuentos, pero no cambiar productos ni cantidades.
               </div>
+            )}
+
+            <div className="order-edit-fields">
+              <label>Cliente
+                <select className="form-control" value={editFormData.clientId} onChange={event => setEditFormData({ ...editFormData, clientId: event.target.value })}>
+                  <option value="">Selecciona un cliente</option>
+                  {clients.map(client => <option key={client.id} value={client.id}>{client.commercialName || client.name}</option>)}
+                </select>
+              </label>
+              <label>Fecha del pedido
+                <input className="form-control" type="date" value={editFormData.date} onChange={event => setEditFormData({ ...editFormData, date: event.target.value })} />
+              </label>
+              <label>Persona que recibió
+                <input className="form-control" value={editFormData.deliveredTo} onChange={event => setEditFormData({ ...editFormData, deliveredTo: event.target.value })} placeholder="Opcional" />
+              </label>
             </div>
-         </div>
+
+            {!editingInventoryLocked && (
+              <div className="order-edit-add-line">
+                <select className="form-control" value={editNewItemProduct} onChange={handleEditNewProductChange}>
+                  <option value="">Añadir producto…</option>
+                  {products.map(product => <option key={product.id} value={product.id}>{product.name}</option>)}
+                </select>
+                <input className="form-control" type="number" min="0" step="0.01" value={editNewItemPrice} onChange={event => setEditNewItemPrice(event.target.value)} placeholder="Precio" />
+                <input className="form-control" type="number" min="1" value={editNewItemQuantity} onChange={event => setEditNewItemQuantity(Number(event.target.value))} aria-label="Cantidad" />
+                <input className="form-control" type="number" min="0" max="100" value={editNewItemDiscount} onChange={event => setEditNewItemDiscount(Number(event.target.value))} aria-label="Descuento" />
+                <label className="order-edit-free"><input type="checkbox" checked={editNewIsFree} onChange={event => setEditNewIsFree(event.target.checked)} /> Gratis</label>
+                <button type="button" className="btn btn-secondary" onClick={handleAddEditItem}>Añadir</button>
+              </div>
+            )}
+
+            <div className="order-edit-lines">
+              <table>
+                <thead><tr><th>Producto</th><th>Precio</th><th>Cantidad</th><th>Dto.</th><th>Total</th><th /></tr></thead>
+                <tbody>
+                  {editFormData.items.map((item, index) => {
+                    const lineTotal = Number(item.price || 0) * Number(item.quantity || 0) * (1 - Number(item.discount || 0) / 100);
+                    return (
+                      <tr key={`${item.productId}-${index}`}>
+                        <td><strong>{products.find(product => product.id === item.productId)?.name || item.name}</strong></td>
+                        <td><input type="number" min="0" step="0.01" value={item.price} onChange={event => handleEditItemChange(index, 'price', event.target.value)} /></td>
+                        <td><input type="number" min="1" disabled={editingInventoryLocked} value={item.quantity} onChange={event => handleEditItemChange(index, 'quantity', event.target.value)} /></td>
+                        <td><input type="number" min="0" max="100" value={item.discount || 0} onChange={event => handleEditItemChange(index, 'discount', event.target.value)} /></td>
+                        <td><strong>{lineTotal.toFixed(2)} €</strong></td>
+                        <td>{!editingInventoryLocked && <button type="button" onClick={() => handleRemoveEditItem(index)}>Quitar</button>}</td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+
+            <footer>
+              <div><span>Nuevo total</span><strong>{editFormData.items.reduce((sum, item) => sum + Number(item.price || 0) * Number(item.quantity || 0) * (1 - Number(item.discount || 0) / 100), 0).toFixed(2)} €</strong></div>
+              <button type="button" className="btn btn-secondary" onClick={() => setEditingOrder(null)}>Cancelar</button>
+              <button type="button" className="btn btn-primary" onClick={handleSaveEdit}>Guardar cambios</button>
+            </footer>
+          </section>
+        </div>
       )}
 
       <div className="table-container">
@@ -463,6 +548,13 @@ export default function Orders() {
                         onClick={() => setExpandedOrderId(expandedOrderId === order.id ? null : order.id)}
                       >
                         {expandedOrderId === order.id ? 'Ocultar' : 'Ver Detalles'}
+                      </button>
+                      <button
+                        className="btn btn-secondary"
+                        style={{ padding: '0.3rem 0.6rem', fontSize: '0.8rem' }}
+                        onClick={() => openEditModal(order)}
+                      >
+                        Editar
                       </button>
                       <button 
                         className="btn btn-danger" 
@@ -543,4 +635,3 @@ export default function Orders() {
     </div>
   );
 }
-
