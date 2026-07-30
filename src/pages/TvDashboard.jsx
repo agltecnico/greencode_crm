@@ -296,72 +296,74 @@ export default function TvDashboard() {
             <div className="tv-info-grid stock">
               {(() => {
                 if (!products || !productMovements) return <p style={{color:'white'}}>Cargando datos...</p>;
-                
-                return products.map(product => {
-                  // 1. Tuppers Envasados (Stock físico)
+
+                const pendingOrders = orders?.filter(order =>
+                  ['PENDING', 'PENDIENTE', 'PREPARED', 'IN_TRANSIT'].includes(order.status)
+                ) || [];
+
+                const stockRows = products.map(product => {
                   const movements = productMovements.filter(m => m.productId === product.id);
-                  const envasados = movements.reduce((sum, m) => sum + Number(m.quantity || 0), 0);
-                  
-                  // 2. Tuppers en Pedidos (Pendientes de entrega)
-                  const pendingOrders = orders?.filter(o =>
-                    ['PENDING', 'PENDIENTE', 'PREPARED', 'IN_TRANSIT'].includes(o.status)
-                  ) || [];
-                  let enPedidos = 0;
-                  pendingOrders.forEach(o => {
-                    if (o.items) {
-                      o.items.forEach(item => {
-                        if (item.productId === product.id) enPedidos += Number(item.quantity || 0);
-                      });
-                    }
-                  });
+                  const physical = movements.reduce((sum, movement) => sum + Number(movement.quantity || 0), 0);
+                  const reserved = pendingOrders.reduce((sum, order) =>
+                    sum + (order.items || [])
+                      .filter(item => item.productId === product.id)
+                      .reduce((itemSum, item) => itemSum + Number(item.quantity || 0), 0)
+                  , 0);
+                  return {
+                    id: product.id,
+                    name: product.name,
+                    physical,
+                    reserved,
+                    available: physical - reserved
+                  };
+                })
+                  .filter(row => row.physical !== 0 || row.reserved !== 0)
+                  .sort((a, b) => String(a.name).localeCompare(String(b.name), 'es', { sensitivity: 'base' }));
 
-                  // 3. Tuppers que Sobran (Disponibles)
-                  const sobran = envasados - enPedidos;
-                  const assignedPackaging = (product.packagingArticleIds || [])
-                    .map(articleId => articles?.find(article => article.id === articleId))
-                    .filter(Boolean);
-                  const legacyPackaging = (packagingFormats || []).filter(format =>
-                    movements.some(movement => movement.packagingFormatId === format.id)
-                  );
-                  const formatStocks = [...assignedPackaging, ...legacyPackaging].map(format => {
-                    const produced = movements.filter(m => m.type === 'HARVEST' && (m.packagingArticleId === format.id || m.packagingFormatId === format.id)).reduce((sum, movement) => sum + Number(movement.quantity || 0), 0);
-                    const delivered = movements.filter(m => m.type === 'ORDER' && (m.packagingArticleId === format.id || m.packagingFormatId === format.id)).reduce((sum, movement) => sum + Math.abs(Number(movement.quantity || 0)), 0);
-                    return { ...format, stock: produced - delivered };
-                  }).filter(format => format.stock !== 0);
+                const columns = [
+                  {
+                    key: 'physical',
+                    title: 'Stock total en nevera',
+                    subtitle: 'Producto físico',
+                    tone: 'physical',
+                    rows: stockRows.filter(row => row.physical !== 0)
+                  },
+                  {
+                    key: 'reserved',
+                    title: 'Reservado en pedidos',
+                    subtitle: 'Pendiente de entregar',
+                    tone: 'reserved',
+                    rows: stockRows.filter(row => row.reserved > 0)
+                  },
+                  {
+                    key: 'available',
+                    title: 'Disponible para venta',
+                    subtitle: 'Stock libre',
+                    tone: 'available',
+                    rows: stockRows.filter(row => row.available !== 0)
+                  }
+                ];
 
-                  if (envasados === 0 && enPedidos === 0) return null;
-
-                  return (
-                    <div key={product.id} className="tv-info-card stock-card" data-tone={sobran > 0 ? 'green' : sobran < 0 ? 'red' : 'slate'}>
-                      <div className="tv-card-topline">
-                        <span className={`tv-label ${sobran > 0 ? 'green' : sobran < 0 ? 'red' : 'neutral'}`}>{sobran > 0 ? 'Disponible' : sobran < 0 ? 'Falta stock' : 'Justo'}</span>
+                return columns.map(column => (
+                  <section key={column.key} className={`tv-stock-column ${column.tone}`}>
+                    <header>
+                      <div>
+                        <span>{column.subtitle}</span>
+                        <h3>{column.title}</h3>
                       </div>
-                      <h3>{product.name}</h3>
-                      {formatStocks.length > 0 && (
-                        <div className="tv-label-row">
-                          {formatStocks.map(format => <span key={format.id} className="tv-label neutral">{format.name}: {format.stock}</span>)}
+                      <strong>{column.rows.reduce((sum, row) => sum + row[column.key], 0)}</strong>
+                    </header>
+                    <div className="tv-stock-list">
+                      {column.rows.map(row => (
+                        <div key={row.id} className={column.key === 'available' && row.available < 0 ? 'negative' : ''}>
+                          <span>{row.name}</span>
+                          <strong>{row[column.key]}</strong>
                         </div>
-                      )}
-                      <div className="tv-stock-metrics">
-                        <div className="physical">
-                          <span>Stock total en nevera</span>
-                          <strong>{envasados}</strong>
-                          <small>Físico</small>
-                        </div>
-                        <div className="reserved">
-                          <span>Reservado en pedidos</span>
-                          <strong>{enPedidos}</strong>
-                          <small>Pendiente de entregar</small>
-                        </div>
-                        <div className={`available ${sobran >= 0 ? 'positive' : 'negative'}`}>
-                          <span>Disponible para venta</span>
-                          <strong>{sobran}</strong>
-                          <small>Stock libre</small>
-                        </div>
-                      </div>
+                      ))}
+                      {column.rows.length === 0 && <p>Sin productos</p>}
                     </div>
-                  );
-                });
+                  </section>
+                ));
               })()}
             </div>
           </div>
