@@ -492,7 +492,7 @@ export default function Profitability({
     const averageOrder = sales.length ? totalUnits / sales.length : 0;
     const averagePrice = totalUnits ? totalRevenue / totalUnits : 0;
     const averageUnitCost = costedUnits ? totalCost / costedUnits : 0;
-    const profitPerUnit = averagePrice - averageUnitCost;
+    const profitPerUnit = costedUnits > 0 ? averagePrice - averageUnitCost : 0;
     const relevantHarvests = (harvests || []).filter(harvest => String(harvest.productId) === String(effectiveProductId));
     const producedUnits = relevantHarvests.reduce((sum, harvest) => sum + Number(harvest.tuppersCount || 0), 0);
     const usedTrays = relevantHarvests.reduce((sum, harvest) => sum + Object.values(harvest.selectedCropUsages || {}).reduce((traySum, value) => traySum + Number(value || 0), 0), 0);
@@ -526,6 +526,7 @@ export default function Profitability({
       averagePrice,
       averageUnitCost,
       profitPerUnit,
+      costedUnits,
       forecastUnits,
       forecastOrders: averageOrder > 0 ? Math.ceil(forecastUnits / averageOrder) : 0,
       unitsPerTray,
@@ -815,7 +816,7 @@ export default function Profitability({
           <StatCard icon={<PackageCheck size={22} />} label="Valor total del stock" value={money(financialControl.totalStockValue)} detail={`Materiales ${money(financialControl.materialStockValue)}`} tone="blue" />
         </>}
         {section === 'intelligence' && <>
-          <StatCard icon={<CircleDollarSign size={22} />} label="Beneficio por unidad" value={money(intelligence.profitPerUnit)} detail={`Precio medio ${money(intelligence.averagePrice)}`} />
+          <StatCard icon={<CircleDollarSign size={22} />} label="Beneficio por unidad" value={intelligence.costedUnits ? money(intelligence.profitPerUnit) : 'Pendiente'} detail={intelligence.costedUnits ? `Precio medio ${money(intelligence.averagePrice)}` : 'Falta coste trazado de ventas'} />
           <StatCard icon={<TrendingUp size={22} />} label="Previsión próxima semana" value={`${intelligence.forecastUnits} uds.`} detail={`${intelligence.forecastOrders} pedidos aproximados`} tone="purple" />
           <StatCard icon={<Sprout size={22} />} label="Cultivo recomendado" value={`${intelligence.recommendedTrays || '—'} bandejas`} detail={intelligence.unitsPerTray ? `${intelligence.unitsPerTray.toFixed(1)} uds. históricas/bandeja` : 'Falta rendimiento de cosechas'} tone="blue" />
           <StatCard icon={<BrainCircuit size={22} />} label="Confianza de previsión" value={intelligence.confidence} detail={`${intelligence.weeksWithSales}/8 semanas con ventas`} tone="amber" />
