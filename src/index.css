@@ -878,7 +878,7 @@ body {
 .profit-modal-backdrop{position:fixed;inset:0;z-index:1200;display:grid;place-items:center;padding:1.2rem;background:rgba(7,24,18,.68);backdrop-filter:blur(7px)}
 .profitability-modal{display:grid;grid-template-rows:auto minmax(0,1fr);gap:0;width:min(1320px,97vw);height:min(880px,95vh);min-height:0;max-height:95vh;overflow:hidden;padding:0;border:1px solid rgba(255,255,255,.35);border-radius:1.25rem;background:linear-gradient(145deg,#f8fafc,#f1f7f4);box-shadow:0 35px 100px rgba(2,15,10,.38)}
 .profitability-modal .table-container{max-height:none;overflow-x:auto;overflow-y:visible;overscroll-behavior-x:contain;touch-action:pan-x pan-y}
-.profitability-scroll-body{display:grid;gap:1.25rem;min-width:0}.profitability-modal .profitability-scroll-body{min-height:0;padding:.8rem 1.1rem 1.2rem;overflow-x:hidden;overflow-y:scroll;overscroll-behavior:contain;scrollbar-gutter:stable;-webkit-overflow-scrolling:touch;touch-action:pan-y}
+.profitability-scroll-body{display:grid;gap:1.25rem;min-width:0}.profitability-modal .profitability-scroll-body{grid-auto-rows:max-content;align-content:start;min-height:0;padding:.8rem 1.1rem 1.2rem;overflow-x:hidden;overflow-y:auto;overscroll-behavior:contain;scrollbar-gutter:stable;-webkit-overflow-scrolling:touch;touch-action:pan-y}.profitability-modal .profit-table-card{overflow:visible}
 .profitability-modal .profit-header{position:relative;z-index:8;margin:0;padding:1rem 1.1rem .75rem;border-bottom:1px solid #dfe9e4;background:rgba(255,255,255,.96);backdrop-filter:blur(12px)}
 .profitability-modal .profit-header h1{margin:.05rem 0;font-size:1.35rem}
 .profitability-modal .profit-header>div:first-child>p:last-child{font-size:.72rem}
