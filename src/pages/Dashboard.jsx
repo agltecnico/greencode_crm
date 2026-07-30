@@ -113,9 +113,24 @@ export default function Dashboard() {
     const pendingCollection = currentNotes
       .filter(note => note.isPaid !== true)
       .reduce((sum, note) => sum + Number(note.total || 0), 0);
-    const monthExpenses = (expenses || [])
+    const generalExpenses = (expenses || [])
       .filter(expense => inPeriod(expense.date))
       .reduce((sum, expense) => sum + Number(expense.total ?? expense.amount ?? 0), 0);
+    // Production cost belongs to the period in which the harvest is registered,
+    // regardless of whether those units have already been sold. Each harvest
+    // already stores seed, substrate and packaging costs calculated from the
+    // trays actually used, so it must not depend on ORDER movements.
+    const productionExpenses = (harvests || [])
+      .filter(harvest => inPeriod(harvest.harvestDate || harvest.createdAt))
+      .reduce((sum, harvest) => sum + Number(
+        harvest.totalCost
+        ?? (
+          Number(harvest.seedCost || 0)
+          + Number(harvest.substrateCost || 0)
+          + Number(harvest.packagingCost || 0)
+        )
+      ), 0);
+    const monthExpenses = generalExpenses + productionExpenses;
 
     const boundsStart = new Date(`${selectedBounds.start}T12:00:00`);
     const boundsEnd = new Date(`${selectedBounds.end}T12:00:00`);
@@ -236,6 +251,8 @@ export default function Dashboard() {
       pendingOrderValue,
       pendingCollection,
       monthExpenses,
+      generalExpenses,
+      productionExpenses,
       chart,
       allClients,
       productSales,
@@ -313,7 +330,7 @@ export default function Dashboard() {
         <Metric icon={<CircleDollarSign />} label="Ventas del periodo" value={money(data.monthSales)} detail={`${data.orderCount} entregas · ${data.units} unidades`} tone="green" />
         <Metric icon={<FileText />} label="Ticket medio" value={money(data.averageTicket)} detail={`${data.orderCount} ventas realizadas`} tone="blue" />
         <Metric icon={<ShoppingBag />} label="Pedidos abiertos" value={data.pendingOrders} detail={money(data.pendingOrderValue)} tone="purple" />
-        <Metric icon={<Receipt />} label="Gastos del periodo" value={money(data.monthExpenses)} detail={`${money(data.pendingCollection)} pendiente de cobro`} tone="amber" />
+        <Metric icon={<Receipt />} label="Gastos del periodo" value={money(data.monthExpenses)} detail={`Producción ${money(data.productionExpenses)} · Generales ${money(data.generalExpenses)}`} tone="amber" />
         <Metric icon={<TrendingUp />} label="Margen trazado" value={money(data.margin)} detail={`${data.marginPercent.toFixed(1)} % · ${data.costedUnits}/${data.units} uds. con coste`} tone="green" />
       </section>
 
