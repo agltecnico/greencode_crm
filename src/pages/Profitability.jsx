@@ -945,11 +945,11 @@ export default function Profitability({
       </header>
 
       <nav className="profit-section-nav" aria-label="Apartados financieros">
-        <button className={section === 'summary' ? 'active' : ''} onClick={() => openSection('summary')}>Resumen</button>
-        <button className={section === 'sales' ? 'active' : ''} onClick={() => openSection('sales')}>Ventas</button>
-        <button className={section === 'costs' ? 'active' : ''} onClick={() => openSection('costs')}>Costes y producción</button>
-        <button className={section === 'treasury' ? 'active' : ''} onClick={() => openSection('treasury')}>Tesorería y stock</button>
-        <button className={section === 'intelligence' ? 'active intelligence' : 'intelligence'} onClick={() => openSection('intelligence')}><BrainCircuit size={16} /> Previsión</button>
+        <button className={section === 'summary' ? 'active' : ''} onClick={() => openSection('summary')}><span>01</span><strong>Resumen</strong><small>Visión general</small></button>
+        <button className={section === 'sales' ? 'active' : ''} onClick={() => openSection('sales')}><span>02</span><strong>Ventas</strong><small>Productos y clientes</small></button>
+        <button className={section === 'costs' ? 'active' : ''} onClick={() => openSection('costs')}><span>03</span><strong>Costes</strong><small>Producción y cultivos</small></button>
+        <button className={section === 'treasury' ? 'active' : ''} onClick={() => openSection('treasury')}><span>04</span><strong>Tesorería</strong><small>Cobros y existencias</small></button>
+        <button className={section === 'intelligence' ? 'active intelligence' : 'intelligence'} onClick={() => openSection('intelligence')}><BrainCircuit size={16} /><strong>Previsión</strong><small>Demanda semanal</small></button>
       </nav>
 
       <section className="profit-stats profit-section-stats">

@@ -69,7 +69,7 @@ export default function Dashboard() {
   const [rangeEnd, setRangeEnd] = useState(localDate(today));
   const [detailsOpen, setDetailsOpen] = useState(false);
   const [financialOpen, setFinancialOpen] = useState(false);
-  const [financialView, setFinancialView] = useState('products');
+  const [financialView, setFinancialView] = useState('summary');
   const [reportView, setReportView] = useState('products');
   const [reportQuery, setReportQuery] = useState('');
   const [companyForm, setCompanyForm] = useState(companyProfile || {});
@@ -305,7 +305,7 @@ export default function Dashboard() {
         </div>
         <div className="admin-header-actions">
           <button className="admin-secondary-action" onClick={() => setDetailsOpen(true)}>Ver informe completo</button>
-          <button className="admin-primary-action" onClick={() => setFinancialOpen(true)}>Ver rentabilidad <ArrowRight size={17} /></button>
+          <button className="admin-primary-action" onClick={() => openFinancial('summary')}>Centro financiero <ArrowRight size={17} /></button>
         </div>
       </header>
 
