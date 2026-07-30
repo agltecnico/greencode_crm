@@ -121,7 +121,7 @@ export default function Crops() {
     stockEntries, stockLots, articles, seedVarieties, providers,
     cropTypes,
     harvestTargets, addHarvestTarget, updateHarvestTarget, deleteHarvestTarget,
-    harvests, registerHarvest,
+    harvests, registerHarvest, editHarvestPackaging,
     productMovements,
     products, packagingFormats,
     orders, clients, updateOrderList
@@ -231,6 +231,9 @@ export default function Crops() {
     registrationNotes: ''
   };
   const [newHarvest, setNewHarvest] = useState(emptyHarvestForm);
+  const [editingHarvest, setEditingHarvest] = useState(null);
+  const [editPackagingQuantities, setEditPackagingQuantities] = useState({});
+  const [savingHarvestEdit, setSavingHarvestEdit] = useState(false);
 
   const emptySowForm = { cropTypeId: '', traysCount: 1, stockLotId: '', datePlanted: toLocalDateTimeInputValue(), initialStatus: 'GERMINATING' };
   const openSowModal = (initialValues = {}) => {
@@ -475,6 +478,41 @@ export default function Crops() {
     setIsHarvestModalOpen(false);
     setNewHarvest(emptyHarvestForm);
     setHarvestBatchQueue([]);
+  };
+
+  const openHarvestPackagingEditor = harvest => {
+    const quantities = {};
+    (harvest.packagingBreakdown || []).forEach(item => {
+      const articleId = item.articleId || item.formatId;
+      if (articleId) quantities[articleId] = Number(item.quantity || 0);
+    });
+    setEditPackagingQuantities(quantities);
+    setEditingHarvest(harvest);
+  };
+
+  const saveHarvestPackagingEdit = async event => {
+    event.preventDefault();
+    if (!editingHarvest || savingHarvestEdit) return;
+    const packagingBreakdown = Object.entries(editPackagingQuantities)
+      .map(([articleId, quantity]) => ({ articleId, quantity: Math.max(0, Number(quantity || 0)) }))
+      .filter(item => item.quantity > 0);
+    if (!packagingBreakdown.length) {
+      Swal.fire({ title: 'Faltan unidades', text: 'La cosecha debe conservar al menos una unidad envasada.', icon: 'warning' });
+      return;
+    }
+    setSavingHarvestEdit(true);
+    const result = await editHarvestPackaging(editingHarvest.id, packagingBreakdown);
+    setSavingHarvestEdit(false);
+    if (!result) return;
+    setEditingHarvest(null);
+    setEditPackagingQuantities({});
+    Swal.fire({
+      title: 'Cosecha corregida',
+      text: 'Se han actualizado los envases, el stock y los costes asociados.',
+      icon: 'success',
+      timer: 1800,
+      showConfirmButton: false
+    });
   };
 
   
@@ -1153,6 +1191,14 @@ export default function Crops() {
                     )}
                     
                   </div>
+                  <div style={{ display: 'flex', gap: '0.55rem', marginLeft: '1rem', flexWrap: 'wrap', justifyContent: 'flex-end' }}>
+                  <button
+                    type="button"
+                    style={{ backgroundColor: '#ecfdf5', border: '1px solid #86efac', padding: '0.75rem 1rem', borderRadius: '8px', cursor: 'pointer', fontWeight: 'bold', color: '#166534' }}
+                    onClick={() => openHarvestPackagingEditor(h)}
+                  >
+                    ✏️ Corregir envases
+                  </button>
                   <button 
                     style={{ backgroundColor: 'white', border: '1px solid #cbd5e1', padding: '0.75rem 1.25rem', borderRadius: '8px', cursor: 'pointer', fontWeight: 'bold', color: '#334155', display: 'flex', alignItems: 'center', gap: '0.5rem', boxShadow: '0 1px 2px rgba(0,0,0,0.05)', transition: 'all 0.2s', marginLeft: '1rem' }}
                     onMouseOver={e => { e.currentTarget.style.borderColor = '#94a3b8'; e.currentTarget.style.backgroundColor = '#f8fafc'; }}
@@ -1161,6 +1207,7 @@ export default function Crops() {
                   >
                     <span>🖨️</span> Re-Imprimir PDF
                   </button>
+                  </div>
                 </div>
               )
             })}
@@ -2257,6 +2304,61 @@ export default function Crops() {
     </div>
   </div>
 )}
+
+{editingHarvest && (() => {
+  const product = products?.find(item => item.id === editingHarvest.productId);
+  const allowedFormats = packagingArticlesForProduct(product);
+  const oldByArticle = Object.fromEntries((editingHarvest.packagingBreakdown || []).map(item => [item.articleId || item.formatId, Number(item.quantity || 0)]));
+  const totalUnits = Object.values(editPackagingQuantities).reduce((sum, value) => sum + Number(value || 0), 0);
+  return (
+    <div style={modalOverlayStyle}>
+      <form onSubmit={saveHarvestPackagingEdit} style={{ ...modalCardStyle, maxWidth: '620px' }}>
+        <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '1rem', marginBottom: '1rem' }}>
+          <div>
+            <span style={{ color: '#059669', fontSize: '0.7rem', fontWeight: 900, letterSpacing: '0.08em' }}>CORRECCIÓN DE ENVASADO</span>
+            <h3 style={{ margin: '0.2rem 0', color: '#0f172a' }}>{product?.name || 'Producto'}</h3>
+            <p style={{ margin: 0, color: '#64748b', fontSize: '0.82rem' }}>Lote {editingHarvest.batchNumber} · No modifica fecha, cultivo ni bandejas cosechadas.</p>
+          </div>
+          <button type="button" onClick={() => setEditingHarvest(null)} style={{ border: 0, borderRadius: '50%', width: '2rem', height: '2rem', cursor: 'pointer' }}>×</button>
+        </div>
+
+        <div style={{ display: 'grid', gap: '0.65rem' }}>
+          {allowedFormats.map(format => {
+            const returnedUnits = Number(oldByArticle[format.id] || 0);
+            const availableAfterReturn = articlePhysicalStock(format.id) + returnedUnits;
+            return (
+              <label key={format.id} style={{ display: 'grid', gridTemplateColumns: 'minmax(0,1fr) 110px', alignItems: 'center', gap: '1rem', padding: '0.8rem', border: '1px solid #dbe6e0', borderRadius: '0.75rem', background: '#f8faf9' }}>
+                <span style={{ display: 'grid', gap: '0.15rem' }}>
+                  <strong style={{ color: '#1e293b' }}>{format.type === 'BANDEJA' ? `Vivo · ${format.name}` : format.name}</strong>
+                  <small style={{ color: '#64748b' }}>Disponibles al corregir: {availableAfterReturn} · Antes: {returnedUnits}</small>
+                </span>
+                <input
+                  type="number"
+                  min="0"
+                  step="1"
+                  value={editPackagingQuantities[format.id] || 0}
+                  onChange={event => setEditPackagingQuantities(previous => ({ ...previous, [format.id]: Math.max(0, parseInt(event.target.value) || 0) }))}
+                  className="premium-input"
+                  style={{ width: '100%', boxSizing: 'border-box', textAlign: 'center', fontWeight: 900 }}
+                />
+              </label>
+            );
+          })}
+        </div>
+
+        <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '1rem', padding: '0.8rem', borderRadius: '0.7rem', background: '#ecfdf5', color: '#166534' }}>
+          <span>Total corregido</span><strong>{totalUnits} unidades</strong>
+        </div>
+        <p style={{ color: '#92400e', fontSize: '0.75rem', lineHeight: 1.45 }}>El sistema devolverá primero los envases del registro anterior y descontará las cantidades nuevas. Si ya existen ventas de este lote, protegerá las unidades entregadas.</p>
+
+        <div style={{ display: 'flex', gap: '0.65rem', justifyContent: 'flex-end' }}>
+          <button type="button" onClick={() => setEditingHarvest(null)} className="btn btn-secondary">Cancelar</button>
+          <button type="submit" disabled={savingHarvestEdit || totalUnits <= 0} className="btn btn-primary">{savingHarvestEdit ? 'Guardando…' : 'Guardar corrección'}</button>
+        </div>
+      </form>
+    </div>
+  );
+})()}
 
 {showPhaseChangeModal && (
         <div style={modalOverlayStyle}>

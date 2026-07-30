@@ -1470,6 +1470,18 @@ export const DataProvider = ({ children }) => {
       return false;
     }
   };
+  const editHarvestPackaging = async (id, packagingBreakdown) => {
+    const { data, error } = await persistOrReload(
+      () => supabase.rpc('edit_harvest_packaging', {
+        p_harvest_id: id,
+        p_packaging_breakdown: packagingBreakdown
+      }),
+      'corregir los envases de la cosecha'
+    );
+    if (error) return null;
+    await refreshData({ force: true });
+    return data;
+  };
 
   const saveSalesForecasts = async forecastRows => {
     if (!Array.isArray(forecastRows) || forecastRows.length === 0) return false;
@@ -1514,7 +1526,7 @@ export const DataProvider = ({ children }) => {
         substrateInventory, addSubstrateInventory, deleteSubstrateInventory,
         crops, addCrop, sowCrop, updateCrop, deleteCrop, advanceCropStatus, reverseCropStatus, setCropPhase, discardCrop,
         harvestTargets, addHarvestTarget, updateHarvestTarget, deleteHarvestTarget,
-      harvests, addHarvest, registerHarvest, updateHarvest, deleteHarvest,
+      harvests, addHarvest, registerHarvest, updateHarvest, editHarvestPackaging, deleteHarvest,
       dailyLogs, addDailyLog, updateDailyLog, deleteDailyLog,
 
       clients: sortedClients, addClient, updateClient, deleteClient,
