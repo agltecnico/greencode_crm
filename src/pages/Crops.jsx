@@ -501,18 +501,28 @@ export default function Crops() {
       return;
     }
     setSavingHarvestEdit(true);
-    const result = await editHarvestPackaging(editingHarvest.id, packagingBreakdown);
-    setSavingHarvestEdit(false);
-    if (!result) return;
-    setEditingHarvest(null);
-    setEditPackagingQuantities({});
-    Swal.fire({
-      title: 'Cosecha corregida',
-      text: 'Se han actualizado los envases, el stock y los costes asociados.',
-      icon: 'success',
-      timer: 1800,
-      showConfirmButton: false
-    });
+    try {
+      const result = await editHarvestPackaging(editingHarvest.id, packagingBreakdown);
+      if (!result) throw new Error('Supabase no devolvió la confirmación de la corrección.');
+      setEditingHarvest(null);
+      setEditPackagingQuantities({});
+      Swal.fire({
+        title: 'Cosecha corregida',
+        text: 'Se han actualizado los envases, el stock y los costes asociados.',
+        icon: 'success',
+        timer: 1800,
+        showConfirmButton: false
+      });
+    } catch (error) {
+      console.error('Error corrigiendo los envases de la cosecha:', error);
+      Swal.fire({
+        title: 'No se pudo guardar',
+        text: error?.message || 'No se pudo corregir el envasado. Vuelve a intentarlo.',
+        icon: 'error'
+      });
+    } finally {
+      setSavingHarvestEdit(false);
+    }
   };
 
   
@@ -2325,12 +2335,15 @@ export default function Crops() {
         <div style={{ display: 'grid', gap: '0.65rem' }}>
           {allowedFormats.map(format => {
             const returnedUnits = Number(oldByArticle[format.id] || 0);
-            const availableAfterReturn = articlePhysicalStock(format.id) + returnedUnits;
+            const correctedUnits = Number(editPackagingQuantities[format.id] || 0);
+            const resultingStock = articlePhysicalStock(format.id) + returnedUnits - correctedUnits;
             return (
               <label key={format.id} style={{ display: 'grid', gridTemplateColumns: 'minmax(0,1fr) 110px', alignItems: 'center', gap: '1rem', padding: '0.8rem', border: '1px solid #dbe6e0', borderRadius: '0.75rem', background: '#f8faf9' }}>
                 <span style={{ display: 'grid', gap: '0.15rem' }}>
                   <strong style={{ color: '#1e293b' }}>{format.type === 'BANDEJA' ? `Vivo · ${format.name}` : format.name}</strong>
-                  <small style={{ color: '#64748b' }}>Disponibles al corregir: {availableAfterReturn} · Antes: {returnedUnits}</small>
+                  <small style={{ color: resultingStock < 0 ? '#b45309' : '#64748b' }}>
+                    Stock tras corregir: {resultingStock} · Antes: {returnedUnits}
+                  </small>
                 </span>
                 <input
                   type="number"

@@ -1471,14 +1471,11 @@ export const DataProvider = ({ children }) => {
     }
   };
   const editHarvestPackaging = async (id, packagingBreakdown) => {
-    const { data, error } = await persistOrReload(
-      () => supabase.rpc('edit_harvest_packaging', {
-        p_harvest_id: id,
-        p_packaging_breakdown: packagingBreakdown
-      }),
-      'corregir los envases de la cosecha'
-    );
-    if (error) return null;
+    const { data, error } = await supabase.rpc('edit_harvest_packaging', {
+      p_harvest_id: id,
+      p_packaging_breakdown: packagingBreakdown
+    });
+    if (error) throw error;
     await refreshData({ force: true });
     return data;
   };
