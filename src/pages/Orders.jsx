@@ -27,7 +27,7 @@ export default function Orders() {
   const [filterEndDate, setFilterEndDate] = useState('');
   const [filterClientId, setFilterClientId] = useState('');
 
-  const [activeTab, setActiveTab] = useState('ALL');
+  const [activeTab, setActiveTab] = useState('PENDING');
   const [searchTerm, setSearchTerm] = useState('');
 
 
@@ -257,6 +257,15 @@ export default function Orders() {
       }
     }
     return true;
+  }).sort((a, b) => {
+    const currentDay = new Date();
+    currentDay.setHours(0, 0, 0, 0);
+    const dateA = new Date(a.date);
+    const dateB = new Date(b.date);
+    const distanceA = Number.isNaN(dateA.getTime()) ? Number.POSITIVE_INFINITY : Math.abs(dateA.setHours(0, 0, 0, 0) - currentDay.getTime());
+    const distanceB = Number.isNaN(dateB.getTime()) ? Number.POSITIVE_INFINITY : Math.abs(dateB.setHours(0, 0, 0, 0) - currentDay.getTime());
+    if (distanceA !== distanceB) return distanceA - distanceB;
+    return new Date(b.createdAt || b.date || 0) - new Date(a.createdAt || a.date || 0);
   });
 
   const { currentData: paginatedData, currentPage, totalPages, nextPage, prevPage, goToPage } = usePagination(heavilyFilteredOrders, 10);
