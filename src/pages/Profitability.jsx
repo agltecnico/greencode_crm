@@ -79,6 +79,19 @@ export default function Profitability({
   const selectedBounds = filterMode === 'month'
     ? boundsForMonth(selectedMonth)
     : { start: startDate, end: endDate };
+  const section = view === 'summary'
+    ? 'summary'
+    : ['orders', 'products', 'clients'].includes(view)
+      ? 'sales'
+      : ['harvests', 'cultivations', 'production', 'expenses', 'packaging'].includes(view)
+        ? 'costs'
+        : 'treasury';
+  const openSection = nextSection => {
+    const defaultViews = { summary: 'summary', sales: 'products', costs: 'harvests', treasury: 'treasury' };
+    setView(defaultViews[nextSection]);
+    setDisplayMode(nextSection === 'sales' ? 'visual' : 'detail');
+    setQuery('');
+  };
   const saveExpense = async event => {
     event.preventDefault();
     const total = Number(expenseForm.total || 0);
@@ -348,6 +361,12 @@ export default function Profitability({
     const unsoldUnits = harvestRows.reduce((sum, row) => sum + row.remainingUnits, 0);
     const unsoldCost = harvestRows.reduce((sum, row) => sum + row.unsoldCost, 0);
     const purchases = purchaseRows.reduce((sum, row) => sum + row.total, 0);
+    const materialStockValue = (articles || []).reduce((sum, article) => {
+      const quantity = (stockEntries || [])
+        .filter(entry => String(entry.articleId) === String(article.id))
+        .reduce((stock, entry) => stock + Number(entry.quantity || 0), 0);
+      return sum + Math.max(quantity, 0) * latestArticleUnitCost(article.id);
+    }, 0);
     const operatingProfit = report.revenue - report.cost - generalExpensesTotal;
     const cashOut = purchases + paidGeneralExpenses;
 
@@ -365,11 +384,14 @@ export default function Profitability({
       collected,
       pendingCollection,
       purchases,
+      materialStockValue,
+      totalStockValue: materialStockValue + unsoldCost,
+      totalPeriodCosts: productionCost + generalExpensesTotal,
       operatingProfit,
       cashOut,
       cashBalance: collected - cashOut
     };
-  }, [deliveryNotes, expenses, harvests, productMovements, products, providers, purchaseDeliveryNotes, report.cost, report.revenue, selectedBounds.end, selectedBounds.start]);
+  }, [articles, deliveryNotes, expenses, harvests, productMovements, products, providers, purchaseDeliveryNotes, report.cost, report.revenue, selectedBounds.end, selectedBounds.start, stockEntries]);
 
   const productionRows = (cropTypes || []).map(cropType => {
     const seedCost = latestVarietySeedCost(cropType.varietyId) * Number(cropType.seedGrams || 0);
@@ -492,6 +514,19 @@ export default function Profitability({
     doc.text(`Generado: ${new Date().toLocaleString('es-ES')}  |  Ventas: ${money(report.revenue)}  |  Costes trazados: ${money(report.cost)}  |  Margen trazado: ${money(report.margin)}  |  Cobertura: ${report.coverage.toFixed(1)} %`, 14, 40);
 
     const configurations = {
+      summary: {
+        title: 'Resumen económico del periodo',
+        head: [['Indicador', 'Importe']],
+        body: [
+          ['Ventas netas', money(report.revenue)],
+          ['Coste de lo vendido', money(report.cost)],
+          ['Gastos generales', money(financialControl.generalExpensesTotal)],
+          ['Beneficio operativo', money(financialControl.operatingProfit)],
+          ['Producción realizada', money(financialControl.productionCost)],
+          ['Stock total a coste', money(financialControl.totalStockValue)],
+          ['Tesorería estimada', money(financialControl.cashBalance)]
+        ]
+      },
       products: {
         title: 'Rentabilidad completa por producto',
         head: [['Producto', 'Uds.', 'Ventas', 'Venta trazada', 'Coste', 'Margen', '%', 'Sin coste']],
@@ -588,16 +623,41 @@ export default function Profitability({
         </div>
       </header>
 
-      <section className="profit-stats profit-stats-wide">
-        <StatCard icon={<CircleDollarSign size={22} />} label="Ventas netas" value={money(report.revenue)} detail={`${report.units} unidades entregadas`} />
-        <StatCard icon={<Sprout size={22} />} label="Producción realizada" value={money(financialControl.productionCost)} detail={`${financialControl.producedUnits} unidades producidas`} tone="blue" />
-        <StatCard icon={<PackageCheck size={22} />} label="Coste de lo vendido" value={money(report.cost)} detail={`${report.costedUnits} unidades trazadas`} tone="blue" />
-        <StatCard icon={<ReceiptText size={22} />} label="Gastos generales" value={money(financialControl.generalExpensesTotal)} detail={`${money(financialControl.pendingGeneralExpenses)} pendientes`} tone="amber" />
-        <StatCard icon={<BarChart3 size={22} />} label="Beneficio operativo" value={money(financialControl.operatingProfit)} detail="Ventas − coste vendido − generales" tone="purple" />
-        <StatCard icon={<WalletCards size={22} />} label="Tesorería estimada" value={money(financialControl.cashBalance)} detail={`${money(financialControl.pendingCollection)} por cobrar`} tone="green" />
+      <nav className="profit-section-nav" aria-label="Apartados financieros">
+        <button className={section === 'summary' ? 'active' : ''} onClick={() => openSection('summary')}>Resumen</button>
+        <button className={section === 'sales' ? 'active' : ''} onClick={() => openSection('sales')}>Ventas</button>
+        <button className={section === 'costs' ? 'active' : ''} onClick={() => openSection('costs')}>Costes y producción</button>
+        <button className={section === 'treasury' ? 'active' : ''} onClick={() => openSection('treasury')}>Tesorería y stock</button>
+      </nav>
+
+      <section className="profit-stats profit-section-stats">
+        {section === 'summary' && <>
+          <StatCard icon={<CircleDollarSign size={22} />} label="Ventas" value={money(report.revenue)} detail={`${report.units} unidades entregadas`} />
+          <StatCard icon={<PackageCheck size={22} />} label="Costes totales" value={money(report.cost + financialControl.generalExpensesTotal)} detail="Coste vendido + gastos generales" tone="blue" />
+          <StatCard icon={<BarChart3 size={22} />} label="Beneficio operativo" value={money(financialControl.operatingProfit)} detail="Resultado real del periodo" tone="purple" />
+          <StatCard icon={<WalletCards size={22} />} label="Tesorería estimada" value={money(financialControl.cashBalance)} detail={`${money(financialControl.pendingCollection)} por cobrar`} tone="green" />
+        </>}
+        {section === 'sales' && <>
+          <StatCard icon={<CircleDollarSign size={22} />} label="Ventas netas" value={money(report.revenue)} detail={`${report.units} unidades entregadas`} />
+          <StatCard icon={<PackageCheck size={22} />} label="Coste de lo vendido" value={money(report.cost)} detail={`${report.costedUnits} unidades trazadas`} tone="blue" />
+          <StatCard icon={<BarChart3 size={22} />} label="Beneficio de ventas" value={money(report.margin)} detail="Ventas trazadas − coste directo" tone="purple" />
+          <StatCard icon={<Percent size={22} />} label="Margen comercial" value={`${report.marginPercent.toFixed(1)} %`} detail={`${report.coverage.toFixed(1)} % con coste conocido`} tone="amber" />
+        </>}
+        {section === 'costs' && <>
+          <StatCard icon={<Sprout size={22} />} label="Producción realizada" value={money(financialControl.productionCost)} detail={`${financialControl.producedUnits} unidades producidas`} tone="blue" />
+          <StatCard icon={<PackageCheck size={22} />} label="Producto sin vender" value={money(financialControl.unsoldCost)} detail={`${financialControl.unsoldUnits} unidades terminadas`} tone="purple" />
+          <StatCard icon={<ReceiptText size={22} />} label="Gastos generales" value={money(financialControl.generalExpensesTotal)} detail={`${money(financialControl.pendingGeneralExpenses)} pendientes`} tone="amber" />
+          <StatCard icon={<BarChart3 size={22} />} label="Coste total del periodo" value={money(financialControl.totalPeriodCosts)} detail="Producción + gastos generales" tone="green" />
+        </>}
+        {section === 'treasury' && <>
+          <StatCard icon={<CircleDollarSign size={22} />} label="Cobrado" value={money(financialControl.collected)} detail={`${money(financialControl.pendingCollection)} pendiente`} />
+          <StatCard icon={<ReceiptText size={22} />} label="Pagos registrados" value={money(financialControl.cashOut)} detail="Compras + gastos pagados" tone="amber" />
+          <StatCard icon={<WalletCards size={22} />} label="Saldo estimado" value={money(financialControl.cashBalance)} detail="Cobros − pagos registrados" tone="purple" />
+          <StatCard icon={<PackageCheck size={22} />} label="Valor total del stock" value={money(financialControl.totalStockValue)} detail={`Materiales ${money(financialControl.materialStockValue)}`} tone="blue" />
+        </>}
       </section>
 
-      {report.pendingUnits > 0 && (
+      {section === 'sales' && report.pendingUnits > 0 && (
         <div className="profit-warning">
           <TriangleAlert size={20} />
           <div>
@@ -607,22 +667,22 @@ export default function Profitability({
         </div>
       )}
 
-      <section className="profit-control-strip">
+      {section === 'summary' && <section className="profit-control-strip profit-summary-strip">
         <button type="button" onClick={() => { setView('harvests'); setDisplayMode('detail'); }}>
-          <span>Producto terminado sin vender</span><strong>{money(financialControl.unsoldCost)}</strong><small>{financialControl.unsoldUnits} unidades en existencias</small>
+          <span>Producción frente a ventas</span><strong>{money(financialControl.productionCost)} / {money(report.revenue)}</strong><small>{financialControl.unsoldUnits} unidades sin vender</small>
         </button>
         <button type="button" onClick={() => { setView('treasury'); setDisplayMode('detail'); }}>
-          <span>Cobrado en el periodo</span><strong>{money(financialControl.collected)}</strong><small>{money(financialControl.pendingCollection)} pendiente de cobro</small>
+          <span>Cobrado frente a pendiente</span><strong>{money(financialControl.collected)} / {money(financialControl.pendingCollection)}</strong><small>Situación de cobros</small>
         </button>
         <button type="button" onClick={() => { setView('treasury'); setDisplayMode('detail'); }}>
-          <span>Compras de inventario</span><strong>{money(financialControl.purchases)}</strong><small>Entradas de stock del periodo</small>
+          <span>Stock materiales + terminado</span><strong>{money(financialControl.totalStockValue)}</strong><small>Valor actual a coste</small>
         </button>
         <button type="button" onClick={() => { setView('expenses'); setDisplayMode('detail'); }}>
-          <span>Gastos generales pagados</span><strong>{money(financialControl.paidGeneralExpenses)}</strong><small>{money(financialControl.pendingGeneralExpenses)} pendientes</small>
+          <span>Beneficio antes de generales</span><strong>{money(report.margin)}</strong><small>Beneficio final {money(financialControl.operatingProfit)}</small>
         </button>
-      </section>
+      </section>}
 
-      <section className="premium-card profit-table-card">
+      {section !== 'summary' && <section className="premium-card profit-table-card">
         <div className="profit-table-heading">
           <div>
             <h2>Explorador económico</h2>
@@ -630,15 +690,19 @@ export default function Profitability({
           </div>
           <div className="profit-heading-actions">
             <div className="profit-tabs profit-tabs-scroll">
-              <button className={view === 'orders' ? 'active' : ''} onClick={() => { setView('orders'); setDisplayMode('detail'); }}>Ventas</button>
-              <button className={view === 'products' ? 'active' : ''} onClick={() => setView('products')}>Por producto</button>
-              <button className={view === 'clients' ? 'active' : ''} onClick={() => setView('clients')}>Por cliente</button>
-              <button className={view === 'harvests' ? 'active' : ''} onClick={() => { setView('harvests'); setDisplayMode('detail'); }}>Producción real</button>
-              <button className={view === 'cultivations' ? 'active' : ''} onClick={() => { setView('cultivations'); setDisplayMode('detail'); }}>Cada cultivo</button>
-              <button className={view === 'production' ? 'active' : ''} onClick={() => { setView('production'); setDisplayMode('detail'); }}>Coste/bandeja</button>
-              <button className={view === 'expenses' ? 'active' : ''} onClick={() => { setView('expenses'); setDisplayMode('detail'); }}>Gastos generales</button>
-              <button className={view === 'treasury' ? 'active' : ''} onClick={() => { setView('treasury'); setDisplayMode('detail'); }}>Tesorería</button>
-              <button className={view === 'packaging' ? 'active' : ''} onClick={() => { setView('packaging'); setDisplayMode('detail'); }}>Envases y vivo</button>
+              {section === 'sales' && <>
+                <button className={view === 'orders' ? 'active' : ''} onClick={() => { setView('orders'); setDisplayMode('detail'); }}>Todas las ventas</button>
+                <button className={view === 'products' ? 'active' : ''} onClick={() => setView('products')}>Por producto</button>
+                <button className={view === 'clients' ? 'active' : ''} onClick={() => setView('clients')}>Por cliente</button>
+              </>}
+              {section === 'costs' && <>
+                <button className={view === 'harvests' ? 'active' : ''} onClick={() => { setView('harvests'); setDisplayMode('detail'); }}>Producción terminada</button>
+                <button className={view === 'cultivations' ? 'active' : ''} onClick={() => { setView('cultivations'); setDisplayMode('detail'); }}>Cada cultivo</button>
+                <button className={view === 'production' ? 'active' : ''} onClick={() => { setView('production'); setDisplayMode('detail'); }}>Coste por bandeja</button>
+                <button className={view === 'expenses' ? 'active' : ''} onClick={() => { setView('expenses'); setDisplayMode('detail'); }}>Gastos generales</button>
+                <button className={view === 'packaging' ? 'active' : ''} onClick={() => { setView('packaging'); setDisplayMode('detail'); }}>Envases y vivo</button>
+              </>}
+              {section === 'treasury' && <button className="active">Movimientos de tesorería y compras</button>}
             </div>
             {(view === 'products' || view === 'clients') && <div className="profit-tabs">
               <button className={displayMode === 'visual' ? 'active' : ''} onClick={() => setDisplayMode('visual')}><BarChart3 size={15} /> Gráficas</button>
@@ -776,7 +840,7 @@ export default function Profitability({
             </tbody>
           </table>
         </div>}
-      </section>
+      </section>}
     </div>
   );
   return modal
