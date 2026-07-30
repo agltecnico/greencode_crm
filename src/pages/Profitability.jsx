@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { BarChart3, CircleDollarSign, Download, LayoutList, PackageCheck, Percent, TriangleAlert, X } from 'lucide-react';
+import { BarChart3, CircleDollarSign, Download, LayoutList, PackageCheck, Percent, ReceiptText, Sprout, TriangleAlert, WalletCards, X } from 'lucide-react';
 import { jsPDF } from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import {
@@ -44,22 +44,46 @@ const StatCard = ({ icon, label, value, detail, tone = 'green' }) => (
   </article>
 );
 
-export default function Profitability({ modal = false, onClose }) {
+export default function Profitability({ modal = false, onClose, initialView = 'products', initialStart, initialEnd }) {
   const {
     orders, deliveryNotes, clients, products, productMovements, harvests,
-    cropTypes, seedVarieties, articles, stockEntries, companyProfile
+    cropTypes, seedVarieties, articles, stockEntries, companyProfile,
+    expenses, purchaseDeliveryNotes, providers, crops, stockLots, addExpense
   } = useData();
   const [initialBounds] = useState(() => monthBounds());
-  const [filterMode, setFilterMode] = useState('month');
-  const [selectedMonth, setSelectedMonth] = useState(initialBounds.start.slice(0, 7));
-  const [startDate, setStartDate] = useState(initialBounds.start);
-  const [endDate, setEndDate] = useState(initialBounds.end);
-  const [view, setView] = useState('products');
+  const [filterMode, setFilterMode] = useState(initialStart && initialEnd ? 'range' : 'month');
+  const [selectedMonth, setSelectedMonth] = useState((initialStart || initialBounds.start).slice(0, 7));
+  const [startDate, setStartDate] = useState(initialStart || initialBounds.start);
+  const [endDate, setEndDate] = useState(initialEnd || initialBounds.end);
+  const [view, setView] = useState(initialView);
   const [displayMode, setDisplayMode] = useState('visual');
   const [query, setQuery] = useState('');
+  const [showExpenseForm, setShowExpenseForm] = useState(false);
+  const [expenseForm, setExpenseForm] = useState({
+    date: new Date().toISOString().slice(0, 10),
+    category: 'SUMINISTROS',
+    concept: '',
+    total: '',
+    ivaPercentage: 21,
+    paymentMethod: 'Transferencia',
+    isPaid: true
+  });
   const selectedBounds = filterMode === 'month'
     ? boundsForMonth(selectedMonth)
     : { start: startDate, end: endDate };
+  const saveExpense = async event => {
+    event.preventDefault();
+    const total = Number(expenseForm.total || 0);
+    if (!expenseForm.concept.trim() || total <= 0) return;
+    const ivaPercentage = Number(expenseForm.ivaPercentage || 0);
+    await addExpense({
+      ...expenseForm,
+      total,
+      baseAmount: total / (1 + ivaPercentage / 100)
+    });
+    setExpenseForm(previous => ({ ...previous, concept: '', total: '' }));
+    setShowExpenseForm(false);
+  };
 
   const latestArticleUnitCost = articleId => {
     if (!articleId) return 0;
@@ -114,6 +138,7 @@ export default function Profitability({ modal = false, onClose }) {
     let cost = 0;
     let units = 0;
     let costedUnits = 0;
+    const orderRows = [];
 
     (orders || [])
       .filter(order => order.status === 'DELIVERED')
@@ -137,6 +162,11 @@ export default function Profitability({ modal = false, onClose }) {
           groupedItems.set(item.productId, current);
         });
 
+        let orderRevenue = 0;
+        let orderCost = 0;
+        let orderUnits = 0;
+        let orderCostedUnits = 0;
+        let resolvedClientName = 'Cliente sin identificar';
         groupedItems.forEach((item, productId) => {
           const movement = movementsByOrderProduct.get(`${order.id}::${productId}`)
             || { quantity: 0, cost: 0, costedQuantity: 0 };
@@ -145,6 +175,7 @@ export default function Profitability({ modal = false, onClose }) {
           const productName = product?.name || item.name || 'Producto histórico sin ficha';
           const clientName = client?.commercialName || client?.name
             || order.clientCommercialName || order.clientName || 'Cliente sin identificar';
+          resolvedClientName = clientName;
 
           const productRow = productRows.get(productId) || {
             id: productId, name: productName, units: 0, revenue: 0, cost: 0, costedUnits: 0
@@ -169,6 +200,22 @@ export default function Profitability({ modal = false, onClose }) {
           cost += movement.cost;
           units += item.quantity;
           costedUnits += Math.min(item.quantity, movement.costedQuantity);
+          orderRevenue += item.revenue;
+          orderCost += movement.cost;
+          orderUnits += item.quantity;
+          orderCostedUnits += Math.min(item.quantity, movement.costedQuantity);
+        });
+        orderRows.push({
+          id: order.id,
+          date: saleDate,
+          number: note?.deliveryNoteNumber || note?.albaranNumber || order.orderNumber || order.id,
+          name: `${resolvedClientName} ${note?.deliveryNoteNumber || note?.albaranNumber || order.orderNumber || ''}`.trim(),
+          clientName: resolvedClientName,
+          units: orderUnits,
+          revenue: orderRevenue,
+          cost: orderCost,
+          margin: orderRevenue - orderCost,
+          pendingUnits: Math.max(orderUnits - orderCostedUnits, 0)
         });
       });
 
@@ -200,10 +247,121 @@ export default function Profitability({ modal = false, onClose }) {
       margin: tracedMargin,
       marginPercent: tracedRevenue > 0 ? (tracedMargin / tracedRevenue) * 100 : 0,
       coverage: units > 0 ? (costedUnits / units) * 100 : 0,
+      orderRows: orderRows.sort((a, b) => b.date.localeCompare(a.date)),
       productRows: finishedProducts,
       clientRows: finishedClients
     };
   }, [clients, deliveryNotes, harvests, orders, productMovements, products, selectedBounds.end, selectedBounds.start]);
+
+  const financialControl = useMemo(() => {
+    const inPeriod = date => {
+      const value = String(date || '').slice(0, 10);
+      return value && value >= selectedBounds.start && value <= selectedBounds.end;
+    };
+    const productById = new Map((products || []).map(product => [String(product.id), product]));
+    const providerById = new Map((providers || []).map(provider => [String(provider.id), provider]));
+    const soldByBatch = new Map();
+    (productMovements || [])
+      .filter(movement => movement.type === 'ORDER' && movement.referenceId?.includes('|'))
+      .forEach(movement => {
+        const [, batchNumber] = movement.referenceId.split('|');
+        soldByBatch.set(String(batchNumber), (soldByBatch.get(String(batchNumber)) || 0) + Math.abs(Number(movement.quantity || 0)));
+      });
+
+    const harvestRows = (harvests || [])
+      .filter(harvest => inPeriod(harvest.harvestDate || harvest.recordedAt))
+      .map(harvest => {
+        const units = Number(harvest.tuppersCount || 0);
+        const soldUnits = Math.min(soldByBatch.get(String(harvest.batchNumber)) || 0, units);
+        const remainingUnits = Math.max(units - soldUnits, 0);
+        const total = Number(harvest.totalCost ?? (
+          Number(harvest.seedCost || 0)
+          + Number(harvest.substrateCost || 0)
+          + Number(harvest.packagingCost || 0)
+        ));
+        const unitCost = Number(harvest.costPerTupper || (units > 0 ? total / units : 0));
+        const trays = Object.values(harvest.selectedCropUsages || {}).reduce((sum, value) => sum + Number(value || 0), 0);
+        return {
+          id: harvest.id,
+          date: String(harvest.harvestDate || harvest.recordedAt || '').slice(0, 10),
+          name: productById.get(String(harvest.productId))?.name || 'Producto sin ficha',
+          batchNumber: harvest.batchNumber || '-',
+          trays,
+          units,
+          soldUnits,
+          remainingUnits,
+          seedCost: Number(harvest.seedCost || 0),
+          substrateCost: Number(harvest.substrateCost || 0),
+          packagingCost: Number(harvest.packagingCost || 0),
+          total,
+          unitCost,
+          unsoldCost: remainingUnits * unitCost
+        };
+      })
+      .sort((a, b) => b.date.localeCompare(a.date));
+
+    const generalExpenseRows = (expenses || [])
+      .filter(expense => inPeriod(expense.date))
+      .map(expense => ({
+        id: expense.id,
+        date: String(expense.date || '').slice(0, 10),
+        name: expense.concept || 'Gasto sin concepto',
+        category: expense.category || 'OTROS',
+        paymentMethod: expense.paymentMethod || '-',
+        isPaid: expense.isPaid === true,
+        total: Number(expense.total ?? expense.amount ?? 0)
+      }))
+      .sort((a, b) => b.date.localeCompare(a.date));
+
+    const purchaseRows = (purchaseDeliveryNotes || [])
+      .filter(note => inPeriod(note.date || note.createdAt))
+      .map(note => ({
+        id: note.id,
+        date: String(note.date || note.createdAt || '').slice(0, 10),
+        number: note.number || '-',
+        provider: providerById.get(String(note.providerId))?.name || 'Proveedor sin identificar',
+        name: `${providerById.get(String(note.providerId))?.name || 'Proveedor sin identificar'} ${note.number || ''}`.trim(),
+        total: Number(note.totalCost || 0)
+      }))
+      .sort((a, b) => b.date.localeCompare(a.date));
+
+    const periodNotes = (deliveryNotes || []).filter(note => inPeriod(note.date || note.createdAt));
+    const collected = periodNotes
+      .filter(note => note.isPaid === true)
+      .reduce((sum, note) => sum + Number(note.total || 0), 0);
+    const pendingCollection = periodNotes
+      .filter(note => note.isPaid !== true)
+      .reduce((sum, note) => sum + Number(note.total || 0), 0);
+    const generalExpensesTotal = generalExpenseRows.reduce((sum, row) => sum + row.total, 0);
+    const paidGeneralExpenses = generalExpenseRows.filter(row => row.isPaid).reduce((sum, row) => sum + row.total, 0);
+    const pendingGeneralExpenses = generalExpensesTotal - paidGeneralExpenses;
+    const productionCost = harvestRows.reduce((sum, row) => sum + row.total, 0);
+    const producedUnits = harvestRows.reduce((sum, row) => sum + row.units, 0);
+    const unsoldUnits = harvestRows.reduce((sum, row) => sum + row.remainingUnits, 0);
+    const unsoldCost = harvestRows.reduce((sum, row) => sum + row.unsoldCost, 0);
+    const purchases = purchaseRows.reduce((sum, row) => sum + row.total, 0);
+    const operatingProfit = report.revenue - report.cost - generalExpensesTotal;
+    const cashOut = purchases + paidGeneralExpenses;
+
+    return {
+      harvestRows,
+      generalExpenseRows,
+      purchaseRows,
+      productionCost,
+      producedUnits,
+      unsoldUnits,
+      unsoldCost,
+      generalExpensesTotal,
+      paidGeneralExpenses,
+      pendingGeneralExpenses,
+      collected,
+      pendingCollection,
+      purchases,
+      operatingProfit,
+      cashOut,
+      cashBalance: collected - cashOut
+    };
+  }, [deliveryNotes, expenses, harvests, productMovements, products, providers, purchaseDeliveryNotes, report.cost, report.revenue, selectedBounds.end, selectedBounds.start]);
 
   const productionRows = (cropTypes || []).map(cropType => {
     const seedCost = latestVarietySeedCost(cropType.varietyId) * Number(cropType.seedGrams || 0);
@@ -221,6 +379,43 @@ export default function Profitability({ modal = false, onClose }) {
       costPerKg: expectedKg > 0 ? total / expectedKg : 0
     };
   }).sort((a, b) => b.total - a.total);
+  const cultivationRows = (crops || [])
+    .filter(crop => {
+      const date = String(crop.datePlanted || crop.createdAt || '').slice(0, 10);
+      return date && date >= selectedBounds.start && date <= selectedBounds.end;
+    })
+    .map(crop => {
+      const cropType = (cropTypes || []).find(item => String(item.id) === String(crop.cropTypeId));
+      const harvestedTrays = (harvests || []).reduce((sum, harvest) => (
+        sum + Number(harvest.selectedCropUsages?.[crop.id] || 0)
+      ), 0);
+      const remainingTrays = Number(crop.traysCount || 0);
+      const discardedTrays = Number(crop.discardedTrays || 0);
+      const totalTrays = Math.max(remainingTrays + harvestedTrays + discardedTrays, remainingTrays, 1);
+      const seedLot = (stockLots || []).find(lot => String(lot.id) === String(crop.seedStockLotId));
+      const seedUnitCost = Number(seedLot?.unitCost || latestVarietySeedCost(cropType?.varietyId) || 0);
+      const seedCost = seedUnitCost * Number(crop.gramsPerTray || cropType?.seedGrams || 0);
+      const substrateCost = latestArticleUnitCost(cropType?.substrateId) * Number(cropType?.substrateLiters || 0);
+      const trayCost = latestArticleUnitCost(cropType?.containerId);
+      const costPerTray = seedCost + substrateCost + trayCost;
+      return {
+        id: crop.id,
+        date: String(crop.datePlanted || crop.createdAt || '').slice(0, 10),
+        name: cropType?.name || seedVarieties?.find(item => item.id === cropType?.varietyId)?.name || 'Cultivo sin ficha',
+        batchNumber: crop.cultivationBatchNumber || crop.batchNumber || '-',
+        status: crop.status || '-',
+        totalTrays,
+        harvestedTrays,
+        remainingTrays,
+        discardedTrays,
+        seedCost,
+        substrateCost,
+        trayCost,
+        costPerTray,
+        total: costPerTray * totalTrays
+      };
+    })
+    .sort((a, b) => b.date.localeCompare(a.date));
   const packagingRows = (articles || [])
     .filter(article => ['ENVASE', 'BANDEJA'].includes(article.type))
     .map(article => ({
@@ -230,19 +425,29 @@ export default function Profitability({ modal = false, onClose }) {
       stock: (stockEntries || []).filter(entry => entry.articleId === article.id).reduce((sum, entry) => sum + Number(entry.quantity || 0), 0)
     }))
     .sort((a, b) => b.unitCost - a.unitCost);
-  const baseRows = view === 'products'
-    ? report.productRows
+  const baseRows = view === 'orders'
+    ? report.orderRows
+    : view === 'products'
+      ? report.productRows
     : view === 'clients'
       ? report.clientRows
       : view === 'production'
         ? productionRows
-        : packagingRows;
+        : view === 'packaging'
+          ? packagingRows
+          : view === 'cultivations'
+            ? cultivationRows
+          : view === 'harvests'
+            ? financialControl.harvestRows
+            : view === 'expenses'
+              ? financialControl.generalExpenseRows
+              : financialControl.purchaseRows;
   const normalizedQuery = query.trim().toLocaleLowerCase('es');
   const rows = baseRows.filter(row => row.name.toLocaleLowerCase('es').includes(normalizedQuery));
   const chartRows = rows.slice(0, 8).map(row => ({
     name: row.name.length > 22 ? `${row.name.slice(0, 20)}…` : row.name,
-    Ventas: Number(row.revenue.toFixed(2)),
-    Costes: Number(row.cost.toFixed(2))
+    Ventas: Number(Number(row.revenue || 0).toFixed(2)),
+    Costes: Number(Number(row.cost || 0).toFixed(2))
   }));
   const distributionRows = report.productRows.slice(0, 6).map(row => ({
     name: row.name,
@@ -284,6 +489,11 @@ export default function Profitability({ modal = false, onClose }) {
         head: [['Producto', 'Uds.', 'Ventas', 'Venta trazada', 'Coste', 'Margen', '%', 'Sin coste']],
         body: rows.map(row => [row.name, row.units, money(row.revenue), money(row.tracedRevenue), money(row.cost), money(row.margin), `${row.marginPercent.toFixed(1)} %`, row.pendingUnits])
       },
+      orders: {
+        title: 'Ventas entregadas del periodo',
+        head: [['Fecha', 'Albarán / pedido', 'Cliente', 'Uds.', 'Venta', 'Coste', 'Margen', 'Sin coste']],
+        body: rows.map(row => [row.date, row.number, row.clientName, row.units, money(row.revenue), money(row.cost), money(row.margin), row.pendingUnits])
+      },
       clients: {
         title: 'Ventas y rentabilidad por cliente',
         head: [['Cliente', 'Uds.', 'Ventas', 'Venta trazada', 'Coste', 'Margen', '%', 'Sin coste']],
@@ -294,10 +504,30 @@ export default function Profitability({ modal = false, onClose }) {
         head: [['Variedad / ficha', 'Semilla', 'Sustrato', 'Bandeja', 'Coste/bandeja', 'Coste/kg']],
         body: rows.map(row => [row.name, money(row.seedCost), money(row.substrateCost), money(row.trayCost), money(row.total), money(row.costPerKg)])
       },
+      cultivations: {
+        title: 'Coste de cada cultivo y bandeja',
+        head: [['Fecha', 'Cultivo', 'Lote', 'Bandejas', 'Cosechadas', 'Activas', 'Perdidas', 'Coste/bandeja', 'Coste total']],
+        body: rows.map(row => [row.date, row.name, row.batchNumber, row.totalTrays, row.harvestedTrays, row.remainingTrays, row.discardedTrays, money(row.costPerTray), money(row.total)])
+      },
       packaging: {
         title: 'Costes y existencias de formatos de venta',
         head: [['Formato', 'Último coste unitario', 'Stock actual']],
         body: rows.map(row => [row.name, money(row.unitCost), row.stock])
+      },
+      harvests: {
+        title: 'Producción real y existencias terminadas',
+        head: [['Fecha', 'Producto', 'Lote', 'Bandejas', 'Producido', 'Vendido', 'Sin vender', 'Coste total', 'Coste/unidad']],
+        body: rows.map(row => [row.date, row.name, row.batchNumber, row.trays, row.units, row.soldUnits, row.remainingUnits, money(row.total), money(row.unitCost)])
+      },
+      expenses: {
+        title: 'Gastos generales del periodo',
+        head: [['Fecha', 'Categoría', 'Concepto', 'Importe', 'Estado', 'Pago']],
+        body: rows.map(row => [row.date, row.category, row.name, money(row.total), row.isPaid ? 'Pagado' : 'Pendiente', row.paymentMethod])
+      },
+      treasury: {
+        title: 'Compras de stock y tesorería',
+        head: [['Fecha', 'Proveedor', 'Documento', 'Importe']],
+        body: rows.map(row => [row.date, row.provider, row.number, money(row.total)])
       }
     };
     const selected = configurations[view];
@@ -327,8 +557,8 @@ export default function Profitability({ modal = false, onClose }) {
       <header className="profit-header">
         <div>
           <p className="profit-eyebrow">CONTROL ECONÓMICO</p>
-          <h1>Ventas y rentabilidad</h1>
-          <p>Ingresos netos sin IVA y costes directos trazados de semilla, sustrato y envases.</p>
+          <h1>Centro financiero GreenCode</h1>
+          <p>Producción, ventas, existencias, gastos, beneficio y tesorería conectados por trazabilidad.</p>
         </div>
         <div className="profit-header-right">
           <div className="profit-filters">
@@ -350,11 +580,13 @@ export default function Profitability({ modal = false, onClose }) {
         </div>
       </header>
 
-      <section className="profit-stats">
+      <section className="profit-stats profit-stats-wide">
         <StatCard icon={<CircleDollarSign size={22} />} label="Ventas netas" value={money(report.revenue)} detail={`${report.units} unidades entregadas`} />
-        <StatCard icon={<PackageCheck size={22} />} label="Costes directos" value={money(report.cost)} detail={`${report.costedUnits} unidades con coste`} tone="blue" />
-        <StatCard icon={<BarChart3 size={22} />} label="Margen trazado" value={money(report.margin)} detail="Solo ventas con coste conocido" tone="purple" />
-        <StatCard icon={<Percent size={22} />} label="Margen" value={`${report.marginPercent.toFixed(1)} %`} detail={`${report.coverage.toFixed(1)} % con coste trazado`} tone="amber" />
+        <StatCard icon={<Sprout size={22} />} label="Producción realizada" value={money(financialControl.productionCost)} detail={`${financialControl.producedUnits} unidades producidas`} tone="blue" />
+        <StatCard icon={<PackageCheck size={22} />} label="Coste de lo vendido" value={money(report.cost)} detail={`${report.costedUnits} unidades trazadas`} tone="blue" />
+        <StatCard icon={<ReceiptText size={22} />} label="Gastos generales" value={money(financialControl.generalExpensesTotal)} detail={`${money(financialControl.pendingGeneralExpenses)} pendientes`} tone="amber" />
+        <StatCard icon={<BarChart3 size={22} />} label="Beneficio operativo" value={money(financialControl.operatingProfit)} detail="Ventas − coste vendido − generales" tone="purple" />
+        <StatCard icon={<WalletCards size={22} />} label="Tesorería estimada" value={money(financialControl.cashBalance)} detail={`${money(financialControl.pendingCollection)} por cobrar`} tone="green" />
       </section>
 
       {report.pendingUnits > 0 && (
@@ -367,17 +599,37 @@ export default function Profitability({ modal = false, onClose }) {
         </div>
       )}
 
+      <section className="profit-control-strip">
+        <button type="button" onClick={() => { setView('harvests'); setDisplayMode('detail'); }}>
+          <span>Producto terminado sin vender</span><strong>{money(financialControl.unsoldCost)}</strong><small>{financialControl.unsoldUnits} unidades en existencias</small>
+        </button>
+        <button type="button" onClick={() => { setView('treasury'); setDisplayMode('detail'); }}>
+          <span>Cobrado en el periodo</span><strong>{money(financialControl.collected)}</strong><small>{money(financialControl.pendingCollection)} pendiente de cobro</small>
+        </button>
+        <button type="button" onClick={() => { setView('treasury'); setDisplayMode('detail'); }}>
+          <span>Compras de inventario</span><strong>{money(financialControl.purchases)}</strong><small>Entradas de stock del periodo</small>
+        </button>
+        <button type="button" onClick={() => { setView('expenses'); setDisplayMode('detail'); }}>
+          <span>Gastos generales pagados</span><strong>{money(financialControl.paidGeneralExpenses)}</strong><small>{money(financialControl.pendingGeneralExpenses)} pendientes</small>
+        </button>
+      </section>
+
       <section className="premium-card profit-table-card">
         <div className="profit-table-heading">
           <div>
-            <h2>Desglose de resultados</h2>
-            <p>Solo se contabilizan pedidos entregados dentro del periodo.</p>
+            <h2>Explorador económico</h2>
+            <p>Selecciona una perspectiva para profundizar sin perder el periodo elegido.</p>
           </div>
           <div className="profit-heading-actions">
-            <div className="profit-tabs">
+            <div className="profit-tabs profit-tabs-scroll">
+              <button className={view === 'orders' ? 'active' : ''} onClick={() => { setView('orders'); setDisplayMode('detail'); }}>Ventas</button>
               <button className={view === 'products' ? 'active' : ''} onClick={() => setView('products')}>Por producto</button>
               <button className={view === 'clients' ? 'active' : ''} onClick={() => setView('clients')}>Por cliente</button>
-              <button className={view === 'production' ? 'active' : ''} onClick={() => { setView('production'); setDisplayMode('detail'); }}>Coste variedades</button>
+              <button className={view === 'harvests' ? 'active' : ''} onClick={() => { setView('harvests'); setDisplayMode('detail'); }}>Producción real</button>
+              <button className={view === 'cultivations' ? 'active' : ''} onClick={() => { setView('cultivations'); setDisplayMode('detail'); }}>Cada cultivo</button>
+              <button className={view === 'production' ? 'active' : ''} onClick={() => { setView('production'); setDisplayMode('detail'); }}>Coste/bandeja</button>
+              <button className={view === 'expenses' ? 'active' : ''} onClick={() => { setView('expenses'); setDisplayMode('detail'); }}>Gastos generales</button>
+              <button className={view === 'treasury' ? 'active' : ''} onClick={() => { setView('treasury'); setDisplayMode('detail'); }}>Tesorería</button>
               <button className={view === 'packaging' ? 'active' : ''} onClick={() => { setView('packaging'); setDisplayMode('detail'); }}>Envases y vivo</button>
             </div>
             {(view === 'products' || view === 'clients') && <div className="profit-tabs">
@@ -385,8 +637,26 @@ export default function Profitability({ modal = false, onClose }) {
               <button className={displayMode === 'detail' ? 'active' : ''} onClick={() => setDisplayMode('detail')}><LayoutList size={15} /> Detalle</button>
             </div>}
             <input className="profit-search" value={query} onChange={event => setQuery(event.target.value)} placeholder="Buscar…" />
+            {view === 'expenses' && <button className="profit-add-expense" type="button" onClick={() => setShowExpenseForm(value => !value)}>{showExpenseForm ? 'Cancelar' : '+ Registrar gasto'}</button>}
           </div>
         </div>
+
+        {view === 'expenses' && showExpenseForm && (
+          <form className="profit-expense-form" onSubmit={saveExpense}>
+            <label>Fecha<input type="date" required value={expenseForm.date} onChange={event => setExpenseForm({ ...expenseForm, date: event.target.value })} /></label>
+            <label>Categoría<select value={expenseForm.category} onChange={event => setExpenseForm({ ...expenseForm, category: event.target.value })}>
+              <option value="NOMINAS">Personal y nóminas</option><option value="SUMINISTROS">Luz, agua y suministros</option>
+              <option value="TRANSPORTE">Gasoil y desplazamientos</option><option value="MANTENIMIENTO">Mantenimiento</option>
+              <option value="ALQUILER">Alquiler</option><option value="MARKETING">Marketing y software</option><option value="OTROS">Otros</option>
+            </select></label>
+            <label className="profit-expense-concept">Concepto<input required value={expenseForm.concept} onChange={event => setExpenseForm({ ...expenseForm, concept: event.target.value })} placeholder="Ej. Factura de electricidad julio" /></label>
+            <label>Total (€)<input type="number" min="0.01" step="0.01" required value={expenseForm.total} onChange={event => setExpenseForm({ ...expenseForm, total: event.target.value })} /></label>
+            <label>IVA (%)<input type="number" min="0" step="1" value={expenseForm.ivaPercentage} onChange={event => setExpenseForm({ ...expenseForm, ivaPercentage: event.target.value })} /></label>
+            <label>Forma de pago<select value={expenseForm.paymentMethod} onChange={event => setExpenseForm({ ...expenseForm, paymentMethod: event.target.value })}><option>Transferencia</option><option>Tarjeta</option><option>Efectivo</option><option>Domiciliación</option></select></label>
+            <label className="profit-expense-paid"><input type="checkbox" checked={expenseForm.isPaid} onChange={event => setExpenseForm({ ...expenseForm, isPaid: event.target.checked })} /> Pagado</label>
+            <button type="submit">Guardar gasto</button>
+          </form>
+        )}
 
         {displayMode === 'visual' && (view === 'products' || view === 'clients') ? (
           <div className="profit-charts">
@@ -437,7 +707,12 @@ export default function Profitability({ modal = false, onClose }) {
                 <th>Margen</th>
                 <th>Cobertura</th>
               </tr>}
+              {view === 'orders' && <tr><th>Fecha</th><th>Albarán / pedido</th><th>Cliente</th><th>Unidades</th><th>Venta</th><th>Coste</th><th>Beneficio</th><th>Cobertura</th></tr>}
               {view === 'production' && <tr><th>Variedad / ficha</th><th>Semilla</th><th>Sustrato</th><th>Bandeja</th><th>Coste/bandeja</th><th>Coste/kg</th></tr>}
+              {view === 'cultivations' && <tr><th>Fecha</th><th>Cultivo / lote</th><th>Estado</th><th>Bandejas totales</th><th>Cosechadas</th><th>Activas</th><th>Perdidas</th><th>Semilla/bdj.</th><th>Sustrato/bdj.</th><th>Bandeja</th><th>Coste/bdj.</th><th>Coste total</th></tr>}
+              {view === 'harvests' && <tr><th>Fecha</th><th>Producto / lote</th><th>Bandejas</th><th>Producido</th><th>Vendido</th><th>Sin vender</th><th>Semilla</th><th>Sustrato</th><th>Envases</th><th>Coste total</th><th>Coste/ud.</th></tr>}
+              {view === 'expenses' && <tr><th>Fecha</th><th>Categoría</th><th>Concepto</th><th>Importe</th><th>Estado</th><th>Forma de pago</th></tr>}
+              {view === 'treasury' && <tr><th>Fecha</th><th>Proveedor</th><th>Documento</th><th>Compra de stock</th></tr>}
               {view === 'packaging' && <tr><th>Formato de venta</th><th>Último coste unitario</th><th>Stock actual</th></tr>}
             </thead>
             <tbody>
@@ -456,8 +731,33 @@ export default function Profitability({ modal = false, onClose }) {
                   </td>
                 </tr>
               ))}
+              {view === 'orders' && rows.map(row => (
+                <tr key={row.id}><td>{row.date}</td><td><strong>{row.number}</strong></td><td>{row.clientName}</td><td>{row.units}</td><td>{money(row.revenue)}</td><td>{money(row.cost)}</td><td><strong className={row.margin >= 0 ? 'profit-positive' : 'profit-negative'}>{money(row.margin)}</strong></td><td>{row.pendingUnits ? <span className="badge badge-warning">{row.pendingUnits} sin coste</span> : <span className="badge badge-success">Completa</span>}</td></tr>
+              ))}
               {view === 'production' && rows.map(row => (
                 <tr key={row.id}><td><strong>{row.name}</strong></td><td>{money(row.seedCost)}</td><td>{money(row.substrateCost)}</td><td>{money(row.trayCost)}</td><td><strong>{money(row.total)}</strong></td><td>{money(row.costPerKg)}</td></tr>
+              ))}
+              {view === 'cultivations' && rows.map(row => (
+                <tr key={row.id}>
+                  <td>{row.date}</td><td><strong>{row.name}</strong><small className="profit-cell-note">{row.batchNumber}</small></td><td>{row.status}</td>
+                  <td>{row.totalTrays}</td><td>{row.harvestedTrays}</td><td>{row.remainingTrays}</td><td>{row.discardedTrays}</td>
+                  <td>{money(row.seedCost)}</td><td>{money(row.substrateCost)}</td><td>{money(row.trayCost)}</td>
+                  <td><strong>{money(row.costPerTray)}</strong></td><td><strong>{money(row.total)}</strong></td>
+                </tr>
+              ))}
+              {view === 'harvests' && rows.map(row => (
+                <tr key={row.id}>
+                  <td>{row.date}</td><td><strong>{row.name}</strong><small className="profit-cell-note">{row.batchNumber}</small></td>
+                  <td>{row.trays}</td><td>{row.units}</td><td>{row.soldUnits}</td><td>{row.remainingUnits}</td>
+                  <td>{money(row.seedCost)}</td><td>{money(row.substrateCost)}</td><td>{money(row.packagingCost)}</td>
+                  <td><strong>{money(row.total)}</strong></td><td>{money(row.unitCost)}</td>
+                </tr>
+              ))}
+              {view === 'expenses' && rows.map(row => (
+                <tr key={row.id}><td>{row.date}</td><td>{row.category}</td><td><strong>{row.name}</strong></td><td>{money(row.total)}</td><td><span className={`badge ${row.isPaid ? 'badge-success' : 'badge-warning'}`}>{row.isPaid ? 'Pagado' : 'Pendiente'}</span></td><td>{row.paymentMethod}</td></tr>
+              ))}
+              {view === 'treasury' && rows.map(row => (
+                <tr key={row.id}><td>{row.date}</td><td><strong>{row.provider}</strong></td><td>{row.number}</td><td>{money(row.total)}</td></tr>
               ))}
               {view === 'packaging' && rows.map(row => (
                 <tr key={row.id}><td><strong>{row.name}</strong></td><td>{money(row.unitCost)}</td><td>{row.stock}</td></tr>

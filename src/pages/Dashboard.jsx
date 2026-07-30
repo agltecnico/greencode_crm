@@ -46,11 +46,11 @@ const weekBounds = week => {
 
 const yearBounds = year => ({ start: `${year}-01-01`, end: `${year}-12-31` });
 
-const Metric = ({ icon, label, value, detail, tone }) => (
-  <article className={`admin-metric admin-metric-${tone}`}>
+const Metric = ({ icon, label, value, detail, tone, onClick }) => (
+  <button type="button" className={`admin-metric admin-metric-${tone}`} onClick={onClick} aria-label={`Consultar ${label}`}>
     <div className="admin-metric-icon">{icon}</div>
     <div><span>{label}</span><strong>{value}</strong><small>{detail}</small></div>
-  </article>
+  </button>
 );
 
 export default function Dashboard() {
@@ -69,6 +69,7 @@ export default function Dashboard() {
   const [rangeEnd, setRangeEnd] = useState(localDate(today));
   const [detailsOpen, setDetailsOpen] = useState(false);
   const [financialOpen, setFinancialOpen] = useState(false);
+  const [financialView, setFinancialView] = useState('products');
   const [reportView, setReportView] = useState('products');
   const [reportQuery, setReportQuery] = useState('');
   const [companyForm, setCompanyForm] = useState(companyProfile || {});
@@ -274,6 +275,10 @@ export default function Dashboard() {
     setFilterMode('range');
     setDetailsOpen(true);
   };
+  const openFinancial = view => {
+    setFinancialView(view);
+    setFinancialOpen(true);
+  };
 
   const shortcuts = [
     { label: 'Nuevo pedido', detail: 'Registrar una venta', icon: <ShoppingBag />, path: '/admin/orders' },
@@ -327,11 +332,11 @@ export default function Dashboard() {
       )}
 
       <section className="admin-metrics">
-        <Metric icon={<CircleDollarSign />} label="Ventas del periodo" value={money(data.monthSales)} detail={`${data.orderCount} entregas · ${data.units} unidades`} tone="green" />
-        <Metric icon={<FileText />} label="Ticket medio" value={money(data.averageTicket)} detail={`${data.orderCount} ventas realizadas`} tone="blue" />
-        <Metric icon={<ShoppingBag />} label="Pedidos abiertos" value={data.pendingOrders} detail={money(data.pendingOrderValue)} tone="purple" />
-        <Metric icon={<Receipt />} label="Gastos del periodo" value={money(data.monthExpenses)} detail={`Producción ${money(data.productionExpenses)} · Generales ${money(data.generalExpenses)}`} tone="amber" />
-        <Metric icon={<TrendingUp />} label="Margen trazado" value={money(data.margin)} detail={`${data.marginPercent.toFixed(1)} % · ${data.costedUnits}/${data.units} uds. con coste`} tone="green" />
+        <Metric icon={<CircleDollarSign />} label="Ventas del periodo" value={money(data.monthSales)} detail={`${data.orderCount} entregas · ${data.units} unidades`} tone="green" onClick={() => openFinancial('orders')} />
+        <Metric icon={<FileText />} label="Ticket medio" value={money(data.averageTicket)} detail={`${data.orderCount} ventas realizadas`} tone="blue" onClick={() => openFinancial('clients')} />
+        <Metric icon={<ShoppingBag />} label="Pedidos abiertos" value={data.pendingOrders} detail={money(data.pendingOrderValue)} tone="purple" onClick={() => navigate('/admin/orders')} />
+        <Metric icon={<Receipt />} label="Gastos del periodo" value={money(data.monthExpenses)} detail={`Producción ${money(data.productionExpenses)} · Generales ${money(data.generalExpenses)}`} tone="amber" onClick={() => openFinancial('harvests')} />
+        <Metric icon={<TrendingUp />} label="Margen trazado" value={money(data.margin)} detail={`${data.marginPercent.toFixed(1)} % · ${data.costedUnits}/${data.units} uds. con coste`} tone="green" onClick={() => openFinancial('products')} />
       </section>
 
       <section className="admin-insights-grid">
@@ -496,7 +501,7 @@ export default function Dashboard() {
           </section>
         </div>
       )}
-      {financialOpen && <Profitability modal onClose={() => setFinancialOpen(false)} />}
+      {financialOpen && <Profitability key={`${financialView}-${selectedBounds.start}-${selectedBounds.end}`} modal initialView={financialView} initialStart={selectedBounds.start} initialEnd={selectedBounds.end} onClose={() => setFinancialOpen(false)} />}
     </div>
   );
 }
