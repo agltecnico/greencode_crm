@@ -944,6 +944,7 @@ export default function Profitability({
         </div>
       </header>
 
+      <div className="profitability-scroll-body">
       <nav className="profit-section-nav" aria-label="Apartados financieros">
         <button className={section === 'summary' ? 'active' : ''} onClick={() => openSection('summary')}><span>01</span><strong>Resumen</strong><small>Visión general</small></button>
         <button className={section === 'sales' ? 'active' : ''} onClick={() => openSection('sales')}><span>02</span><strong>Ventas</strong><small>Productos y clientes</small></button>
@@ -1243,6 +1244,7 @@ export default function Profitability({
           </table>
         </div>}
       </section>}
+      </div>
     </div>
   );
   return modal
