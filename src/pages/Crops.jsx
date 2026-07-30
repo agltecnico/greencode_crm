@@ -71,6 +71,22 @@ const startOfHarvestWeek = dateValue => {
   return date;
 };
 
+const toLocalDateKey = dateValue => {
+  const date = new Date(dateValue);
+  if (Number.isNaN(date.getTime())) return '';
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+};
+
+const currentWeekDateRange = () => {
+  const from = startOfHarvestWeek(new Date());
+  const to = new Date(from);
+  to.setDate(to.getDate() + 6);
+  return { from: toLocalDateKey(from), to: toLocalDateKey(to) };
+};
+
 const getCropCycleOffsets = (cropType) => {
   const soak = Number(cropType?.soakingHours || 0) > 0 ? Math.max(1, Math.ceil(Number(cropType.soakingHours) / 24)) : 0;
   const germination = Number(cropType?.germinationDays || 0);
@@ -216,6 +232,8 @@ export default function Crops() {
   const [sowTab, setSowTab] = useState('activos');
   const [harvestTab, setHarvestTab] = useState('cosechar');
   const [harvestHistoryPage, setHarvestHistoryPage] = useState(1);
+  const [inventoryDateFrom, setInventoryDateFrom] = useState(() => currentWeekDateRange().from);
+  const [inventoryDateTo, setInventoryDateTo] = useState(() => currentWeekDateRange().to);
   const [statusFilter, setStatusFilter] = useState('ALL');
   const [historySearch, setHistorySearch] = useState('');
   const [historyPage, setHistoryPage] = useState(1);
@@ -1019,12 +1037,20 @@ export default function Crops() {
   };
 
   const renderFinishedProductInventory = () => {
+    const isInsideInventoryRange = dateValue => {
+      const key = toLocalDateKey(dateValue);
+      return key && key >= inventoryDateFrom && key <= inventoryDateTo;
+    };
     const pendingOrders = orders?.filter(order =>
       ['PENDING', 'PENDIENTE', 'PREPARED', 'IN_TRANSIT'].includes(order.status)
+      && isInsideInventoryRange(order.date || order.createdAt)
     ) || [];
 
     const rows = (products || []).map(product => {
-      const movements = productMovements?.filter(movement => movement.productId === product.id) || [];
+      const movements = productMovements?.filter(movement =>
+        movement.productId === product.id
+        && isInsideInventoryRange(movement.createdAt)
+      ) || [];
       const harvested = movements
         .filter(movement => movement.type === 'HARVEST')
         .reduce((sum, movement) => sum + Number(movement.quantity || 0), 0);
@@ -1048,14 +1074,50 @@ export default function Crops() {
 
     return (
       <div className="premium-card mb-6" style={{ background: '#fff', border: '1px solid #e2e8f0', borderRadius: '16px', overflow: 'hidden', boxShadow: '0 4px 10px rgba(15,23,42,0.06)' }}>
-        <div style={{ padding: '1rem 1.25rem', background: '#f8fafc', borderBottom: '1px solid #e2e8f0', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '1rem', flexWrap: 'wrap' }}>
+        <div style={{ padding: '0.85rem 1.1rem', background: '#f8fafc', borderBottom: '1px solid #e2e8f0', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '1rem', flexWrap: 'wrap' }}>
           <div>
             <h3 style={{ margin: 0, color: '#0f172a', fontSize: '1.15rem' }}>Inventario de producto terminado</h3>
-            <span style={{ color: '#64748b', fontSize: '0.8rem' }}>Nevera, reservas y disponibilidad comercial</span>
+            <span style={{ color: '#64748b', fontSize: '0.8rem' }}>Producción, entregas y reservas del periodo seleccionado</span>
           </div>
-          <span style={{ padding: '0.35rem 0.7rem', borderRadius: '999px', background: '#ecfdf5', color: '#047857', fontSize: '0.78rem', fontWeight: 900 }}>
-            {rows.length} productos
-          </span>
+          <div style={{ display: 'flex', alignItems: 'flex-end', gap: '0.55rem', flexWrap: 'wrap' }}>
+            <label style={{ display: 'grid', gap: '0.15rem', color: '#64748b', fontSize: '0.65rem', fontWeight: 900, textTransform: 'uppercase' }}>
+              Desde
+              <input
+                type="date"
+                className="premium-input"
+                value={inventoryDateFrom}
+                max={inventoryDateTo}
+                onChange={event => setInventoryDateFrom(event.target.value)}
+                style={{ padding: '0.42rem 0.55rem', minHeight: 'auto' }}
+              />
+            </label>
+            <label style={{ display: 'grid', gap: '0.15rem', color: '#64748b', fontSize: '0.65rem', fontWeight: 900, textTransform: 'uppercase' }}>
+              Hasta
+              <input
+                type="date"
+                className="premium-input"
+                value={inventoryDateTo}
+                min={inventoryDateFrom}
+                onChange={event => setInventoryDateTo(event.target.value)}
+                style={{ padding: '0.42rem 0.55rem', minHeight: 'auto' }}
+              />
+            </label>
+            <button
+              type="button"
+              className="btn btn-secondary"
+              onClick={() => {
+                const range = currentWeekDateRange();
+                setInventoryDateFrom(range.from);
+                setInventoryDateTo(range.to);
+              }}
+              style={{ padding: '0.48rem 0.7rem' }}
+            >
+              Esta semana
+            </button>
+            <span style={{ padding: '0.42rem 0.7rem', borderRadius: '999px', background: '#ecfdf5', color: '#047857', fontSize: '0.75rem', fontWeight: 900 }}>
+              {rows.length} productos
+            </span>
+          </div>
         </div>
 
         <div className="table-container" style={{ margin: 0, border: 0, borderRadius: 0 }}>
@@ -1066,7 +1128,7 @@ export default function Crops() {
                 <th>Formato</th>
                 <th style={{ textAlign: 'center' }}>Cosechado</th>
                 <th style={{ textAlign: 'center' }}>Entregado</th>
-                <th style={{ textAlign: 'center' }}>Físico</th>
+                <th style={{ textAlign: 'center' }}>Balance físico</th>
                 <th style={{ textAlign: 'center' }}>Reservado</th>
                 <th style={{ textAlign: 'center' }}>Disponible</th>
                 <th>Estado</th>
