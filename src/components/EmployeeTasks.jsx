@@ -141,7 +141,7 @@ export default function EmployeeTasks({ onTaskAction, onHarvestBatchAction }) {
         else if (daysSincePlanted >= lightDay && st === 'DARKNESS') { 
           action = 'move'; phaseStr = 'LUZ'; 
         }
-        else if (daysSincePlanted >= harvestDay && st === 'LIGHT') { 
+        else if (daysSincePlanted >= harvestDay && ['LIGHT', 'READY'].includes(st)) {
           action = 'harvest'; 
         }
       } else if (!isPast) {
@@ -154,7 +154,7 @@ export default function EmployeeTasks({ onTaskAction, onHarvestBatchAction }) {
         else if (daysSincePlanted === lightDay && !['LIGHT', 'READY'].includes(st)) {
           action = 'move'; phaseStr = 'LUZ'; 
         }
-        else if (daysSincePlanted === harvestDay) { 
+        else if (daysSincePlanted === harvestDay && ['LIGHT', 'READY'].includes(st)) {
           action = 'harvest'; 
         }
       }

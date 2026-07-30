@@ -1,5 +1,5 @@
 /* eslint-disable no-unused-vars */
-import { useState, useMemo, useEffect } from 'react';
+import { useState, useMemo, useEffect, useRef } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useData } from '../context/DataContext';
 import { generateLabelPDF } from '../utils/labelPdf.js';
@@ -214,6 +214,7 @@ export default function Crops() {
   const [searchParams, setSearchParams] = useSearchParams();
   const [showPhaseChangeModal, setShowPhaseChangeModal] = useState(null);
   const [pendingPhase, setPendingPhase] = useState(null);
+  const readinessSyncRef = useRef(new Set());
   const [newCrop, setNewCrop] = useState({ cropTypeId: '', traysCount: 1, stockLotId: '', datePlanted: toLocalDateTimeInputValue(), initialStatus: 'GERMINATING' });
   const [plannerHarvestDay, setPlannerHarvestDay] = useState('');
   const [plannerSelections, setPlannerSelections] = useState({});
@@ -263,6 +264,21 @@ export default function Crops() {
       }
     }
   }, [searchParams, setSearchParams]);
+
+  useEffect(() => {
+    const cropsReadyByDate = (crops || []).filter(crop => {
+      if (String(crop.status || '').toUpperCase() !== 'LIGHT' || readinessSyncRef.current.has(crop.id)) return false;
+      const cropType = cropTypes?.find(type => type.id === crop.cropTypeId || type.id === crop.seedId);
+      if (!cropType) return false;
+      return calendarDaysSince(crop.datePlanted || crop.plantedAt) >= getCropCycleOffsets(cropType).harvest;
+    });
+    if (!cropsReadyByDate.length) return;
+    cropsReadyByDate.forEach(crop => readinessSyncRef.current.add(crop.id));
+    Promise.all(cropsReadyByDate.map(crop => updateCrop(crop.id, {
+      status: 'READY',
+      phaseConfirmedAt: new Date().toISOString()
+    })));
+  }, [crops, cropTypes, updateCrop]);
 
   // Computed properties for seed availability
   const selectedCropType = cropTypes?.find(c => c.id === newCrop.cropTypeId);
