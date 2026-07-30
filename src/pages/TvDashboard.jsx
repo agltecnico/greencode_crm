@@ -303,7 +303,8 @@ export default function TvDashboard() {
 
                 const stockRows = products.map(product => {
                   const movements = productMovements.filter(m => m.productId === product.id);
-                  const physical = movements.reduce((sum, movement) => sum + Number(movement.quantity || 0), 0);
+                  const movementBalance = movements.reduce((sum, movement) => sum + Number(movement.quantity || 0), 0);
+                  const physical = Math.max(0, movementBalance);
                   const reserved = pendingOrders.reduce((sum, order) =>
                     sum + (order.items || [])
                       .filter(item => item.productId === product.id)
@@ -314,7 +315,8 @@ export default function TvDashboard() {
                     name: product.name,
                     physical,
                     reserved,
-                    available: physical - reserved
+                    available: Math.max(0, physical - reserved),
+                    shortage: Math.max(0, reserved - physical)
                   };
                 })
                   .filter(row => row.physical !== 0 || row.reserved !== 0)
@@ -326,7 +328,7 @@ export default function TvDashboard() {
                     title: 'Stock total en nevera',
                     subtitle: 'Producto físico',
                     tone: 'physical',
-                    rows: stockRows.filter(row => row.physical !== 0)
+                    rows: stockRows.filter(row => row.physical > 0)
                   },
                   {
                     key: 'reserved',
@@ -340,7 +342,7 @@ export default function TvDashboard() {
                     title: 'Disponible para venta',
                     subtitle: 'Stock libre',
                     tone: 'available',
-                    rows: stockRows.filter(row => row.available !== 0)
+                    rows: stockRows.filter(row => row.available > 0)
                   }
                 ];
 
@@ -355,9 +357,12 @@ export default function TvDashboard() {
                     </header>
                     <div className="tv-stock-list">
                       {column.rows.map(row => (
-                        <div key={row.id} className={column.key === 'available' && row.available < 0 ? 'negative' : ''}>
+                        <div key={row.id} className={column.key === 'reserved' && row.shortage > 0 ? 'shortage' : ''}>
                           <span>{row.name}</span>
-                          <strong>{row[column.key]}</strong>
+                          <span className="tv-stock-value">
+                            <strong>{row[column.key]}</strong>
+                            {column.key === 'reserved' && row.shortage > 0 && <small>Faltan {row.shortage}</small>}
+                          </span>
                         </div>
                       ))}
                       {column.rows.length === 0 && <p>Sin productos</p>}

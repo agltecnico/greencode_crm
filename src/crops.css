@@ -728,10 +728,27 @@
   font-size: 1.05rem;
 }
 
+.tv-stock-value {
+  display: grid;
+  justify-items: end;
+  flex: 0 0 auto;
+}
+
+.tv-stock-value small {
+  color: #fca5a5;
+  font-size: 0.56rem;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
+.tv-stock-list > div.shortage {
+  border-left: 3px solid #ef4444;
+  background: rgba(127, 29, 29, 0.14);
+}
+
 .tv-stock-column.physical .tv-stock-list strong { color: #7dd3fc; }
 .tv-stock-column.reserved .tv-stock-list strong { color: #fbbf24; }
 .tv-stock-column.available .tv-stock-list strong { color: #6ee7b7; }
-.tv-stock-column.available .tv-stock-list .negative strong { color: #f87171; }
 
 .tv-stock-list p {
   margin: 1rem;
