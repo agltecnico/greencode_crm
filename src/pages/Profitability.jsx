@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import { BarChart3, BrainCircuit, CircleDollarSign, Download, LayoutList, PackageCheck, Percent, ReceiptText, Sprout, TrendingUp, TriangleAlert, Users, WalletCards, X } from 'lucide-react';
 import { jsPDF } from 'jspdf';
 import autoTable from 'jspdf-autotable';
@@ -116,7 +116,7 @@ export default function Profitability({
     setShowExpenseForm(false);
   };
 
-  const latestArticleUnitCost = articleId => {
+  const latestArticleUnitCost = useCallback(articleId => {
     if (!articleId) return 0;
     const latestEntry = (stockEntries || [])
       .filter(entry => entry.articleId === articleId && entry.purchaseDeliveryNoteId && Number(entry.quantity) > 0)
@@ -128,7 +128,7 @@ export default function Profitability({
     }
     const article = (articles || []).find(item => item.id === articleId);
     return Number(article?.lastPurchaseUnitCost || article?.currentUnitCost || 0);
-  };
+  }, [articles, stockEntries]);
 
   const latestVarietySeedCost = varietyId => {
     const seedIds = new Set((articles || []).filter(item => item.type === 'SEMILLA' && item.varietyId === varietyId).map(item => item.id));
@@ -310,6 +310,7 @@ export default function Profitability({
           Number(harvest.seedCost || 0)
           + Number(harvest.substrateCost || 0)
           + Number(harvest.packagingCost || 0)
+          + Number(harvest.labelCost || 0)
         ));
         const unitCost = Number(harvest.costPerTupper || (units > 0 ? total / units : 0));
         const trays = Object.values(harvest.selectedCropUsages || {}).reduce((sum, value) => sum + Number(value || 0), 0);
@@ -325,6 +326,7 @@ export default function Profitability({
           seedCost: Number(harvest.seedCost || 0),
           substrateCost: Number(harvest.substrateCost || 0),
           packagingCost: Number(harvest.packagingCost || 0),
+          labelCost: Number(harvest.labelCost || 0),
           total,
           unitCost,
           unsoldCost: remainingUnits * unitCost
@@ -426,7 +428,7 @@ export default function Profitability({
       cashOut,
       cashBalance: collected - cashOut
     };
-  }, [articles, clients, deliveryNotes, expenses, harvests, invoices, productMovements, products, providers, purchaseDeliveryNotes, report.cost, report.revenue, selectedBounds.end, selectedBounds.start, stockEntries, stockLots]);
+  }, [articles, clients, deliveryNotes, expenses, harvests, invoices, latestArticleUnitCost, productMovements, products, providers, purchaseDeliveryNotes, report.cost, report.revenue, selectedBounds.end, selectedBounds.start, stockLots]);
 
   const intelligence = useMemo(() => {
     const isAllProducts = intelligenceProductId === '__ALL__';
@@ -1196,7 +1198,7 @@ export default function Profitability({
               {view === 'cultivations' && <tr><th>Fecha</th><th>Cultivo / lote</th><th>Estado</th><th>Bandejas totales</th><th>Cosechadas</th><th>Activas</th><th>Perdidas</th><th>Semilla/bdj.</th><th>Sustrato/bdj.</th><th>Bandeja</th><th>Coste/bdj.</th><th>Coste total</th></tr>}
               {view === 'varietycosts' && <tr><th>Variedad</th><th>Cultivos</th><th>Bandejas</th><th>Cosechadas</th><th>Perdidas</th><th>Coste/bandeja</th><th>Coste total</th></tr>}
               {view === 'clientcosts' && <tr><th>Cliente</th><th>Uds.</th><th>Ventas</th><th>Coste trazado</th><th>Beneficio</th><th>Cobertura</th></tr>}
-              {view === 'harvests' && <tr><th>Fecha</th><th>Producto / lote</th><th>Bandejas</th><th>Producido</th><th>Vendido</th><th>Sin vender</th><th>Semilla</th><th>Sustrato</th><th>Envases</th><th>Coste total</th><th>Coste/ud.</th></tr>}
+              {view === 'harvests' && <tr><th>Fecha</th><th>Producto / lote</th><th>Bandejas</th><th>Producido</th><th>Vendido</th><th>Sin vender</th><th>Semilla</th><th>Sustrato</th><th>Envases</th><th>Etiquetas</th><th>Coste total</th><th>Coste/ud.</th></tr>}
               {view === 'expenses' && <tr><th>Fecha</th><th>Categoría</th><th>Concepto</th><th>Importe</th><th>Estado</th><th>Forma de pago</th></tr>}
               {view === 'treasury' && <tr><th>Fecha</th><th>Proveedor</th><th>Documento</th><th>Compra de stock</th></tr>}
               {view === 'receivables' && <tr><th>Cliente</th><th>Facturado</th><th>Pagado</th><th>Pendiente</th><th>Entregado sin facturar</th><th>Documentos</th></tr>}
@@ -1249,7 +1251,7 @@ export default function Profitability({
                 <tr key={row.id}>
                   <td>{row.date}</td><td><strong>{row.name}</strong><small className="profit-cell-note">{row.batchNumber}</small></td>
                   <td>{row.trays}</td><td>{row.units}</td><td>{row.soldUnits}</td><td>{row.remainingUnits}</td>
-                  <td>{money(row.seedCost)}</td><td>{money(row.substrateCost)}</td><td>{money(row.packagingCost)}</td>
+                  <td>{money(row.seedCost)}</td><td>{money(row.substrateCost)}</td><td>{money(row.packagingCost)}</td><td>{money(row.labelCost)}</td>
                   <td><strong>{money(row.total)}</strong></td><td>{money(row.unitCost)}</td>
                 </tr>
               ))}

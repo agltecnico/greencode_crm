@@ -56,7 +56,7 @@ const Metric = ({ icon, label, value, detail, tone, onClick }) => (
 export default function Dashboard() {
   const {
     companyProfile, updateCompanyProfile, clients, orders, deliveryNotes,
-    expenses, products, articles, stockEntries, harvests, productMovements
+    products, articles, stockEntries, harvests, productMovements
   } = useData();
   const navigate = useNavigate();
   const [today] = useState(() => new Date());
@@ -114,24 +114,14 @@ export default function Dashboard() {
     const pendingCollection = currentNotes
       .filter(note => note.isPaid !== true)
       .reduce((sum, note) => sum + Number(note.total || 0), 0);
-    const generalExpenses = (expenses || [])
-      .filter(expense => inPeriod(expense.date))
-      .reduce((sum, expense) => sum + Number(expense.total ?? expense.amount ?? 0), 0);
-    // Production cost belongs to the period in which the harvest is registered,
-    // regardless of whether those units have already been sold. Each harvest
-    // already stores seed, substrate and packaging costs calculated from the
-    // trays actually used, so it must not depend on ORDER movements.
-    const productionExpenses = (harvests || [])
-      .filter(harvest => inPeriod(harvest.harvestDate || harvest.createdAt))
-      .reduce((sum, harvest) => sum + Number(
-        harvest.totalCost
-        ?? (
-          Number(harvest.seedCost || 0)
-          + Number(harvest.substrateCost || 0)
-          + Number(harvest.packagingCost || 0)
-        )
-      ), 0);
-    const monthExpenses = generalExpenses + productionExpenses;
+    const periodHarvests = (harvests || [])
+      .filter(harvest => inPeriod(harvest.harvestDate || harvest.createdAt));
+    const seedExpenses = periodHarvests.reduce((sum, harvest) => sum + Number(harvest.seedCost || 0), 0);
+    const substrateExpenses = periodHarvests.reduce((sum, harvest) => sum + Number(harvest.substrateCost || 0), 0);
+    const packagingExpenses = periodHarvests.reduce((sum, harvest) => sum + Number(harvest.packagingCost || 0), 0);
+    const labelExpenses = periodHarvests.reduce((sum, harvest) => sum + Number(harvest.labelCost || 0), 0);
+    const productionExpenses = seedExpenses + substrateExpenses + packagingExpenses + labelExpenses;
+    const productionMargin = monthSales - productionExpenses;
 
     const boundsStart = new Date(`${selectedBounds.start}T12:00:00`);
     const boundsEnd = new Date(`${selectedBounds.end}T12:00:00`);
@@ -224,8 +214,6 @@ export default function Dashboard() {
     const mostProfitable = tracedProducts.slice().sort((a, b) => b.margin - a.margin)[0] || null;
     const totalCost = productSales.reduce((sum, item) => sum + item.cost, 0);
     const costedUnits = productSales.reduce((sum, item) => sum + item.costedUnits, 0);
-    const tracedRevenue = productSales.reduce((sum, item) => sum + item.tracedRevenue, 0);
-    const tracedMargin = productSales.reduce((sum, item) => sum + item.margin, 0);
 
     const lowStock = (articles || [])
       .map(article => ({
@@ -241,8 +229,8 @@ export default function Dashboard() {
       periodLabel: `${new Intl.DateTimeFormat('es-ES').format(new Date(`${selectedBounds.start}T12:00:00`))} – ${new Intl.DateTimeFormat('es-ES').format(new Date(`${selectedBounds.end}T12:00:00`))}`,
       monthSales,
       totalCost,
-      margin: tracedMargin,
-      marginPercent: tracedRevenue > 0 ? (tracedMargin / tracedRevenue) * 100 : 0,
+      margin: productionMargin,
+      marginPercent: monthSales > 0 ? (productionMargin / monthSales) * 100 : 0,
       costedUnits,
       mostProfitable,
       orderCount: periodOrders.length,
@@ -251,15 +239,17 @@ export default function Dashboard() {
       pendingOrders: pendingOrders.length,
       pendingOrderValue,
       pendingCollection,
-      monthExpenses,
-      generalExpenses,
       productionExpenses,
+      seedExpenses,
+      substrateExpenses,
+      packagingExpenses,
+      labelExpenses,
       chart,
       allClients,
       productSales,
       lowStock
     };
-  }, [articles, clients, deliveryNotes, expenses, harvests, orders, productMovements, products, selectedBounds.end, selectedBounds.start, stockEntries]);
+  }, [articles, clients, deliveryNotes, harvests, orders, productMovements, products, selectedBounds.end, selectedBounds.start, stockEntries]);
 
   const saveCompany = async event => {
     event.preventDefault();
@@ -335,8 +325,8 @@ export default function Dashboard() {
         <Metric icon={<CircleDollarSign />} label="Ventas del periodo" value={money(data.monthSales)} detail={`${data.orderCount} entregas · ${data.units} unidades`} tone="green" onClick={() => openFinancial('orders')} />
         <Metric icon={<FileText />} label="Ticket medio" value={money(data.averageTicket)} detail={`${data.orderCount} ventas realizadas`} tone="blue" onClick={() => openFinancial('clients')} />
         <Metric icon={<ShoppingBag />} label="Pedidos abiertos" value={data.pendingOrders} detail={money(data.pendingOrderValue)} tone="purple" onClick={() => navigate('/admin/orders')} />
-        <Metric icon={<Receipt />} label="Gastos del periodo" value={money(data.monthExpenses)} detail={`Producción ${money(data.productionExpenses)} · Generales ${money(data.generalExpenses)}`} tone="amber" onClick={() => navigate('/admin/expenses')} />
-        <Metric icon={<TrendingUp />} label="Margen trazado" value={money(data.margin)} detail={`${data.marginPercent.toFixed(1)} % · ${data.costedUnits}/${data.units} uds. con coste`} tone="green" onClick={() => openFinancial('profit-products')} />
+        <Metric icon={<Receipt />} label="Costes de producción" value={money(data.productionExpenses)} detail={`Semillas ${money(data.seedExpenses)} · Sustrato ${money(data.substrateExpenses)} · Táperes ${money(data.packagingExpenses)} · Etiquetas ${money(data.labelExpenses)}`} tone="amber" onClick={() => openFinancial('harvests')} />
+        <Metric icon={<TrendingUp />} label="Margen del periodo" value={money(data.margin)} detail={`${data.marginPercent.toFixed(1)} % · Ventas menos producción`} tone="green" onClick={() => openFinancial('summary')} />
       </section>
 
       <section className="admin-insights-grid">

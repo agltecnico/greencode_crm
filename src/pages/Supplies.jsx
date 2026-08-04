@@ -270,6 +270,7 @@ export default function Supplies() {
       case 'SEMILLA': return '🌱 Semilla';
       case 'SUSTRATO': return '🪨 Sustrato';
       case 'ENVASE': return '📦 Envase';
+      case 'ETIQUETA': return '🏷️ Etiqueta';
       case 'OTRO': return '🏷️ Consumible (Stock)';
       case 'GASTO_FIJO': return '💸 Gasto Fijo General';
       case 'SUMINISTROS': return '⚡ Suministros (Luz, Agua)';
@@ -627,10 +628,19 @@ export default function Supplies() {
                   editingArticleId === a.id ? (
                     <tr key={a.id}>
                       <td>
-                        <select className="form-control" value={editedArticle.type} onChange={e => setEditedArticle({...editedArticle, type: e.target.value})}>
+                        <select className="form-control" value={editedArticle.type} onChange={e => {
+                          const type = e.target.value;
+                          setEditedArticle({
+                            ...editedArticle,
+                            type,
+                            unit: type === 'SEMILLA' ? 'g' : type === 'SUSTRATO' ? 'l' : 'ud',
+                            varietyId: type === 'SEMILLA' ? editedArticle.varietyId : ''
+                          });
+                        }}>
                           <option value="SEMILLA">🌱 Semilla (Stock y Gasto)</option>
                           <option value="SUSTRATO">🟤 Sustrato (Stock y Gasto)</option>
                           <option value="ENVASE">📦 Envase / Bandeja (Stock y Gasto)</option>
+                          <option value="ETIQUETA">🏷️ Etiqueta (Stock y Gasto)</option>
                           <option value="OTRO">❓ Consumible (Stock y Gasto)</option>
                           <option value="BANDEJA">🔲 Bandeja Reutilizable (Sin Stock)</option>
                   <optgroup label="Gastos (Sin Stock)">
@@ -645,7 +655,7 @@ export default function Supplies() {
                       <td>
                         <div style={{ display: 'grid', gap: '0.5rem', minWidth: '260px' }}>
                           <input type="text" className="form-control" value={editedArticle.name} onChange={e => setEditedArticle({...editedArticle, name: e.target.value})} placeholder="Nombre del artículo" />
-                          {['SEMILLA', 'SUSTRATO', 'ENVASE', 'OTRO'].includes(editedArticle.type) && (
+                          {['SEMILLA', 'SUSTRATO', 'ENVASE', 'ETIQUETA', 'OTRO'].includes(editedArticle.type) && (
                             <>
                               {editedArticle.type === 'SEMILLA' && (
                                 <select className="form-control" value={editedArticle.varietyId || ''} onChange={e => setEditedArticle({...editedArticle, varietyId: e.target.value})}>
@@ -673,7 +683,7 @@ export default function Supplies() {
                         </div>
                       </td>
                       <td>
-                        {['SEMILLA', 'SUSTRATO', 'ENVASE', 'OTRO'].includes(editedArticle.type) ? (
+                        {['SEMILLA', 'SUSTRATO', 'ENVASE', 'ETIQUETA', 'OTRO'].includes(editedArticle.type) ? (
                           <input type="number" min="0" className="form-control w-24" value={editedArticle.minStock || 0} onChange={e => setEditedArticle({...editedArticle, minStock: parseFloat(e.target.value) || 0})} />
                         ) : (
                           <span className="text-gray-400">-</span>
@@ -682,7 +692,7 @@ export default function Supplies() {
                       <td>
                         <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'flex-end' }}>
                           <button className="btn btn-primary" style={{ padding: '0.3rem 0.6rem', fontSize: '0.8rem' }} onClick={async () => {
-                            const managed = ['SEMILLA', 'SUSTRATO', 'ENVASE', 'OTRO'].includes(editedArticle.type);
+                            const managed = ['SEMILLA', 'SUSTRATO', 'ENVASE', 'ETIQUETA', 'OTRO'].includes(editedArticle.type);
                             if (managed && !editedArticle.providerId) {
                               await Swal.fire('Falta el proveedor', 'Selecciona el proveedor de esta referencia antes de guardar.', 'warning');
                               return;
@@ -713,7 +723,7 @@ export default function Supplies() {
                           {' · '}Medio: {Number(a.currentUnitCost || 0).toFixed(4)} €/{a.unit || getUnitLabel(a.type)}
                         </div>
                       </td>
-                      <td className="font-mono text-slate-600">{['SEMILLA', 'SUSTRATO', 'ENVASE', 'OTRO'].includes(a.type) ? (a.minStock || 0) : '-'}</td>
+                      <td className="font-mono text-slate-600">{['SEMILLA', 'SUSTRATO', 'ENVASE', 'ETIQUETA', 'OTRO'].includes(a.type) ? (a.minStock || 0) : '-'}</td>
                       <td>
                         <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'flex-end' }}>
                           <button className="btn btn-secondary" style={{ padding: '0.3rem 0.6rem', fontSize: '0.8rem', background: 'transparent' }} onClick={() => { setEditingArticleId(a.id); setEditedArticle(a); }}>Editar</button>
@@ -900,6 +910,7 @@ export default function Supplies() {
                 <option value="SEMILLA">Solo Semillas</option>
                 <option value="SUSTRATO">Solo Sustratos</option>
                 <option value="ENVASE">Solo Envases</option>
+                <option value="ETIQUETA">Solo Etiquetas</option>
                 <option value="GASTO_FIJO">Gastos Fijos</option>
                 <option value="SUMINISTROS">Suministros</option>
                 <option value="MANTENIMIENTO">Mantenimiento</option>
@@ -1166,10 +1177,19 @@ export default function Supplies() {
             <form onSubmit={handleAddArticle} style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
               <div>
                 <label className="form-label">Tipo de Artículo</label>
-                <select className="form-control" value={newArticle.type} onChange={e => setNewArticle({...newArticle, type: e.target.value})}>
+                <select className="form-control" value={newArticle.type} onChange={e => {
+                  const type = e.target.value;
+                  setNewArticle({
+                    ...newArticle,
+                    type,
+                    unit: type === 'SEMILLA' ? 'g' : type === 'SUSTRATO' ? 'l' : 'ud',
+                    varietyId: type === 'SEMILLA' ? newArticle.varietyId : ''
+                  });
+                }}>
                   <option value="SEMILLA">🌱 Semilla (Stock y Gasto)</option>
                   <option value="SUSTRATO">🪨 Sustrato (Stock y Gasto)</option>
                   <option value="ENVASE">📦 Envase / Bandeja (Stock y Gasto)</option>
+                  <option value="ETIQUETA">🏷️ Etiqueta (Stock y Gasto)</option>
                   <option value="OTRO">🏷️ Consumible (Stock y Gasto)</option>
                   <option value="BANDEJA">🔲 Bandeja Reutilizable (Sin Stock)</option>
                   <optgroup label="Gastos (Sin Stock)">
@@ -1185,7 +1205,7 @@ export default function Supplies() {
                 <label className="form-label">Nombre (Ej: Bandeja 1020, Recibo Luz, Semilla X)</label>
                 <input required type="text" className="form-control" value={newArticle.name} onChange={e => setNewArticle({...newArticle, name: e.target.value})} />
               </div>
-              {['SEMILLA', 'SUSTRATO', 'ENVASE', 'OTRO'].includes(newArticle.type) && (
+              {['SEMILLA', 'SUSTRATO', 'ENVASE', 'ETIQUETA', 'OTRO'].includes(newArticle.type) && (
                 <>
                   {newArticle.type === 'SEMILLA' && (
                     <div>
@@ -1221,7 +1241,7 @@ export default function Supplies() {
                   </div>
                 </>
               )}
-              {['SEMILLA', 'SUSTRATO', 'ENVASE', 'OTRO'].includes(newArticle.type) && (
+              {['SEMILLA', 'SUSTRATO', 'ENVASE', 'ETIQUETA', 'OTRO'].includes(newArticle.type) && (
                 <div>
                   <label className="form-label">Stock de Seguridad (Aviso si baja de esta cantidad)</label>
                   <input type="number" min="0" className="form-control" value={newArticle.minStock} onChange={e => setNewArticle({...newArticle, minStock: parseFloat(e.target.value) || 0})} />

@@ -11,6 +11,8 @@ const emptyForm = () => ({
   isMix: false,
   recipeVarieties: [],
   packagingArticleIds: [],
+  labelArticleId: '',
+  labelsPerUnit: 1,
   nutritionalInfo: { ...emptyNutrition }
 });
 
@@ -26,6 +28,9 @@ export default function Products() {
   const [formData, setFormData] = useState(emptyForm);
   const packagingArticles = articles?.filter(article =>
     ['ENVASE', 'BANDEJA'].includes(article.type) && article.active !== false
+  ) || [];
+  const labelArticles = articles?.filter(article =>
+    article.type === 'ETIQUETA' && article.active !== false
   ) || [];
 
   const recipeFor = (product) => {
@@ -51,6 +56,8 @@ export default function Products() {
       shelfLifeDays: Number(formData.shelfLifeDays) || 10,
       recipeVarieties: recipe,
       packagingArticleIds: formData.packagingArticleIds,
+      labelArticleId: formData.labelArticleId || null,
+      labelsPerUnit: Math.max(1, Number(formData.labelsPerUnit) || 1),
       nutritionalInfo: formData.nutritionalInfo
     };
     if (editingId) await updateProduct(editingId, payload);
@@ -67,6 +74,8 @@ export default function Products() {
       isMix: recipeVarieties.length > 1,
       recipeVarieties,
       packagingArticleIds: Array.isArray(product.packagingArticleIds) ? product.packagingArticleIds : [],
+      labelArticleId: product.labelArticleId || '',
+      labelsPerUnit: Number(product.labelsPerUnit || 1),
       nutritionalInfo: product.nutritionalInfo || { ...emptyNutrition }
     });
     setEditingId(product.id);
@@ -194,9 +203,24 @@ export default function Products() {
               {!packagingArticles.length && <p className="text-muted text-sm mt-2">Primero crea un Envase o una Bandeja de cultivo en Producción → Stock.</p>}
             </div>
 
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-4">
+              <div className="form-group" style={{ gridColumn: 'span 2' }}>
+                <label className="form-label">Etiqueta del producto</label>
+                <select required className="premium-input w-full" value={formData.labelArticleId} onChange={e => setFormData({ ...formData, labelArticleId: e.target.value })}>
+                  <option value="">Selecciona una etiqueta...</option>
+                  {labelArticles.map(article => <option key={article.id} value={article.id}>{article.name}</option>)}
+                </select>
+                {!labelArticles.length && <p className="text-muted text-sm mt-2">Primero crea una Etiqueta en Producción → Stock → Catálogo de artículos.</p>}
+              </div>
+              <div className="form-group">
+                <label className="form-label">Etiquetas por unidad</label>
+                <input required min="1" step="1" type="number" className="premium-input w-full" value={formData.labelsPerUnit} onChange={e => setFormData({ ...formData, labelsPerUnit: e.target.value })} />
+              </div>
+            </div>
+
             <div className="flex gap-2 justify-end mt-4">
               <button type="button" className="btn btn-secondary" onClick={cancelForm}>Cancelar</button>
-              <button type="submit" className="btn btn-primary" disabled={!formData.recipeVarieties.length || !formData.packagingArticleIds.length}>Guardar producto</button>
+              <button type="submit" className="btn btn-primary" disabled={!formData.recipeVarieties.length || !formData.packagingArticleIds.length || !formData.labelArticleId}>Guardar producto</button>
             </div>
           </form>
         </div>
@@ -224,6 +248,9 @@ export default function Products() {
                   return article ? <span key={articleId} className="badge badge-primary">{article.type === 'BANDEJA' ? '🌱 Vivo' : '📦'} {article.name}</span> : null;
                 })}
                 {!(product.packagingArticleIds || []).length && <span className="badge badge-warning">Envase pendiente de asignar</span>}
+                {product.labelArticleId ? (
+                  <span className="badge badge-primary">🏷️ {articles?.find(item => item.id === product.labelArticleId)?.name || 'Etiqueta'} · {Number(product.labelsPerUnit || 1)} por unidad</span>
+                ) : <span className="badge badge-warning">Etiqueta pendiente de asignar</span>}
               </div>
               <div className="flex flex-wrap gap-2 mt-3">
                 {recipe.map(item => {
