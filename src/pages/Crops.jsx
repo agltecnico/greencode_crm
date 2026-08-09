@@ -182,7 +182,7 @@ export default function Crops() {
   const navigate = useNavigate();
   const { requireAdmin } = useAdminMode();
   const { 
-    crops, sowCrop, updateCrop, advanceCropStatus, setCropPhase, discardCrop, deleteCrop,
+    crops, sowCrop, updateCrop, increaseCropTrays, advanceCropStatus, setCropPhase, discardCrop, deleteCrop,
     stockEntries, stockLots, articles, seedVarieties, providers,
     cropTypes,
     harvestTargets, addHarvestTarget, updateHarvestTarget, deleteHarvestTarget,
@@ -286,6 +286,9 @@ export default function Crops() {
   const [searchParams, setSearchParams] = useSearchParams();
   const [showPhaseChangeModal, setShowPhaseChangeModal] = useState(null);
   const [pendingPhase, setPendingPhase] = useState(null);
+  const [editingCropTrays, setEditingCropTrays] = useState(null);
+  const [cropTrayEdit, setCropTrayEdit] = useState({ newTrays: 1, consumeStock: false });
+  const [savingCropTrays, setSavingCropTrays] = useState(false);
   const readinessSyncRef = useRef(new Set());
   const [newCrop, setNewCrop] = useState({ cropTypeId: '', traysCount: 1, stockLotId: '', datePlanted: toLocalDateTimeInputValue(), initialStatus: 'GERMINATING', consumeStock: true });
   const [plannerHarvestDay, setPlannerHarvestDay] = useState('');
@@ -375,6 +378,31 @@ export default function Crops() {
       .filter(lot => lot.articleId === articleId)
       .sort((a, b) => String(b.receivedAt || b.createdAt || '').localeCompare(String(a.receivedAt || a.createdAt || '')))[0];
     return Number(latestLot?.unitCost ?? article?.currentUnitCost ?? article?.lastPurchaseUnitCost ?? 0);
+  };
+
+  const openCropTrayEditor = crop => {
+    setEditingCropTrays(crop);
+    setCropTrayEdit({ newTrays: Number(crop.traysCount || 0) + 1, consumeStock: false });
+  };
+
+  const saveCropTrayIncrease = async event => {
+    event.preventDefault();
+    if (!editingCropTrays || Number(cropTrayEdit.newTrays) <= Number(editingCropTrays.traysCount || 0)) return;
+    setSavingCropTrays(true);
+    try {
+      const result = await increaseCropTrays(editingCropTrays.id, cropTrayEdit.newTrays, cropTrayEdit.consumeStock);
+      setEditingCropTrays(null);
+      await Swal.fire({
+        title: 'Bandejas actualizadas',
+        text: `Se han añadido ${result?.addedTrays || Number(cropTrayEdit.newTrays) - Number(editingCropTrays.traysCount || 0)} bandeja(s)${cropTrayEdit.consumeStock ? ' y se ha descontado su consumo.' : ' sin modificar el stock.'}`,
+        icon: 'success',
+        confirmButtonColor: '#10b981'
+      });
+    } catch (error) {
+      Swal.fire({ title: 'No se pudo actualizar', text: error.message, icon: 'error', confirmButtonColor: '#ef4444' });
+    } finally {
+      setSavingCropTrays(false);
+    }
   };
   const estimatedPackagingCost = Object.entries(newHarvest.packagingQuantities || {})
     .reduce((sum, [articleId, quantity]) => sum + Number(quantity || 0) * articleUnitCost(articleId), 0);
@@ -960,6 +988,7 @@ export default function Crops() {
                             </td>
                             <td style={{ padding: '0.5rem 1rem', textAlign: 'right' }}>
                               <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'flex-end' }}>
+                                <button onClick={() => openCropTrayEditor(crop)} title="Aumentar bandejas" style={{ padding: '0.35rem 0.75rem', borderRadius: '0.5rem', border: '1px solid #86efac', backgroundColor: '#f0fdf4', color: '#166534', fontWeight: 'bold', fontSize: '0.75rem', cursor: 'pointer' }}>+ Bandejas</button>
                                 <button onClick={() => handleDeleteCrop(crop)} title="Eliminar Registro" style={{ padding: '0.25rem 0.5rem', borderRadius: '0.35rem', border: '1px solid #fecaca', color: '#dc2626', backgroundColor: '#fee2e2', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
   <svg width="14" height="14" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
 </button>
@@ -2720,6 +2749,49 @@ export default function Crops() {
           <button type="submit" disabled={savingHarvestEdit || totalUnits <= 0} className="btn btn-primary">{savingHarvestEdit ? 'Guardando…' : 'Guardar corrección'}</button>
         </div>
       </form>
+    </div>
+  );
+})()}
+
+{editingCropTrays && (() => {
+  const cropType = cropTypes?.find(type => type.id === editingCropTrays.cropTypeId || type.id === editingCropTrays.seedId);
+  const currentTrays = Number(editingCropTrays.traysCount || 0);
+  const addedTrays = Math.max(0, Number(cropTrayEdit.newTrays || 0) - currentTrays);
+  const seedGrams = addedTrays * Number(cropType?.seedGrams || editingCropTrays.gramsPerTray || 0);
+  const substrateLiters = addedTrays * Number(cropType?.substrateLiters || 0);
+  return (
+    <div style={modalOverlayStyle}>
+      <div style={{ ...modalCardStyle, maxWidth: '520px' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
+          <div><h3 style={{ margin: 0, color: '#0f172a' }}>Aumentar bandejas</h3><small style={{ color: '#64748b' }}>{cropType?.name} · {editingCropTrays.cultivationBatchNumber || editingCropTrays.batchNumber}</small></div>
+          <button type="button" onClick={() => setEditingCropTrays(null)} style={{ border: 'none', background: 'transparent', fontSize: '1.5rem', cursor: 'pointer' }}>&times;</button>
+        </div>
+        <form onSubmit={saveCropTrayIncrease} style={{ display: 'grid', gap: '1rem' }}>
+          <div style={{ padding: '0.8rem', borderRadius: '0.7rem', background: '#f8fafc', color: '#334155' }}>
+            Bandejas actuales: <strong>{currentTrays}</strong>
+          </div>
+          <label>
+            <span className="form-label">Nueva cantidad total de bandejas</span>
+            <input className="form-control" required type="number" min={currentTrays + 1} step="1" value={cropTrayEdit.newTrays} onChange={event => setCropTrayEdit(previous => ({ ...previous, newTrays: Number(event.target.value) }))} />
+          </label>
+          <div style={{ padding: '0.85rem', borderRadius: '0.7rem', background: '#ecfdf5', border: '1px solid #a7f3d0', color: '#166534' }}>
+            <strong>Ampliación: +{addedTrays} bandeja(s)</strong>
+            <div style={{ fontSize: '0.8rem', marginTop: '0.3rem' }}>Consumo correspondiente: {seedGrams.toFixed(2)} g de semilla{substrateLiters > 0 ? ` y ${substrateLiters.toFixed(2)} L de sustrato` : ''}.</div>
+          </div>
+          <label style={{ padding: '0.85rem', borderRadius: '0.7rem', border: '1px solid #fbbf24', background: '#fffbeb' }}>
+            <span className="form-label">¿Descontar este consumo del stock actual?</span>
+            <select className="form-control" value={cropTrayEdit.consumeStock ? 'yes' : 'no'} onChange={event => setCropTrayEdit(previous => ({ ...previous, consumeStock: event.target.value === 'yes' }))}>
+              <option value="no">No descontar (corrección de registro)</option>
+              <option value="yes">Sí, descontar semillas y sustrato</option>
+            </select>
+          </label>
+          <p style={{ margin: 0, color: '#64748b', fontSize: '0.78rem' }}>La fecha, la fase y el lote del cultivo no cambiarán. Para una siembra distinta debe crearse otro cultivo.</p>
+          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.75rem' }}>
+            <button type="button" className="btn btn-secondary" onClick={() => setEditingCropTrays(null)}>Cancelar</button>
+            <button type="submit" className="btn btn-primary" disabled={savingCropTrays || addedTrays <= 0}>{savingCropTrays ? 'Guardando…' : 'Guardar ampliación'}</button>
+          </div>
+        </form>
+      </div>
     </div>
   );
 })()}

@@ -1497,6 +1497,19 @@ export const DataProvider = ({ children }) => {
       return false;
     }
   };
+  const increaseCropTrays = async (cropId, newTrays, consumeStock = false) => {
+    const { data, error } = await persistOrReload(
+      () => supabase.rpc('increase_active_crop_trays', {
+        p_crop_id: cropId,
+        p_new_trays: Number(newTrays),
+        p_consume_stock: Boolean(consumeStock)
+      }),
+      'aumentar las bandejas del cultivo'
+    );
+    if (error) throw error;
+    await refreshData({ force: true });
+    return data;
+  };
   const editHarvestPackaging = async (id, packagingBreakdown) => {
     const { data, error } = await supabase.rpc('edit_harvest_packaging', {
       p_harvest_id: id,
@@ -1548,7 +1561,7 @@ export const DataProvider = ({ children }) => {
         seedInventory, addSeedInventory, updateSeedInventory, deleteSeedInventory,
         substrates, addSubstrate, deleteSubstrate,
         substrateInventory, addSubstrateInventory, deleteSubstrateInventory,
-        crops, addCrop, sowCrop, updateCrop, deleteCrop, advanceCropStatus, reverseCropStatus, setCropPhase, discardCrop,
+        crops, addCrop, sowCrop, updateCrop, increaseCropTrays, deleteCrop, advanceCropStatus, reverseCropStatus, setCropPhase, discardCrop,
         harvestTargets, addHarvestTarget, updateHarvestTarget, deleteHarvestTarget,
       harvests, addHarvest, registerHarvest, updateHarvest, editHarvestPackaging, deleteHarvest,
       dailyLogs, addDailyLog, updateDailyLog, deleteDailyLog,
