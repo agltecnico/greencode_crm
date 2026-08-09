@@ -660,6 +660,54 @@
 .tv-crop-toolbar button.active { border-color: #34d399; background: rgba(16, 185, 129, 0.16); color: #6ee7b7; }
 .tv-crop-toolbar button.active strong { background: #10b981; }
 
+/* Compact label board for the greenhouse TV */
+.tv-crop-screen { display: grid; grid-template-columns: 154px minmax(0, 1fr); gap: 0.75rem; min-height: calc(100vh - 94px); }
+.tv-crop-sidebar { align-self: start; position: sticky; top: 0.65rem; padding: 0.7rem; border: 1px solid #334155; border-radius: 13px; background: rgba(15, 23, 42, 0.94); }
+.tv-crop-sidebar-title { display: grid; grid-template-columns: auto 1fr; gap: 0 0.45rem; align-items: center; padding: 0.15rem 0.25rem 0.65rem; border-bottom: 1px solid #273449; }
+.tv-crop-sidebar-title > span { grid-row: 1 / 3; font-size: 1.25rem; }
+.tv-crop-sidebar-title strong { color: #fff; font-size: 0.95rem; }
+.tv-crop-sidebar-title small { color: #64748b; font-size: 0.68rem; }
+.tv-crop-sidebar .tv-crop-toolbar { display: grid; gap: 0.3rem; margin: 0.6rem 0; }
+.tv-crop-sidebar .tv-crop-toolbar button { width: 100%; justify-content: space-between; padding: 0.48rem 0.55rem; font-size: 0.72rem; border-radius: 7px; }
+.tv-crop-sidebar .tv-crop-toolbar button strong { min-width: 1.4rem; font-size: 0.68rem; }
+.tv-crop-sidebar .tv-crop-toolbar button[data-status="SOAKING"].active { border-color: #38bdf8; background: rgba(14,165,233,.18); color: #7dd3fc; }
+.tv-crop-sidebar .tv-crop-toolbar button[data-status="GERMINATING"].active { border-color: #f59e0b; background: rgba(245,158,11,.18); color: #fcd34d; }
+.tv-crop-sidebar .tv-crop-toolbar button[data-status="DARKNESS"].active { border-color: #8b5cf6; background: rgba(139,92,246,.2); color: #c4b5fd; }
+.tv-crop-sidebar .tv-crop-toolbar button[data-status="LIGHT"].active { border-color: #10b981; background: rgba(16,185,129,.18); color: #6ee7b7; }
+.tv-crop-sidebar .tv-crop-toolbar button[data-status="READY"].active { border-color: #f43f5e; background: rgba(244,63,94,.18); color: #fda4af; }
+.tv-crop-size-control { padding-top: 0.6rem; border-top: 1px solid #273449; }
+.tv-crop-size-control > span { display: block; margin-bottom: 0.35rem; color: #64748b; font-size: 0.62rem; font-weight: 900; letter-spacing: .1em; text-transform: uppercase; }
+.tv-crop-size-control > div { display: grid; grid-template-columns: repeat(3, 1fr); gap: 0.25rem; }
+.tv-crop-size-control button { padding: 0.35rem; border: 1px solid #334155; border-radius: 6px; background: #1e293b; color: #94a3b8; font-weight: 900; cursor: pointer; }
+.tv-crop-size-control button.active { border-color: #34d399; color: #6ee7b7; background: rgba(16,185,129,.15); }
+.tv-crop-main { min-width: 0; }
+.tv-crop-compact-heading { height: 33px; display: flex; align-items: center; justify-content: space-between; padding: 0 0.2rem; }
+.tv-crop-compact-heading strong { color: #f8fafc; font-size: 0.95rem; }
+.tv-crop-compact-heading span { color: #64748b; font-size: 0.68rem; }
+.tv-crop-label-grid { display: grid; align-content: start; gap: 0.5rem; }
+.tv-crop-label-grid.size-small { grid-template-columns: repeat(auto-fill, minmax(145px, 1fr)); }
+.tv-crop-label-grid.size-medium { grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); }
+.tv-crop-label-grid.size-large { grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); }
+.tv-crop-label { --phase: #64748b; --phase-bg: rgba(100,116,139,.14); position: relative; min-width: 0; padding: 0.65rem 0.72rem; overflow: hidden; border: 1px solid #475569; border-left: 5px solid var(--phase); border-radius: 9px; background: linear-gradient(135deg, var(--phase-bg), rgba(15,23,42,.97) 62%); box-shadow: 0 5px 16px rgba(0,0,0,.16); color: #e2e8f0; }
+.tv-crop-label[data-status="SOAKING"] { --phase: #38bdf8; --phase-bg: rgba(14,165,233,.22); }
+.tv-crop-label[data-status="SOWED"], .tv-crop-label[data-status="GERMINATING"] { --phase: #f59e0b; --phase-bg: rgba(245,158,11,.22); }
+.tv-crop-label[data-status="DARKNESS"] { --phase: #8b5cf6; --phase-bg: rgba(139,92,246,.24); }
+.tv-crop-label[data-status="LIGHT"], .tv-crop-label[data-status="GROWING"] { --phase: #10b981; --phase-bg: rgba(16,185,129,.22); }
+.tv-crop-label[data-status="READY"] { --phase: #f43f5e; --phase-bg: rgba(244,63,94,.24); }
+.tv-crop-label-top, .tv-crop-label-meta { display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; }
+.tv-crop-label-top > span { color: var(--phase); font-size: 0.63rem; font-weight: 950; letter-spacing: .06em; text-transform: uppercase; }
+.tv-crop-label-top > strong { color: #fff; font-size: 1rem; line-height: 1; }
+.tv-crop-label-top small { color: #94a3b8; font-size: 0.56rem; font-weight: 800; }
+.tv-crop-label h3 { margin: 0.5rem 0 0.45rem; overflow: hidden; color: #fff; font-size: 1.02rem; line-height: 1.08; text-overflow: ellipsis; white-space: nowrap; }
+.tv-crop-label-meta { color: #94a3b8; font-size: 0.68rem; }
+.tv-crop-label-meta strong { color: #cbd5e1; }
+.tv-crop-label-batch { display: block; margin-top: 0.48rem; overflow: hidden; color: #64748b; font: 0.58rem monospace; text-overflow: ellipsis; white-space: nowrap; }
+.tv-crop-label-grid.size-small .tv-crop-label { padding: 0.48rem 0.55rem; }
+.tv-crop-label-grid.size-small .tv-crop-label h3 { margin: 0.35rem 0; font-size: 0.86rem; }
+.tv-crop-label-grid.size-small .tv-crop-label-batch { display: none; }
+.tv-crop-label-grid.size-large .tv-crop-label { padding: 0.9rem; }
+.tv-crop-label-grid.size-large .tv-crop-label h3 { font-size: 1.25rem; }
+
 .tv-crop-table-wrap { overflow: hidden; border: 1px solid #334155; border-radius: 14px; background: rgba(15, 23, 42, 0.86); }
 .tv-crop-table { width: 100%; border-collapse: collapse; table-layout: fixed; color: #e2e8f0; }
 .tv-crop-table th { padding: 0.65rem 1rem; background: #1e293b; color: #94a3b8; font-size: 0.7rem; letter-spacing: 0.08em; text-transform: uppercase; text-align: left; }
@@ -995,6 +1043,15 @@
   .tv-order-grid,
   .tv-climate-grid { grid-template-columns: 1fr; }
   .tv-info-grid.stock { grid-template-columns: repeat(3, minmax(220px, 1fr)); overflow-x: auto; }
+}
+
+.tv-mode:has(.tv-crop-screen) .tv-screen-profile { margin-bottom: 0.6rem; padding: 0.45rem 0.7rem; }
+.tv-mode:has(.tv-crop-screen) .tv-screen-profile select { min-width: 210px; padding: 0.42rem 0.6rem; }
+
+@media (max-width: 720px) {
+  .tv-crop-screen { grid-template-columns: 1fr; }
+  .tv-crop-sidebar { position: static; }
+  .tv-crop-sidebar .tv-crop-toolbar { grid-template-columns: repeat(3, 1fr); }
 }
 
 @media (min-width: 1280px) {

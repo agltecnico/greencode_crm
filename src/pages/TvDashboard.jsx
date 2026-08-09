@@ -14,6 +14,7 @@ export default function TvDashboard() {
   const [tvTab, setTvTab] = useState(() => screenMode === 'rotate' ? 'tasks' : screenMode);
   const [cropStatusFilter, setCropStatusFilter] = useState('ALL');
   const [cropPage, setCropPage] = useState(1);
+  const [cropLabelSize, setCropLabelSize] = useState(() => localStorage.getItem('greencode_tv_crop_label_size') || 'medium');
   const { crops, cropTypes, seeds, refreshData, orders, clients, products, productMovements } = useData();
 
   const translateStatus = (status) => {
@@ -43,7 +44,7 @@ export default function TvDashboard() {
     READY: 'green'
   };
 
-  const cropsPerPage = 12;
+  const cropsPerPage = cropLabelSize === 'small' ? 48 : cropLabelSize === 'large' ? 20 : 32;
   const filteredCrops = useMemo(() => activeCropsList
     .filter(crop => cropStatusFilter === 'ALL' || String(crop.status || '').toUpperCase() === cropStatusFilter)
     .sort((a, b) => new Date(a.datePlanted || 0) - new Date(b.datePlanted || 0)), [activeCropsList, cropStatusFilter]);
@@ -57,6 +58,11 @@ export default function TvDashboard() {
     else url.searchParams.set('view', screenMode);
     window.history.replaceState({}, '', url);
   }, [screenMode]);
+
+  useEffect(() => {
+    localStorage.setItem('greencode_tv_crop_label_size', cropLabelSize);
+    setCropPage(1);
+  }, [cropLabelSize]);
 
   useEffect(() => {
     // Auto-refresh data every 30 seconds for TV Mode
@@ -196,51 +202,49 @@ export default function TvDashboard() {
         )}
         
         {tvTab === 'greenhouse' && (
-          <div style={{ animation: 'fadeIn 0.4s ease' }}>
-            <div className="tv-panel-heading">
-              <div>
-                <span className="tv-eyebrow">PRODUCCIÓN EN TIEMPO REAL</span>
-                <h2>Cultivos activos</h2>
-              </div>
-              <span className="tv-summary-badge">{activeCropsList.length} lotes activos</span>
-            </div>
-            <div className="tv-crop-toolbar">
+          <div className="tv-crop-screen" style={{ animation: 'fadeIn 0.4s ease' }}>
+            <aside className="tv-crop-sidebar">
+              <div className="tv-crop-sidebar-title"><span>🌱</span><strong>Cultivos</strong><small>{activeCropsList.length} activos</small></div>
+              <nav className="tv-crop-toolbar" aria-label="Filtrar cultivos por fase">
               {[
                 ['ALL', 'Todos'], ['SOAKING', 'Remojo'], ['GERMINATING', 'Germinación'],
                 ['DARKNESS', 'Oscuridad'], ['LIGHT', 'Luz'], ['READY', 'Listos']
               ].map(([value, label]) => (
-                <button key={value} className={cropStatusFilter === value ? 'active' : ''} onClick={() => { setCropStatusFilter(value); setCropPage(1); }}>
+                <button key={value} data-status={value} className={cropStatusFilter === value ? 'active' : ''} onClick={() => { setCropStatusFilter(value); setCropPage(1); }}>
                   {label}
                   <strong>{value === 'ALL' ? activeCropsList.length : activeCropsList.filter(crop => String(crop.status || '').toUpperCase() === value).length}</strong>
                 </button>
               ))}
-            </div>
-            <div className="tv-crop-table-wrap">
-              <table className="tv-crop-table">
-                <thead><tr><th>Variedad y lote</th><th>Fase</th><th>Día</th><th>Inicio</th><th>Bandejas</th></tr></thead>
-                <tbody>
+              </nav>
+              <div className="tv-crop-size-control"><span>Tamaño</span><div>
+                {[['small', 'S'], ['medium', 'M'], ['large', 'L']].map(([value, label]) => (
+                  <button key={value} className={cropLabelSize === value ? 'active' : ''} onClick={() => setCropLabelSize(value)}>{label}</button>
+                ))}
+              </div></div>
+            </aside>
+            <main className="tv-crop-main">
+              <div className="tv-crop-compact-heading"><strong>{cropStatusFilter === 'ALL' ? 'Todos los cultivos' : translateStatus(cropStatusFilter)}</strong><span>{filteredCrops.length} lotes · actualización automática</span></div>
+              <div className={`tv-crop-label-grid size-${cropLabelSize}`}>
                   {visibleCrops.map(crop => {
                     const cType = cropTypes?.find(type => type.id === crop.cropTypeId) || seeds?.find(seed => seed.id === crop.seedId);
                     const planted = new Date(crop.datePlanted);
                     const daysAlive = Math.max(0, Math.floor((new Date() - planted) / 86_400_000));
                     return (
-                      <tr key={crop.id}>
-                        <td><strong>{cType?.name || 'Variedad desconocida'}</strong><small>{crop.cultivationBatchNumber || crop.batchNumber || 'Sin lote'}</small></td>
-                        <td><span className={`tv-label ${cropStatusTone[crop.status] || 'slate'}`}>{translateStatus(crop.status)}</span></td>
-                        <td><strong>Día {daysAlive}</strong></td>
-                        <td>{Number.isNaN(planted.getTime()) ? '—' : planted.toLocaleDateString('es-ES', { day: '2-digit', month: '2-digit' })}</td>
-                        <td><strong className="tv-tray-count">{crop.traysCount || 0}</strong></td>
-                      </tr>
+                      <article key={crop.id} className="tv-crop-label" data-status={String(crop.status || '').toUpperCase()}>
+                        <div className="tv-crop-label-top"><span>{translateStatus(crop.status)}</span><strong>{crop.traysCount || 0}<small> band.</small></strong></div>
+                        <h3>{cType?.name || 'Variedad desconocida'}</h3>
+                        <div className="tv-crop-label-meta"><strong>Día {daysAlive}</strong><span>{Number.isNaN(planted.getTime()) ? '—' : planted.toLocaleDateString('es-ES', { day: '2-digit', month: '2-digit' })}</span></div>
+                        <small className="tv-crop-label-batch">{crop.cultivationBatchNumber || crop.batchNumber || 'Sin lote'}</small>
+                      </article>
                     );
                   })}
-                </tbody>
-              </table>
-              {filteredCrops.length === 0 && <div className="tv-crop-empty">No hay cultivos en esta fase.</div>}
-            </div>
-            <div className="tv-pagination">
+                {filteredCrops.length === 0 && <div className="tv-crop-empty">No hay cultivos en esta fase.</div>}
+              </div>
+            {cropPageCount > 1 && <div className="tv-pagination">
               <span>Mostrando {filteredCrops.length ? (cropPage - 1) * cropsPerPage + 1 : 0}–{Math.min(cropPage * cropsPerPage, filteredCrops.length)} de {filteredCrops.length}</span>
               <div><button disabled={cropPage <= 1} onClick={() => setCropPage(page => Math.max(1, page - 1))}>← Anterior</button><strong>Página {cropPage} / {cropPageCount}</strong><button disabled={cropPage >= cropPageCount} onClick={() => setCropPage(page => Math.min(cropPageCount, page + 1))}>Siguiente →</button></div>
-            </div>
+            </div>}
+            </main>
           
           {activeCropsList.length === 0 && (
             <div style={{ textAlign: 'center', padding: '5rem', color: '#64748b', fontSize: '1.5rem' }}>
