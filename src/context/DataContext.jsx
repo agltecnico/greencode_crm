@@ -554,6 +554,32 @@ export const DataProvider = ({ children }) => {
     };
 
   const sowCrop = async (newCrop) => {
+    if (newCrop.consumeStock === false) {
+      const cType = cropTypes.find(c => c.id === newCrop.cropTypeId);
+      if (!cType) throw new Error('Ficha de cultivo no encontrada.');
+      const selectedLot = stockLots.find(lot => lot.id === newCrop.stockLotId);
+      const trays = Number(newCrop.traysCount || 1);
+      const plantedAt = new Date(newCrop.datePlanted).toISOString();
+      const cultivationBatchNumber = `CULT-${new Date(plantedAt).getFullYear()}-${Date.now().toString().slice(-6)}`;
+      const cropId = await addCrop({
+        cropTypeId: cType.id,
+        traysCount: trays,
+        gramsPerTray: Number(cType.seedGrams || 0),
+        substrateCostPerTray: 0,
+        status: newCrop.initialStatus || 'GERMINATING',
+        datePlanted: plantedAt,
+        batchNumber: selectedLot?.supplierBatch || 'SIN_LOTE',
+        cultivationBatchNumber,
+        seedStockLotId: selectedLot?.id || null,
+        seedQuantityUsed: Number(cType.seedGrams || 0) * trays,
+        seedSupplierBatch: selectedLot?.supplierBatch || null,
+        seedProviderId: selectedLot?.providerId || null,
+        phaseConfirmedAt: newCrop.initialStatus !== 'GERMINATING' ? new Date().toISOString() : null
+      });
+      if (!cropId) throw new Error('No se pudo guardar el cultivo.');
+      await refreshData({ force: true });
+      return cropId;
+    }
     if (newCrop.stockLotId) {
       const { data, error } = await persistOrReload(
         () => supabase.rpc('sow_crop_from_lot', {

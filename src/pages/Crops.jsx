@@ -51,6 +51,14 @@ const toLocalDateTimeInputValue = (date = new Date()) => {
   return localDate.toISOString().slice(0, 16);
 };
 
+const isBeforeToday = dateValue => {
+  const date = new Date(dateValue);
+  if (Number.isNaN(date.getTime())) return false;
+  const today = new Date();
+  return new Date(date.getFullYear(), date.getMonth(), date.getDate())
+    < new Date(today.getFullYear(), today.getMonth(), today.getDate());
+};
+
 const suggestedStatusForSowingDate = (cropType, dateValue) => {
   if (!cropType || !dateValue) return 'GERMINATING';
   const elapsed = calendarDaysSince(dateValue);
@@ -279,7 +287,7 @@ export default function Crops() {
   const [showPhaseChangeModal, setShowPhaseChangeModal] = useState(null);
   const [pendingPhase, setPendingPhase] = useState(null);
   const readinessSyncRef = useRef(new Set());
-  const [newCrop, setNewCrop] = useState({ cropTypeId: '', traysCount: 1, stockLotId: '', datePlanted: toLocalDateTimeInputValue(), initialStatus: 'GERMINATING' });
+  const [newCrop, setNewCrop] = useState({ cropTypeId: '', traysCount: 1, stockLotId: '', datePlanted: toLocalDateTimeInputValue(), initialStatus: 'GERMINATING', consumeStock: true });
   const [plannerHarvestDay, setPlannerHarvestDay] = useState('');
   const [plannerSelections, setPlannerSelections] = useState({});
   const [plannerView, setPlannerView] = useState('harvest');
@@ -295,7 +303,7 @@ export default function Crops() {
   const [editPackagingQuantities, setEditPackagingQuantities] = useState({});
   const [savingHarvestEdit, setSavingHarvestEdit] = useState(false);
 
-  const emptySowForm = { cropTypeId: '', traysCount: 1, stockLotId: '', datePlanted: toLocalDateTimeInputValue(), initialStatus: 'GERMINATING' };
+  const emptySowForm = { cropTypeId: '', traysCount: 1, stockLotId: '', datePlanted: toLocalDateTimeInputValue(), initialStatus: 'GERMINATING', consumeStock: true };
   const openSowModal = (initialValues = {}) => {
     setNewCrop({ ...emptySowForm, ...initialValues, stockLotId: '' });
     setIsSowModalOpen(true);
@@ -387,7 +395,7 @@ export default function Crops() {
         Swal.fire({ title: 'Fecha no válida', text: 'La fecha de siembra debe ser válida y no puede estar en el futuro.', icon: 'warning', confirmButtonColor: '#f59e0b' });
         return;
       }
-      if (selectedCropType) {
+      if (selectedCropType && newCrop.consumeStock) {
         const requiredGrams = (selectedCropType.seedGrams || 0) * newCrop.traysCount;
         const remainingSeed = totalAvailableSeed - requiredGrams;
         
@@ -404,7 +412,14 @@ export default function Crops() {
       }
       await sowCrop(newCrop);
       closeSowModal();
-      Swal.fire({ title: '¡Cultivo Plantado!', text: 'Stock de semillas y sustrato descontado correctamente.', icon: 'success', confirmButtonColor: '#10b981' });
+      Swal.fire({
+        title: '¡Cultivo Plantado!',
+        text: newCrop.consumeStock
+          ? 'Stock de semillas descontado correctamente.'
+          : 'Cultivo registrado sin modificar el stock de semillas.',
+        icon: 'success',
+        confirmButtonColor: '#10b981'
+      });
     } catch (error) {
       Swal.fire({ title: 'Error', text: error.message, icon: 'error', confirmButtonColor: '#ef4444' });
     }
@@ -2298,20 +2313,42 @@ export default function Crops() {
                         value={newCrop.datePlanted}
                         onChange={event => {
                           const datePlanted = event.target.value;
-                          setNewCrop(prev => ({ ...prev, datePlanted, initialStatus: suggestedStatusForSowingDate(selectedCropType, datePlanted) }));
+                          setNewCrop(prev => ({
+                            ...prev,
+                            datePlanted,
+                            initialStatus: suggestedStatusForSowingDate(selectedCropType, datePlanted),
+                            consumeStock: !isBeforeToday(datePlanted)
+                          }));
                         }}
                       />
                       <button type="button" className="btn btn-secondary" onClick={() => {
                         const datePlanted = toLocalDateTimeInputValue();
-                        setNewCrop(prev => ({ ...prev, datePlanted, initialStatus: suggestedStatusForSowingDate(selectedCropType, datePlanted) }));
+                        setNewCrop(prev => ({ ...prev, datePlanted, initialStatus: suggestedStatusForSowingDate(selectedCropType, datePlanted), consumeStock: true }));
                       }}>Ahora</button>
                     </div>
-                    {newCrop.datePlanted && new Date(newCrop.datePlanted).getTime() < Date.now() - 5 * 60_000 && (
+                    {newCrop.datePlanted && isBeforeToday(newCrop.datePlanted) && (
                       <div style={{ marginTop: '0.6rem', padding: '0.65rem 0.8rem', borderRadius: '0.6rem', background: '#fffbeb', border: '1px solid #fde68a', color: '#92400e', fontSize: '0.8rem', fontWeight: 700 }}>
-                        ⚠️ Siembra retroactiva: se conservará esta fecha en la trazabilidad.
+                        ⚠️ Siembra retroactiva: por seguridad no se descontará semilla salvo que lo elijas expresamente.
                       </div>
                     )}
                   </div>
+
+                  {newCrop.datePlanted && isBeforeToday(newCrop.datePlanted) && (
+                    <div style={{ padding: '1rem', borderRadius: '0.75rem', border: '2px solid #fbbf24', background: '#fffbeb' }}>
+                      <label style={{ fontSize: '0.875rem', fontWeight: 900, color: '#78350f', display: 'block', marginBottom: '0.65rem' }}>
+                        ¿Descontar las semillas del stock actual?
+                      </label>
+                      <select
+                        className="premium-input"
+                        value={newCrop.consumeStock ? 'yes' : 'no'}
+                        onChange={event => setNewCrop(prev => ({ ...prev, consumeStock: event.target.value === 'yes' }))}
+                        style={{ width: '100%', padding: '0.8rem', borderRadius: '0.6rem', border: '1px solid #f59e0b', background: 'white', fontWeight: 800 }}
+                      >
+                        <option value="no">No descontar (recomendado)</option>
+                        <option value="yes">Sí, descontar del stock actual</option>
+                      </select>
+                    </div>
+                  )}
 
                   <div>
                     <label style={{ fontSize: '0.875rem', fontWeight: 'bold', marginBottom: '0.5rem', display: 'block', color: '#334155' }}>3. Fase física actual</label>
