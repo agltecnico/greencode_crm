@@ -48,7 +48,9 @@ export default function Supplies() {
   const [editingPurchaseNoteId, setEditingPurchaseNoteId] = useState(null);
 
   const isWeightPurchase = article => article?.type === 'SEMILLA' || article?.unit === 'g';
-  const isSubstratePurchase = article => article?.type === 'SUSTRATO' || article?.unit === 'l';
+  // La unidad no define la familia del artículo: un envase puede indicar su
+  // capacidad en el nombre, pero solo un SUSTRATO se compra por litros/sacos.
+  const isSubstratePurchase = article => article?.type === 'SUSTRATO';
   const purchasePriceLabel = article => {
     if (isWeightPurchase(article)) return 'Precio por kilo (€/kg)';
     if (isSubstratePurchase(article)) return 'Precio por litro (€/l)';
