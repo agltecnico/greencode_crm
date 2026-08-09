@@ -366,6 +366,22 @@ export default function Crops() {
     ?.filter(lot => matchingSeedArticleIds.includes(lot.articleId))
     .reduce((acc, curr) => acc + Number(curr.remainingQuantity || 0), 0) || 0;
 
+  const selectedHarvestProduct = products?.find(product => product.id === newHarvest.productId);
+  const harvestUnits = Object.values(newHarvest.packagingQuantities || {})
+    .reduce((sum, value) => sum + Number(value || 0), 0);
+  const articleUnitCost = articleId => {
+    const article = articles?.find(item => item.id === articleId);
+    const latestLot = (stockLots || [])
+      .filter(lot => lot.articleId === articleId)
+      .sort((a, b) => String(b.receivedAt || b.createdAt || '').localeCompare(String(a.receivedAt || a.createdAt || '')))[0];
+    return Number(latestLot?.unitCost ?? article?.currentUnitCost ?? article?.lastPurchaseUnitCost ?? 0);
+  };
+  const estimatedPackagingCost = Object.entries(newHarvest.packagingQuantities || {})
+    .reduce((sum, [articleId, quantity]) => sum + Number(quantity || 0) * articleUnitCost(articleId), 0);
+  const harvestLabelArticle = articles?.find(article => article.id === selectedHarvestProduct?.labelArticleId);
+  const estimatedLabelsCount = harvestUnits * Number(selectedHarvestProduct?.labelsPerUnit || 1);
+  const estimatedLabelCost = estimatedLabelsCount * articleUnitCost(selectedHarvestProduct?.labelArticleId);
+
   const availableBatches = useMemo(() => {
     if (!selectedVarietyId) return [];
     return (stockLots || [])
@@ -2563,6 +2579,7 @@ export default function Crops() {
           <div style={{ background: '#f8fafc', border: '1px solid #cbd5e1', borderRadius: '0.75rem', padding: '1rem', display: 'grid', gap: '0.75rem' }}>
             {packagingArticlesForProduct(products?.find(product => product.id === newHarvest.productId)).map(format => {
               const availableStock = articlePhysicalStock(format.id);
+              const unitCost = articleUnitCost(format.id);
               return (
               <div key={format.id} style={{ display: 'flex', alignItems: 'center', gap: '1rem', background: 'white', border: '1px solid #e2e8f0', borderRadius: '0.6rem', padding: '0.75rem' }}>
                 <span style={{ fontSize: '1.5rem' }}>{format.type === 'BANDEJA' ? '🌱' : '📦'}</span>
@@ -2572,6 +2589,9 @@ export default function Crops() {
                     {availableStock < 0
                       ? `Stock pendiente de regularizar: ${availableStock} unidades (no bloquea la cosecha)`
                       : `Stock disponible: ${availableStock} unidades`}
+                  </div>
+                  <div style={{ color: '#0369a1', fontSize: '0.75rem', fontWeight: 700 }}>
+                    Coste: {unitCost.toFixed(4)} €/ud · Gasto: {(unitCost * Number(newHarvest.packagingQuantities?.[format.id] || 0)).toFixed(2)} €
                   </div>
                 </div>
                 <input
@@ -2593,6 +2613,24 @@ export default function Crops() {
             <div style={{ textAlign: 'right', color: '#334155', fontWeight: 800 }}>
               Total: {Object.values(newHarvest.packagingQuantities || {}).reduce((sum, value) => sum + Number(value || 0), 0)} unidades
             </div>
+            {selectedHarvestProduct?.labelArticleId ? (
+              <div style={{ padding: '0.8rem', borderRadius: '0.6rem', background: '#eff6ff', border: '1px solid #bfdbfe', color: '#1e3a8a' }}>
+                <strong>🏷️ Etiquetas: {harvestLabelArticle?.name || 'Etiqueta asignada'}</strong>
+                <div style={{ fontSize: '0.78rem', marginTop: '0.25rem' }}>
+                  {estimatedLabelsCount} uds. · {articleUnitCost(selectedHarvestProduct.labelArticleId).toFixed(4)} €/ud · Gasto: <strong>{estimatedLabelCost.toFixed(2)} €</strong>
+                </div>
+              </div>
+            ) : newHarvest.productId && (
+              <div style={{ color: '#b45309', fontWeight: 700 }}>⚠️ Este producto no tiene etiqueta asignada. Asígnala en Administración → Productos.</div>
+            )}
+            {harvestUnits > 0 && (
+              <div style={{ textAlign: 'right', color: '#0f172a', fontWeight: 900 }}>
+                Gasto de envasado: {(estimatedPackagingCost + estimatedLabelCost).toFixed(2)} €
+                <div style={{ fontSize: '0.75rem', color: '#64748b' }}>
+                  Táperes {estimatedPackagingCost.toFixed(2)} € + etiquetas {estimatedLabelCost.toFixed(2)} €
+                </div>
+              </div>
+            )}
           </div>
         </div>
 
