@@ -1,8 +1,8 @@
 import { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
-  ArrowRight, Building2, CircleDollarSign, FileText, Package,
-  Receipt, Settings, ShieldCheck, ShoppingBag, TrendingUp, TriangleAlert, Users
+  ArrowRight, Building2, CircleDollarSign, Clock3, FileText, Package,
+  Receipt, ReceiptText, Settings, ShieldCheck, ShoppingBag, TrendingUp, TriangleAlert, Users, WalletCards
 } from 'lucide-react';
 import {
   Area, AreaChart, Bar, BarChart, CartesianGrid, Cell, Pie, PieChart,
@@ -55,7 +55,7 @@ const Metric = ({ icon, label, value, detail, tone, onClick }) => (
 
 export default function Dashboard() {
   const {
-    companyProfile, updateCompanyProfile, clients, orders, deliveryNotes,
+    companyProfile, updateCompanyProfile, clients, orders, deliveryNotes, invoices, expenses,
     products, articles, stockEntries, harvests, productMovements
   } = useData();
   const navigate = useNavigate();
@@ -111,9 +111,20 @@ export default function Dashboard() {
     const monthSales = periodOrders.reduce((sum, order) => sum + Number(order.total || 0), 0);
     const pendingOrders = (orders || []).filter(order => order.status !== 'DELIVERED');
     const pendingOrderValue = pendingOrders.reduce((sum, order) => sum + Number(order.total || 0), 0);
-    const pendingCollection = currentNotes
-      .filter(note => note.isPaid !== true)
-      .reduce((sum, note) => sum + Number(note.total || 0), 0);
+    const periodInvoices = (invoices || []).filter(invoice => inPeriod(invoice.date));
+    const collectedInvoices = periodInvoices.filter(invoice => invoice.isPaid === true);
+    const pendingInvoices = periodInvoices.filter(invoice => invoice.isPaid !== true);
+    const collected = collectedInvoices.reduce((sum, invoice) => sum + Number(invoice.total || 0), 0);
+    const pendingCollection = pendingInvoices.reduce((sum, invoice) => sum + Number(invoice.total || 0), 0);
+    const unbilledNotes = currentNotes.filter(note => note.invoiced !== true && !note.invoiceId);
+    const unbilledSales = unbilledNotes.reduce((sum, note) => sum + Number(note.total || 0), 0);
+    const periodExpenses = (expenses || []).filter(expense => inPeriod(expense.date));
+    const paidExpenses = periodExpenses
+      .filter(expense => expense.isPaid === true)
+      .reduce((sum, expense) => sum + Number(expense.total ?? expense.amount ?? 0), 0);
+    const pendingExpenses = periodExpenses
+      .filter(expense => expense.isPaid !== true)
+      .reduce((sum, expense) => sum + Number(expense.total ?? expense.amount ?? 0), 0);
     const periodHarvests = (harvests || [])
       .filter(harvest => inPeriod(harvest.harvestDate || harvest.createdAt));
     const seedExpenses = periodHarvests.reduce((sum, harvest) => sum + Number(harvest.seedCost || 0), 0);
@@ -238,7 +249,15 @@ export default function Dashboard() {
       averageTicket: periodOrders.length ? monthSales / periodOrders.length : 0,
       pendingOrders: pendingOrders.length,
       pendingOrderValue,
+      collected,
+      collectedInvoiceCount: collectedInvoices.length,
       pendingCollection,
+      pendingInvoiceCount: pendingInvoices.length,
+      unbilledSales,
+      unbilledNoteCount: unbilledNotes.length,
+      paidExpenses,
+      pendingExpenses,
+      expenseCount: periodExpenses.length,
       productionExpenses,
       seedExpenses,
       substrateExpenses,
@@ -249,7 +268,7 @@ export default function Dashboard() {
       productSales,
       lowStock
     };
-  }, [articles, clients, deliveryNotes, harvests, orders, productMovements, products, selectedBounds.end, selectedBounds.start, stockEntries]);
+  }, [articles, clients, deliveryNotes, expenses, harvests, invoices, orders, productMovements, products, selectedBounds.end, selectedBounds.start, stockEntries]);
 
   const saveCompany = async event => {
     event.preventDefault();
@@ -327,6 +346,27 @@ export default function Dashboard() {
         <Metric icon={<ShoppingBag />} label="Pedidos abiertos" value={data.pendingOrders} detail={money(data.pendingOrderValue)} tone="purple" onClick={() => navigate('/admin/orders')} />
         <Metric icon={<Receipt />} label="Costes de producción" value={money(data.productionExpenses)} detail={`Semillas ${money(data.seedExpenses)} · Sustrato ${money(data.substrateExpenses)} · Táperes ${money(data.packagingExpenses)} · Etiquetas ${money(data.labelExpenses)}`} tone="amber" onClick={() => openFinancial('harvests')} />
         <Metric icon={<TrendingUp />} label="Margen del periodo" value={money(data.margin)} detail={`${data.marginPercent.toFixed(1)} % · Ventas menos producción`} tone="green" onClick={() => openFinancial('summary')} />
+      </section>
+
+      <section className="admin-financial-overview" aria-label="Situación financiera del periodo">
+        <header>
+          <div><span>SITUACIÓN FINANCIERA</span><strong>Facturación, cobros y gastos</strong></div>
+          <button type="button" onClick={() => openFinancial('receivables')}>Ver detalle <ArrowRight size={15} /></button>
+        </header>
+        <div className="admin-financial-cards">
+          <button type="button" onClick={() => openFinancial('receivables')}>
+            <CircleDollarSign /><span>Facturas cobradas</span><strong>{money(data.collected)}</strong><small>{data.collectedInvoiceCount} facturas</small>
+          </button>
+          <button type="button" className="is-pending" onClick={() => openFinancial('receivables')}>
+            <Clock3 /><span>Pendiente de cobro</span><strong>{money(data.pendingCollection)}</strong><small>{data.pendingInvoiceCount} facturas</small>
+          </button>
+          <button type="button" className="is-unbilled" onClick={() => openFinancial('receivables')}>
+            <ReceiptText /><span>Pendiente de facturar</span><strong>{money(data.unbilledSales)}</strong><small>{data.unbilledNoteCount} albaranes</small>
+          </button>
+          <button type="button" className="is-expense" onClick={() => openFinancial('expenses')}>
+            <WalletCards /><span>Gastos</span><strong>{money(data.paidExpenses + data.pendingExpenses)}</strong><small>{money(data.paidExpenses)} pagado · {money(data.pendingExpenses)} pendiente</small>
+          </button>
+        </div>
       </section>
 
       <section className="admin-insights-grid">
