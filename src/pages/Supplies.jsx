@@ -2,9 +2,10 @@ import { useState, useMemo } from 'react';
 import { useData } from '../context/DataContext';
 import { usePagination } from '../hooks/usePagination';
 import { useAdminMode } from '../context/AdminModeContext';
+import { buildProcurementPlan, procurementActionLabel, procurementCounts } from '../utils/procurementPlan';
 import Swal from 'sweetalert2';
 
-export default function Supplies() {
+export default function Supplies({ initialTab = 'INVENTORY' }) {
   const { 
     providers,
     seedVarieties, addSeedVariety, updateSeedVariety, deleteSeedVariety,
@@ -12,11 +13,13 @@ export default function Supplies() {
     stockEntries, stockLots, purchaseDeliveryNotes, purchaseDeliveryNoteLines,
     receivePurchaseDeliveryNote, updatePurchaseDeliveryNote, deletePurchaseDeliveryNote,
     deleteStockEntry,
-    cropTypes, addCropType, updateCropType, deleteCropType
+    cropTypes, addCropType, updateCropType, deleteCropType,
+    products, orders
   } = useData();
   const { isAdminMode, requireAdmin } = useAdminMode();
 
-  const [activeTab, setActiveTab] = useState('INVENTORY');
+  const [activeTab, setActiveTab] = useState(initialTab);
+  const [procurementFilter, setProcurementFilter] = useState('ALL');
   const [searchTerm, setSearchTerm] = useState('');
 
   // Expenses Filters
@@ -418,6 +421,18 @@ export default function Supplies() {
       return sum + (totalIn * avgCost);
     }, 0) || 0;
 
+  const procurementPlan = useMemo(() => buildProcurementPlan({
+    articles, stockLots, products, orders, providers
+  }), [articles, stockLots, products, orders, providers]);
+  const procurementSummary = useMemo(() => procurementCounts(procurementPlan), [procurementPlan]);
+  const visibleProcurement = procurementPlan.filter(item => {
+    if (item.required <= 0) return false;
+    if (procurementFilter === 'URGENT') return item.urgency === 'URGENT';
+    if (procurementFilter === 'RECOMMENDED') return item.urgency === 'RECOMMENDED';
+    if (['PRINT', 'ORDER', 'BUY'].includes(procurementFilter)) return item.action === procurementFilter;
+    return true;
+  });
+
   // Modal Styles
   const modalOverlayStyle = { position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 50 };
   const modalCardStyle = { width: '100%', maxWidth: '700px', margin: '20px', maxHeight: '90vh', overflowY: 'auto', backgroundColor: '#fff', padding: '2rem', borderRadius: '8px', border: '1px solid var(--color-border)' };
@@ -432,6 +447,7 @@ export default function Supplies() {
       </div>
 
       <div className="admin-tabs" style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem' }}>
+        <button className={`admin-tab ${activeTab === 'PROCUREMENT' ? 'active' : ''}`} onClick={() => setActiveTab('PROCUREMENT')}>Plan de aprovisionamiento</button>
         <button className={`admin-tab ${activeTab === 'INVENTORY' ? 'active' : ''}`} onClick={() => setActiveTab('INVENTORY')}>Inventario (Stock)</button>
         <button className={`admin-tab ${activeTab === 'CATALOG' ? 'active' : ''}`} onClick={() => setActiveTab('CATALOG')}>Catálogo de Artículos</button>
         <button className={`admin-tab ${activeTab === 'VARIETIES' ? 'active' : ''}`} onClick={() => setActiveTab('VARIETIES')}>Variedades</button>
@@ -441,11 +457,57 @@ export default function Supplies() {
         <button className={`admin-tab ${activeTab === 'CROP_TYPES_LIST' ? 'active' : ''}`} onClick={() => setActiveTab('CROP_TYPES_LIST')}>Fichas de Cultivo</button>
       </div>
 
-      {activeTab !== 'EXPENSES' && (
+      {!['EXPENSES', 'PROCUREMENT'].includes(activeTab) && (
         <div className="admin-toolbar">
           <div className="admin-search">
             <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" width="18" height="18"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>
             <input type="text" placeholder="Buscar..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} />
+          </div>
+        </div>
+      )}
+
+      {activeTab === 'PROCUREMENT' && (
+        <div className="procurement-plan" style={{ animation: 'fadeIn 0.3s ease' }}>
+          <header className="procurement-hero">
+            <div>
+              <span className="procurement-eyebrow">DECISIONES DE ESTA SEMANA</span>
+              <h3>Plan de aprovisionamiento</h3>
+              <p>Qué pedir, comprar o imprimir según el stock mínimo y la previsión media de las últimas 8 semanas.</p>
+            </div>
+            <button className="btn btn-primary" type="button" onClick={openNewPurchaseNote}>+ Registrar entrada</button>
+          </header>
+
+          <div className="procurement-metrics">
+            <button className={procurementFilter === 'URGENT' ? 'active urgent' : 'urgent'} onClick={() => setProcurementFilter('URGENT')}><span>Urgente</span><strong>{procurementSummary.urgent}</strong><small>Por debajo del mínimo</small></button>
+            <button className={procurementFilter === 'RECOMMENDED' ? 'active recommended' : 'recommended'} onClick={() => setProcurementFilter('RECOMMENDED')}><span>Recomendado</span><strong>{procurementSummary.recommended}</strong><small>Por previsión de ventas</small></button>
+            <button className={procurementFilter === 'ORDER' ? 'active' : ''} onClick={() => setProcurementFilter('ORDER')}><span>Pedir</span><strong>{procurementSummary.ORDER}</strong><small>A proveedores</small></button>
+            <button className={procurementFilter === 'PRINT' ? 'active print' : 'print'} onClick={() => setProcurementFilter('PRINT')}><span>Imprimir</span><strong>{procurementSummary.PRINT}</strong><small>Etiquetas</small></button>
+          </div>
+
+          <div className="procurement-filterbar">
+            <div>
+              {[['ALL', 'Todo'], ['URGENT', 'Urgente'], ['RECOMMENDED', 'Recomendaciones'], ['ORDER', 'Pedir'], ['BUY', 'Comprar'], ['PRINT', 'Imprimir']].map(([value, label]) => (
+                <button key={value} className={procurementFilter === value ? 'active' : ''} onClick={() => setProcurementFilter(value)}>{label}</button>
+              ))}
+            </div>
+            <span>{visibleProcurement.length} acciones pendientes</span>
+          </div>
+
+          <div className="procurement-list">
+            {visibleProcurement.map(item => (
+              <article key={item.id} className={`procurement-row ${item.urgency.toLowerCase()}`}>
+                <div className={`procurement-action ${item.action.toLowerCase()}`}><span>{item.action === 'PRINT' ? '▤' : item.action === 'ORDER' ? '↗' : '＋'}</span><strong>{procurementActionLabel(item.action)}</strong></div>
+                <div className="procurement-product"><strong>{item.name}</strong><span>{item.providerName}</span></div>
+                <div className="procurement-numbers">
+                  <span><small>Hay</small><b>{item.stock.toFixed(item.unit === 'ud' ? 0 : 1)} {item.unit}</b></span>
+                  <span><small>Mínimo</small><b>{item.minimum} {item.unit}</b></span>
+                  {item.type === 'ETIQUETA' && <span><small>Previsión</small><b>{item.forecast} / semana</b></span>}
+                  <span><small>Objetivo</small><b>{item.target} {item.unit}</b></span>
+                </div>
+                <div className="procurement-result"><small>{item.reason}</small><strong>{procurementActionLabel(item.action)} {item.required} {item.unit}</strong>{item.unitCost > 0 && <span>≈ {(item.required * item.unitCost).toFixed(2)} €</span>}</div>
+              </article>
+            ))}
+            {!visibleProcurement.length && <div className="procurement-empty"><strong>Todo cubierto</strong><span>No hay acciones pendientes para este filtro.</span></div>}
           </div>
         </div>
       )}

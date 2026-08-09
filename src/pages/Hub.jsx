@@ -1,6 +1,7 @@
 import { useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import StockAlerts from '../components/StockAlerts';
+import ProcurementSummary from '../components/ProcurementSummary';
 import { useAuth } from '../context/AuthContext';
 
 export default function Hub() {
@@ -30,6 +31,7 @@ export default function Hub() {
         </div>
 
         {(hasPermission('stock') || hasPermission('administration')) && <StockAlerts />}
+        {(hasPermission('stock') || hasPermission('administration')) && <ProcurementSummary />}
 
         <div className="hub-grid">
           

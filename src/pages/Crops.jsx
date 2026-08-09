@@ -319,9 +319,9 @@ export default function Crops() {
   useEffect(() => {
     const action = searchParams.get('action');
     const requestedTab = searchParams.get('tab');
-    if (requestedTab === 'trazabilidad') {
-      setActiveTab('trazabilidad');
-      setSearchParams({}, { replace: true });
+    if (requestedTab === 'trazabilidad' || requestedTab === 'stock') {
+      setActiveTab(requestedTab);
+      if (requestedTab === 'trazabilidad') setSearchParams({}, { replace: true });
       return;
     }
     if (action === 'sow') {
@@ -2312,7 +2312,7 @@ export default function Crops() {
         {activeTab === 'trazabilidad' && <TraceabilityExplorer />}
         {activeTab === 'historial' && renderHistorial()}
         {activeTab === 'pedidos' && renderPedidos()}
-        {activeTab === 'stock' && <Supplies />}
+        {activeTab === 'stock' && <Supplies initialTab={searchParams.get('section') === 'procurement' ? 'PROCUREMENT' : 'INVENTORY'} />}
       </div>
       
     
