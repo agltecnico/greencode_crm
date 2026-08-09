@@ -33,7 +33,7 @@ export default function Supplies() {
   const [editedArticle, setEditedArticle] = useState(null);
   const [editingCropTypeId, setEditingCropTypeId] = useState(null);
   const [editedCropType, setEditedCropType] = useState(null);
-  const [newStockEntry, setNewStockEntry] = useState({ purchaseDate: new Date().toISOString().split('T')[0], deliveryNote: '', batchNumber: '', articleId: '', providerId: '', quantity: 1, price: 0 });
+  const [newStockEntry, setNewStockEntry] = useState({ purchaseDate: new Date().toISOString().split('T')[0], deliveryNote: '', batchNumber: '', articleId: '', providerId: '', quantity: 1, price: 0, packageCount: 1, packageLiters: 50 });
   const [purchaseLines, setPurchaseLines] = useState([]);
   
   const [newType, setNewType] = useState({
@@ -48,15 +48,20 @@ export default function Supplies() {
   const [editingPurchaseNoteId, setEditingPurchaseNoteId] = useState(null);
 
   const isWeightPurchase = article => article?.type === 'SEMILLA' || article?.unit === 'g';
+  const isSubstratePurchase = article => article?.type === 'SUSTRATO' || article?.unit === 'l';
   const purchasePriceLabel = article => {
     if (isWeightPurchase(article)) return 'Precio por kilo (€/kg)';
-    if (article?.unit === 'l' || article?.type === 'SUSTRATO') return 'Precio por litro (€/l)';
+    if (isSubstratePurchase(article)) return 'Precio por litro (€/l)';
     return 'Precio por unidad (€/ud)';
   };
   const purchasePriceFromLine = (article, line) =>
     Number(line?.unitCost || 0) * (isWeightPurchase(article) ? 1000 : 1);
-  const purchaseTotalCost = (article, quantity, purchasePrice) =>
-    Number(quantity || 0) * Number(purchasePrice || 0) / (isWeightPurchase(article) ? 1000 : 1);
+  const purchaseTotalCost = (article, quantity, purchasePrice, packageCount = null) => {
+    if (isSubstratePurchase(article) && packageCount !== null) {
+      return Number(packageCount || 0) * Number(purchasePrice || 0);
+    }
+    return Number(quantity || 0) * Number(purchasePrice || 0) / (isWeightPurchase(article) ? 1000 : 1);
+  };
 
   const resetPurchaseModal = () => {
     setEditingPurchaseNoteId(null);
@@ -67,7 +72,9 @@ export default function Supplies() {
       articleId: '',
       providerId: '',
       quantity: 1,
-      price: 0
+      price: 0,
+      packageCount: 1,
+      packageLiters: 50
     });
     setPurchaseLines([]);
   };
@@ -134,9 +141,12 @@ export default function Supplies() {
         totalCost: purchaseTotalCost(
           articles?.find(item => item.id === newStockEntry.articleId),
           newStockEntry.quantity,
-          newStockEntry.price
+          newStockEntry.price,
+          isSubstratePurchase(articles?.find(item => item.id === newStockEntry.articleId)) ? newStockEntry.packageCount : null
         ),
-        purchaseUnitPrice: Number(newStockEntry.price)
+        purchaseUnitPrice: Number(newStockEntry.price),
+        packageCount: isSubstratePurchase(articles?.find(item => item.id === newStockEntry.articleId)) ? Number(newStockEntry.packageCount) : null,
+        packageLiters: isSubstratePurchase(articles?.find(item => item.id === newStockEntry.articleId)) ? Number(newStockEntry.packageLiters) : null
       } : null;
       const lines = [...purchaseLines, ...(pendingLine ? [pendingLine] : [])];
       if (lines.length === 0) {
@@ -150,7 +160,7 @@ export default function Supplies() {
           articleId: line.articleId,
           supplierBatch: line.supplierBatch,
           quantity: Number(line.quantity),
-          totalCost: purchaseTotalCost(article, line.quantity, line.purchaseUnitPrice)
+          totalCost: purchaseTotalCost(article, line.quantity, line.purchaseUnitPrice, line.packageCount)
         };
       });
       const result = editingPurchaseNoteId
@@ -202,11 +212,14 @@ export default function Supplies() {
       totalCost: purchaseTotalCost(
         articles?.find(item => item.id === newStockEntry.articleId),
         newStockEntry.quantity,
-        newStockEntry.price
+        newStockEntry.price,
+        isSubstratePurchase(articles?.find(item => item.id === newStockEntry.articleId)) ? newStockEntry.packageCount : null
       ),
-      purchaseUnitPrice: Number(newStockEntry.price)
+      purchaseUnitPrice: Number(newStockEntry.price),
+      packageCount: isSubstratePurchase(articles?.find(item => item.id === newStockEntry.articleId)) ? Number(newStockEntry.packageCount) : null,
+      packageLiters: isSubstratePurchase(articles?.find(item => item.id === newStockEntry.articleId)) ? Number(newStockEntry.packageLiters) : null
     }]);
-    setNewStockEntry(previous => ({ ...previous, articleId: '', batchNumber: '', quantity: 1, price: 0 }));
+    setNewStockEntry(previous => ({ ...previous, articleId: '', batchNumber: '', quantity: 1, price: 0, packageCount: 1, packageLiters: 50 }));
   };
 
   const runAdminDelete = async (message, action) => {
@@ -373,6 +386,8 @@ export default function Supplies() {
   const substrates = articles?.filter(a => a.type === 'SUSTRATO') || [];
   const containers = articles?.filter(a => a.type === 'ENVASE' || a.type === 'BANDEJA' || a.type === 'SUMINISTROS') || [];
   const selectedArticleType = newStockEntry.articleId ? articles?.find(a => a.id === newStockEntry.articleId)?.type : null;
+  const selectedPurchaseArticle = newStockEntry.articleId ? articles?.find(a => a.id === newStockEntry.articleId) : null;
+  const selectedPurchaseIsSubstrate = isSubstratePurchase(selectedPurchaseArticle);
   const isExpenseOnly = ['GASTO_FIJO', 'SUMINISTROS', 'MANTENIMIENTO', 'MARKETING', 'NOMINAS', 'BANDEJA'].includes(selectedArticleType);
 
   const getLiveCosts = (formData) => {
@@ -1264,7 +1279,11 @@ export default function Supplies() {
                 <>
               <div style={{ gridColumn: 'span 2' }}>
                 <label className="form-label">Artículo (Semilla, Luz...)</label>
-                <select required={purchaseLines.length === 0} className="form-control" value={newStockEntry.articleId} onChange={e => setNewStockEntry({...newStockEntry, articleId: e.target.value, batchNumber: ''})}>
+                <select required={purchaseLines.length === 0} className="form-control" value={newStockEntry.articleId} onChange={e => {
+                  const article = articles?.find(item => item.id === e.target.value);
+                  const substrate = isSubstratePurchase(article);
+                  setNewStockEntry({ ...newStockEntry, articleId: e.target.value, batchNumber: '', packageCount: 1, packageLiters: 50, quantity: substrate ? 50 : 1, price: 0 });
+                }}>
                   <option value="">Selecciona...</option>
                   {articles?.filter(a => a.active !== false && a.providerId === newStockEntry.providerId).map(a => <option key={a.id} value={a.id}>{getTypeLabel(a.type)} - {a.name}</option>)}
                 </select>
@@ -1277,16 +1296,40 @@ export default function Supplies() {
                 <label className="form-label">Lote (Para Trazabilidad)</label>
                 <input required={Boolean(newStockEntry.articleId) && !isExpenseOnly} type="text" className="form-control" placeholder="Lote del proveedor" disabled={!newStockEntry.articleId || isExpenseOnly} value={newStockEntry.batchNumber} onChange={e => setNewStockEntry({...newStockEntry, batchNumber: e.target.value})} />
               </div>
+              {selectedPurchaseIsSubstrate ? (
+                <>
+                  <div>
+                    <label className="form-label">Cantidad de sacos</label>
+                    <input required type="number" min="1" step="1" className="form-control" value={newStockEntry.packageCount} onChange={e => {
+                      const packageCount = Number(e.target.value);
+                      setNewStockEntry({ ...newStockEntry, packageCount, quantity: packageCount * Number(newStockEntry.packageLiters || 0) });
+                    }} />
+                  </div>
+                  <div>
+                    <label className="form-label">Capacidad del saco</label>
+                    <select className="form-control" value={newStockEntry.packageLiters} onChange={e => {
+                      const packageLiters = Number(e.target.value);
+                      setNewStockEntry({ ...newStockEntry, packageLiters, quantity: Number(newStockEntry.packageCount || 0) * packageLiters });
+                    }}>
+                      <option value="50">50 litros</option>
+                      <option value="70">70 litros</option>
+                    </select>
+                  </div>
+                </>
+              ) : (
+                <div>
+                  <label className="form-label">Cant. ({selectedArticleType ? getUnitLabel(selectedArticleType) : 'Uds'})</label>
+                  <input required={Boolean(newStockEntry.articleId)} disabled={!newStockEntry.articleId} type="number" min="0.01" step="0.01" className="form-control" value={newStockEntry.quantity} onChange={e => setNewStockEntry({...newStockEntry, quantity: Number(e.target.value)})} />
+                </div>
+              )}
               <div>
-                <label className="form-label">Cant. ({selectedArticleType ? getUnitLabel(selectedArticleType) : 'Uds'})</label>
-                <input required={Boolean(newStockEntry.articleId)} disabled={!newStockEntry.articleId} type="number" min="0.01" step="0.01" className="form-control" value={newStockEntry.quantity} onChange={e => setNewStockEntry({...newStockEntry, quantity: Number(e.target.value)})} />
-              </div>
-              <div>
-                <label className="form-label">{purchasePriceLabel(articles?.find(item => item.id === newStockEntry.articleId))}</label>
+                <label className="form-label">{selectedPurchaseIsSubstrate ? 'Precio por saco (€/saco)' : purchasePriceLabel(selectedPurchaseArticle)}</label>
                 <input required={Boolean(newStockEntry.articleId)} disabled={!newStockEntry.articleId} type="number" step="0.01" min="0" className="form-control" value={newStockEntry.price} onChange={e => setNewStockEntry({...newStockEntry, price: Number(e.target.value)})} />
                 {newStockEntry.articleId && (
                   <small className="text-muted">
-                    Total calculado: {purchaseTotalCost(articles?.find(item => item.id === newStockEntry.articleId), newStockEntry.quantity, newStockEntry.price).toFixed(2)} €
+                    {selectedPurchaseIsSubstrate && <>{newStockEntry.packageCount} sacos × {newStockEntry.packageLiters} L = <strong>{newStockEntry.quantity} litros</strong> · </>}
+                    Total calculado: {purchaseTotalCost(selectedPurchaseArticle, newStockEntry.quantity, newStockEntry.price, selectedPurchaseIsSubstrate ? newStockEntry.packageCount : null).toFixed(2)} €
+                    {selectedPurchaseIsSubstrate && Number(newStockEntry.quantity) > 0 && <> · {(purchaseTotalCost(selectedPurchaseArticle, newStockEntry.quantity, newStockEntry.price, newStockEntry.packageCount) / Number(newStockEntry.quantity)).toFixed(4)} €/L</>}
                   </small>
                 )}
               </div>
@@ -1306,7 +1349,7 @@ export default function Supplies() {
                   </div>
                   {purchaseLines.map((line, index) => {
                     const article = articles?.find(item => item.id === line.articleId);
-                    const calculatedTotal = purchaseTotalCost(article, line.quantity, line.purchaseUnitPrice);
+                    const calculatedTotal = purchaseTotalCost(article, line.quantity, line.purchaseUnitPrice, line.packageCount);
                     return (
                       <div key={line.id} style={{ display: 'grid', gridTemplateColumns: editingPurchaseNoteId ? '1.2fr 1fr 0.8fr 1fr auto' : '1fr auto auto auto', gap: '0.75rem', alignItems: 'end', padding: '0.75rem 1rem', borderTop: '1px solid #e2e8f0' }}>
                         <div>
@@ -1352,7 +1395,11 @@ export default function Supplies() {
                           </>
                         ) : (
                           <>
-                            <span>{line.quantity} {article?.unit || getUnitLabel(article?.type)}</span>
+                            <span>
+                              {line.packageCount !== null && line.packageCount !== undefined
+                                ? `${line.packageCount} sacos × ${line.packageLiters} L = ${line.quantity} L`
+                                : `${line.quantity} ${article?.unit || getUnitLabel(article?.type)}`}
+                            </span>
                             <strong>{calculatedTotal.toFixed(2)} €</strong>
                             <button type="button" className="btn btn-danger" onClick={() => setPurchaseLines(previous => previous.filter((_, itemIndex) => itemIndex !== index))}>Quitar</button>
                           </>
@@ -1363,7 +1410,7 @@ export default function Supplies() {
                   <div style={{ padding: '0.75rem 1rem', borderTop: '1px solid #cbd5e1', textAlign: 'right', fontWeight: 'bold' }}>
                     Total: {purchaseLines.reduce((sum, line) => {
                       const article = articles?.find(item => item.id === line.articleId);
-                      return sum + purchaseTotalCost(article, line.quantity, line.purchaseUnitPrice);
+                      return sum + purchaseTotalCost(article, line.quantity, line.purchaseUnitPrice, line.packageCount);
                     }, 0).toFixed(2)} €
                   </div>
                 </div>
