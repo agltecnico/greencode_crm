@@ -638,6 +638,44 @@
   align-items: start;
 }
 
+.tv-screen-profile {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: 1.4rem;
+  padding: 0.75rem 1rem;
+  border: 1px solid #334155;
+  border-radius: 14px;
+  background: rgba(15, 23, 42, 0.92);
+}
+.tv-screen-profile div { display: flex; align-items: baseline; gap: 0.75rem; }
+.tv-screen-profile span { color: #64748b; font-size: 0.72rem; font-weight: 900; letter-spacing: 0.14em; }
+.tv-screen-profile strong { color: #f8fafc; font-size: 1rem; }
+.tv-screen-profile select { min-width: 260px; padding: 0.65rem 0.8rem; border-radius: 9px; border: 1px solid #475569; background: #1e293b; color: white; font-weight: 800; }
+
+.tv-crop-toolbar { display: flex; flex-wrap: wrap; gap: 0.55rem; margin-bottom: 0.8rem; }
+.tv-crop-toolbar button { display: flex; align-items: center; gap: 0.55rem; padding: 0.58rem 0.8rem; border-radius: 9px; border: 1px solid #334155; background: #1e293b; color: #cbd5e1; font-weight: 800; cursor: pointer; }
+.tv-crop-toolbar button strong { min-width: 1.6rem; padding: 0.1rem 0.35rem; border-radius: 999px; background: #334155; color: white; }
+.tv-crop-toolbar button.active { border-color: #34d399; background: rgba(16, 185, 129, 0.16); color: #6ee7b7; }
+.tv-crop-toolbar button.active strong { background: #10b981; }
+
+.tv-crop-table-wrap { overflow: hidden; border: 1px solid #334155; border-radius: 14px; background: rgba(15, 23, 42, 0.86); }
+.tv-crop-table { width: 100%; border-collapse: collapse; table-layout: fixed; color: #e2e8f0; }
+.tv-crop-table th { padding: 0.65rem 1rem; background: #1e293b; color: #94a3b8; font-size: 0.7rem; letter-spacing: 0.08em; text-transform: uppercase; text-align: left; }
+.tv-crop-table th:first-child { width: 38%; }
+.tv-crop-table th:last-child, .tv-crop-table td:last-child { text-align: center; }
+.tv-crop-table td { height: 48px; padding: 0.48rem 1rem; border-top: 1px solid #1e293b; font-size: 0.92rem; }
+.tv-crop-table td:first-child strong, .tv-crop-table td:first-child small { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.tv-crop-table td:first-child strong { color: white; font-size: 1rem; }
+.tv-crop-table td:first-child small { color: #64748b; font-family: monospace; margin-top: 0.1rem; }
+.tv-tray-count { display: inline-flex; min-width: 2.3rem; height: 2.3rem; align-items: center; justify-content: center; border-radius: 9px; background: rgba(16, 185, 129, 0.16); color: #6ee7b7; font-size: 1.2rem; }
+.tv-crop-empty { padding: 4rem; text-align: center; color: #64748b; font-size: 1.2rem; }
+.tv-pagination { display: flex; align-items: center; justify-content: space-between; margin-top: 0.8rem; color: #94a3b8; font-size: 0.8rem; }
+.tv-pagination > div { display: flex; align-items: center; gap: 0.75rem; }
+.tv-pagination button { padding: 0.5rem 0.75rem; border: 1px solid #475569; border-radius: 8px; background: #1e293b; color: white; font-weight: 800; cursor: pointer; }
+.tv-pagination button:disabled { opacity: 0.35; cursor: default; }
+
 .tv-stock-column {
   overflow: hidden;
   border: 1px solid #334155;

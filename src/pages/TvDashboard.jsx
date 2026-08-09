@@ -1,11 +1,20 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import EmployeeTasks from '../components/EmployeeTasks';
 import { useData } from '../context/DataContext';
 import '../crops.css';
 
 export default function TvDashboard() {
-  const [tvTab, setTvTab] = useState('tasks');
-  const { crops, cropTypes, seeds, articles, advanceCropStatus, refreshData, orders, clients, products, productMovements, packagingFormats } = useData();
+  const tvViews = ['tasks', 'greenhouse', 'climate', 'orders', 'stock'];
+  const [screenMode, setScreenMode] = useState(() => {
+    const urlView = new URLSearchParams(window.location.search).get('view');
+    if (tvViews.includes(urlView)) return urlView;
+    const savedView = localStorage.getItem('greencode_tv_screen_mode');
+    return savedView === 'rotate' || tvViews.includes(savedView) ? savedView : 'rotate';
+  });
+  const [tvTab, setTvTab] = useState(() => screenMode === 'rotate' ? 'tasks' : screenMode);
+  const [cropStatusFilter, setCropStatusFilter] = useState('ALL');
+  const [cropPage, setCropPage] = useState(1);
+  const { crops, cropTypes, seeds, refreshData, orders, clients, products, productMovements } = useData();
 
   const translateStatus = (status) => {
     const statusMap = {
@@ -15,6 +24,7 @@ export default function TvDashboard() {
         'DARKNESS': 'Oscuridad',
         'LIGHT': 'Luz',
       'GROWING': 'Creciendo',
+      'READY': 'Listo para cosechar',
       'HARVESTED': 'Cosechado',
       'DISCARDED': 'Descartado'
     };
@@ -22,15 +32,31 @@ export default function TvDashboard() {
     return statusMap[normalized] || status;
   };
 
-  const activeCropsList = crops?.filter(c => c.status !== 'HARVESTED' && c.status !== 'DISCARDED') || [];
+  const activeCropsList = useMemo(() => crops?.filter(c => c.status !== 'HARVESTED' && c.status !== 'DISCARDED') || [], [crops]);
   const cropStatusTone = {
     SOAKING: 'blue',
     SOWED: 'green',
     GERMINATING: 'green',
     DARKNESS: 'violet',
     LIGHT: 'amber',
-    GROWING: 'green'
+    GROWING: 'green',
+    READY: 'green'
   };
+
+  const cropsPerPage = 12;
+  const filteredCrops = useMemo(() => activeCropsList
+    .filter(crop => cropStatusFilter === 'ALL' || String(crop.status || '').toUpperCase() === cropStatusFilter)
+    .sort((a, b) => new Date(a.datePlanted || 0) - new Date(b.datePlanted || 0)), [activeCropsList, cropStatusFilter]);
+  const cropPageCount = Math.max(1, Math.ceil(filteredCrops.length / cropsPerPage));
+  const visibleCrops = filteredCrops.slice((cropPage - 1) * cropsPerPage, cropPage * cropsPerPage);
+
+  useEffect(() => {
+    localStorage.setItem('greencode_tv_screen_mode', screenMode);
+    const url = new URL(window.location.href);
+    if (screenMode === 'rotate') url.searchParams.delete('view');
+    else url.searchParams.set('view', screenMode);
+    window.history.replaceState({}, '', url);
+  }, [screenMode]);
 
   useEffect(() => {
     // Auto-refresh data every 30 seconds for TV Mode
@@ -43,6 +69,7 @@ export default function TvDashboard() {
 
 
   useEffect(() => {
+    if (screenMode !== 'rotate') return undefined;
     const tabs = ['tasks', 'greenhouse', 'climate', 'orders', 'stock'];
     const rotateInterval = setInterval(() => {
       setTvTab(prev => {
@@ -51,10 +78,26 @@ export default function TvDashboard() {
       });
     }, 15000); // Rotate every 15 seconds
     return () => clearInterval(rotateInterval);
-  }, []);
+  }, [screenMode]);
 
   return (
     <div className="tv-mode" style={{ minHeight: "100vh" }}>
+      <div className="tv-screen-profile">
+        <div><span>PANTALLA</span><strong>{screenMode === 'rotate' ? 'Rotación general' : screenMode === 'greenhouse' ? 'Sala de cultivos' : screenMode === 'orders' ? 'Sala de cosecha y pedidos' : screenMode === 'tasks' ? 'Tareas del equipo' : screenMode === 'stock' ? 'Stock de nevera' : 'Clima'}</strong></div>
+        <select value={screenMode} onChange={event => {
+          const nextMode = event.target.value;
+          setScreenMode(nextMode);
+          if (nextMode !== 'rotate') setTvTab(nextMode);
+        }} aria-label="Perfil de esta pantalla">
+          <option value="rotate">Rotación general</option>
+          <option value="greenhouse">Sala de cultivos</option>
+          <option value="orders">Sala de cosecha · Pedidos</option>
+          <option value="tasks">Tareas del equipo</option>
+          <option value="stock">Stock de nevera</option>
+          <option value="climate">Clima</option>
+        </select>
+      </div>
+      {screenMode === 'rotate' && (
       <div style={{ display: 'flex', gap: '1rem', marginBottom: '3rem', justifyContent: 'center' }}>
         <button 
           onClick={() => setTvTab('tasks')}
@@ -146,6 +189,7 @@ export default function TvDashboard() {
         </button>
 
       </div>
+      )}
 
         {tvTab === 'tasks' && (
           <EmployeeTasks />
@@ -160,25 +204,42 @@ export default function TvDashboard() {
               </div>
               <span className="tv-summary-badge">{activeCropsList.length} lotes activos</span>
             </div>
-            <div className="tv-info-grid">
-              {activeCropsList.map(crop => {
-                const cType = cropTypes?.find(c => c.id === crop.cropTypeId) || seeds?.find(s => s.id === crop.seedId);
-                const daysAlive = Math.floor((new Date() - new Date(crop.datePlanted)) / (1000 * 60 * 60 * 24));
-                
-                return (
-                  <div key={crop.id} className="tv-info-card" data-tone={cropStatusTone[crop.status] || 'slate'}>
-                    <div className="tv-card-topline">
-                      <span className={`tv-label ${cropStatusTone[crop.status] || 'slate'}`}>{translateStatus(crop.status)}</span>
-                      <span className="tv-label neutral">Día {daysAlive}</span>
-                    </div>
-                    <h3>{cType?.name || 'Variedad desconocida'}</h3>
-                    <div className="tv-label-row">
-                      <span className="tv-label neutral">Lote {crop.batchNumber || 'sin lote'}</span>
-                      <span className="tv-label green">{crop.traysCount || 0} bandejas</span>
-                    </div>
-                  </div>
-                );
-              })}
+            <div className="tv-crop-toolbar">
+              {[
+                ['ALL', 'Todos'], ['SOAKING', 'Remojo'], ['GERMINATING', 'Germinación'],
+                ['DARKNESS', 'Oscuridad'], ['LIGHT', 'Luz'], ['READY', 'Listos']
+              ].map(([value, label]) => (
+                <button key={value} className={cropStatusFilter === value ? 'active' : ''} onClick={() => { setCropStatusFilter(value); setCropPage(1); }}>
+                  {label}
+                  <strong>{value === 'ALL' ? activeCropsList.length : activeCropsList.filter(crop => String(crop.status || '').toUpperCase() === value).length}</strong>
+                </button>
+              ))}
+            </div>
+            <div className="tv-crop-table-wrap">
+              <table className="tv-crop-table">
+                <thead><tr><th>Variedad y lote</th><th>Fase</th><th>Día</th><th>Inicio</th><th>Bandejas</th></tr></thead>
+                <tbody>
+                  {visibleCrops.map(crop => {
+                    const cType = cropTypes?.find(type => type.id === crop.cropTypeId) || seeds?.find(seed => seed.id === crop.seedId);
+                    const planted = new Date(crop.datePlanted);
+                    const daysAlive = Math.max(0, Math.floor((new Date() - planted) / 86_400_000));
+                    return (
+                      <tr key={crop.id}>
+                        <td><strong>{cType?.name || 'Variedad desconocida'}</strong><small>{crop.cultivationBatchNumber || crop.batchNumber || 'Sin lote'}</small></td>
+                        <td><span className={`tv-label ${cropStatusTone[crop.status] || 'slate'}`}>{translateStatus(crop.status)}</span></td>
+                        <td><strong>Día {daysAlive}</strong></td>
+                        <td>{Number.isNaN(planted.getTime()) ? '—' : planted.toLocaleDateString('es-ES', { day: '2-digit', month: '2-digit' })}</td>
+                        <td><strong className="tv-tray-count">{crop.traysCount || 0}</strong></td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+              {filteredCrops.length === 0 && <div className="tv-crop-empty">No hay cultivos en esta fase.</div>}
+            </div>
+            <div className="tv-pagination">
+              <span>Mostrando {filteredCrops.length ? (cropPage - 1) * cropsPerPage + 1 : 0}–{Math.min(cropPage * cropsPerPage, filteredCrops.length)} de {filteredCrops.length}</span>
+              <div><button disabled={cropPage <= 1} onClick={() => setCropPage(page => Math.max(1, page - 1))}>← Anterior</button><strong>Página {cropPage} / {cropPageCount}</strong><button disabled={cropPage >= cropPageCount} onClick={() => setCropPage(page => Math.min(cropPageCount, page + 1))}>Siguiente →</button></div>
             </div>
           
           {activeCropsList.length === 0 && (
