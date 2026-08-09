@@ -1,16 +1,46 @@
-# React + Vite
+# GreenCode CRM
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+Aplicacion de gestion integral para la operativa de GreenCode: produccion de microgreens, almacen, ventas, reparto, trazabilidad y control economico.
 
-Currently, two official plugins are available:
+## Tecnologia
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+- React 19 y React Router
+- Vite 8
+- Supabase: Postgres, Auth, Realtime y Edge Functions
+- jsPDF para facturas, albaranes, trazabilidad y etiquetas
+- Recharts para paneles e indicadores
 
-## React Compiler
+## Desarrollo local
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+Requisitos: Node.js y npm.
 
-## Expanding the ESLint configuration
+```powershell
+npm.cmd install
+npm.cmd run dev
+```
 
-If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and [`typescript-eslint`](https://typescript-eslint.io) in your project.
+Comprobaciones antes de publicar:
+
+```powershell
+npm.cmd run lint
+npm.cmd run build
+```
+
+## Areas funcionales
+
+- Administracion de clientes, proveedores, catalogo, pedidos, albaranes, facturas y gastos.
+- Control de cultivos, siembras, tareas, cosechas y producto terminado.
+- Gestion de semillas, consumibles, envases, lotes y movimientos de almacen.
+- Trazabilidad completa desde proveedor y siembra hasta cliente.
+- Rentabilidad, costes y documentacion PDF.
+- Panel operativo de TV, reparto movil y administracion de usuarios.
+
+## Base de datos
+
+Las migraciones incrementales se guardan en `supabase/migrations/`. Las funciones de servidor se encuentran en `supabase/functions/`.
+
+No deben ejecutarse scripts SQL ni migraciones contra produccion sin revisar su alcance y contar con autorizacion expresa.
+
+## Contexto para Codex
+
+Las instrucciones persistentes del proyecto estan en `AGENTS.md`. Al abrir esta carpeta como proyecto de Codex, el asistente podra reconocer GreenCode CRM y sus reglas de trabajo automaticamente.
