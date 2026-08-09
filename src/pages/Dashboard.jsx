@@ -103,7 +103,6 @@ export default function Dashboard() {
         if (unitCost > 0) current.costedUnits += quantity;
         movementCostByOrderProduct.set(key, current);
       });
-    const currentNotes = (deliveryNotes || []).filter(note => inPeriod(note.date));
     const periodOrders = (orders || []).filter(order => {
       if (order.status !== 'DELIVERED') return false;
       return inPeriod(noteByOrder.get(order.id)?.date || order.date);
@@ -116,8 +115,14 @@ export default function Dashboard() {
     const pendingInvoices = periodInvoices.filter(invoice => invoice.isPaid !== true);
     const collected = collectedInvoices.reduce((sum, invoice) => sum + Number(invoice.total || 0), 0);
     const pendingCollection = pendingInvoices.reduce((sum, invoice) => sum + Number(invoice.total || 0), 0);
-    const unbilledNotes = currentNotes.filter(note => note.invoiced !== true && !note.invoiceId);
-    const unbilledSales = unbilledNotes.reduce((sum, note) => sum + Number(note.total || 0), 0);
+    const invoicedNoteIds = new Set(
+      (invoices || []).flatMap(invoice => invoice.deliveryNoteIds || []).map(String)
+    );
+    const unbilledOrders = periodOrders.filter(order => {
+      const note = noteByOrder.get(order.id);
+      return !note || !invoicedNoteIds.has(String(note.id));
+    });
+    const unbilledSales = unbilledOrders.reduce((sum, order) => sum + Number(order.total || 0), 0);
     const periodExpenses = (expenses || []).filter(expense => inPeriod(expense.date));
     const paidExpenses = periodExpenses
       .filter(expense => expense.isPaid === true)
@@ -254,7 +259,7 @@ export default function Dashboard() {
       pendingCollection,
       pendingInvoiceCount: pendingInvoices.length,
       unbilledSales,
-      unbilledNoteCount: unbilledNotes.length,
+      unbilledOrderCount: unbilledOrders.length,
       paidExpenses,
       pendingExpenses,
       expenseCount: periodExpenses.length,
@@ -361,7 +366,7 @@ export default function Dashboard() {
             <Clock3 /><span>Pendiente de cobro</span><strong>{money(data.pendingCollection)}</strong><small>{data.pendingInvoiceCount} facturas</small>
           </button>
           <button type="button" className="is-unbilled" onClick={() => openFinancial('receivables')}>
-            <ReceiptText /><span>Pendiente de facturar</span><strong>{money(data.unbilledSales)}</strong><small>{data.unbilledNoteCount} albaranes</small>
+            <ReceiptText /><span>Pedidos entregados sin facturar</span><strong>{money(data.unbilledSales)}</strong><small>{data.unbilledOrderCount} pedidos</small>
           </button>
           <button type="button" className="is-expense" onClick={() => openFinancial('expenses')}>
             <WalletCards /><span>Gastos</span><strong>{money(data.paidExpenses + data.pendingExpenses)}</strong><small>{money(data.paidExpenses)} pagado · {money(data.pendingExpenses)} pendiente</small>
