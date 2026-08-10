@@ -10,6 +10,7 @@ import {
 } from 'recharts';
 import { useData } from '../context/DataContext';
 import Profitability from './Profitability';
+import AdminExecutiveDashboards from '../components/AdminExecutiveDashboards';
 
 const money = value => new Intl.NumberFormat('es-ES', {
   style: 'currency',
@@ -70,6 +71,7 @@ export default function Dashboard() {
   const [detailsOpen, setDetailsOpen] = useState(false);
   const [financialOpen, setFinancialOpen] = useState(false);
   const [financialView, setFinancialView] = useState('summary');
+  const [dashboardView, setDashboardView] = useState('sales');
   const [reportView, setReportView] = useState('products');
   const [reportQuery, setReportQuery] = useState('');
   const [companyForm, setCompanyForm] = useState(companyProfile || {});
@@ -147,7 +149,7 @@ export default function Dashboard() {
       const article = (articles || []).find(item => String(item.id) === String(articleId));
       return Number(latestLot?.unitCost ?? article?.currentUnitCost ?? article?.lastPurchaseUnitCost ?? 0);
     };
-    const activeHarvestsInPeriod = (crops || []).filter(crop => {
+    const activeProductionRows = (crops || []).map(crop => {
       if (['HARVESTED', 'DISCARDED'].includes(String(crop.status || '').toUpperCase()) || Number(crop.traysCount || 0) <= 0) return false;
       const cropType = (cropTypes || []).find(type => String(type.id) === String(crop.cropTypeId || crop.seedId));
       if (!cropType) return false;
@@ -157,17 +159,16 @@ export default function Dashboard() {
         + Number(cropType.germinationDays || 0) + Number(cropType.darknessDays || 0) + Number(cropType.lightDays || 0)
         - Number(crop.cycleDayAdjustment || 0);
       planted.setDate(planted.getDate() + cycleDays);
-      return planted >= productionPeriodStart && planted <= productionPeriodEnd;
-    });
-    const activeHarvestCostInPeriod = activeHarvestsInPeriod.reduce((sum, crop) => {
-      const cropType = (cropTypes || []).find(type => String(type.id) === String(crop.cropTypeId || crop.seedId));
+      if (planted < productionPeriodStart || planted > productionPeriodEnd) return null;
       const seedLot = (stockLots || []).find(lot => String(lot.id) === String(crop.seedStockLotId));
       const seedUnitCost = Number(seedLot?.unitCost || latestArticleUnitCost(cropType?.seedId));
-      const seedCost = seedUnitCost * Number(crop.gramsPerTray || cropType?.seedGrams || 0);
-      const substrateCost = latestArticleUnitCost(cropType?.substrateId) * Number(cropType?.substrateLiters || 0);
-      const trayCost = latestArticleUnitCost(cropType?.containerId);
-      return sum + (seedCost + substrateCost + trayCost) * Number(crop.traysCount || 0);
-    }, 0);
+      const trays = Number(crop.traysCount || 0);
+      const seedCost = seedUnitCost * Number(crop.gramsPerTray || cropType?.seedGrams || 0) * trays;
+      const substrateCost = latestArticleUnitCost(cropType?.substrateId) * Number(cropType?.substrateLiters || 0) * trays;
+      const trayCost = latestArticleUnitCost(cropType?.containerId) * trays;
+      return { id: crop.id, name: cropType.name || 'Cultivo', trays, seedCost, substrateCost, trayCost, total: seedCost + substrateCost + trayCost, harvestDate: planted };
+    }).filter(Boolean);
+    const activeHarvestCostInPeriod = activeProductionRows.reduce((sum, crop) => sum + crop.total, 0);
 
     const boundsStart = new Date(`${selectedBounds.start}T12:00:00`);
     const boundsEnd = new Date(`${selectedBounds.end}T12:00:00`);
@@ -181,7 +182,9 @@ export default function Dashboard() {
           start: key,
           end: key,
           name: new Intl.DateTimeFormat('es-ES', { day: '2-digit', month: 'short' }).format(cursor).replace('.', ''),
-          Ventas: 0
+          Ventas: 0,
+          'Coste vendido': 0,
+          'Gastos generales': 0
         });
       }
     } else {
@@ -193,7 +196,9 @@ export default function Dashboard() {
           start: `${key}-01`,
           end: monthBounds(key).end,
           name: new Intl.DateTimeFormat('es-ES', { month: 'short', year: '2-digit' }).format(cursor).replace('.', ''),
-          Ventas: 0
+          Ventas: 0,
+          'Coste vendido': 0,
+          'Gastos generales': 0
         });
         cursor.setMonth(cursor.getMonth() + 1);
       }
@@ -203,7 +208,21 @@ export default function Dashboard() {
       const orderDate = noteByOrder.get(order.id)?.date || order.date;
       const key = periodDays <= 62 ? String(orderDate || '').slice(0, 10) : monthKey(orderDate);
       const item = chartMap.get(key);
-      if (item) item.Ventas += Number(order.total || 0);
+      if (item) {
+        item.Ventas += Number(order.total || 0);
+        const costedProducts = new Set();
+        item['Coste vendido'] += (order.items || []).reduce((sum, orderItem) => {
+          if (costedProducts.has(orderItem.productId)) return sum;
+          costedProducts.add(orderItem.productId);
+          return sum + Number(movementCostByOrderProduct.get(`${order.id}::${orderItem.productId}`)?.cost || 0);
+        }, 0);
+      }
+    });
+    periodExpenses.forEach(expense => {
+      const expenseDate = expense.date;
+      const key = periodDays <= 62 ? String(expenseDate || '').slice(0, 10) : monthKey(expenseDate);
+      const item = chartMap.get(key);
+      if (item) item['Gastos generales'] += Number(expense.total ?? expense.amount ?? 0);
     });
 
     const productTotals = new Map();
@@ -262,6 +281,23 @@ export default function Dashboard() {
     const costedUnits = productSales.reduce((sum, item) => sum + item.costedUnits, 0);
     const tracedRevenue = productSales.reduce((sum, item) => sum + item.tracedRevenue, 0);
     const grossMargin = tracedRevenue - totalCost;
+    const generalExpensesTotal = paidExpenses + pendingExpenses;
+    const operatingResult = grossMargin - generalExpensesTotal;
+    const productionByVariety = [...activeProductionRows.reduce((map, row) => {
+      const current = map.get(row.name) || { name: row.name, trays: 0, cost: 0 };
+      current.trays += row.trays;
+      current.cost += row.total;
+      map.set(row.name, current);
+      return map;
+    }, new Map()).values()].sort((a, b) => b.cost - a.cost);
+    const harvestCostByProduct = [...periodHarvests.reduce((map, harvest) => {
+      const name = products.find(product => String(product.id) === String(harvest.productId))?.name || 'Producto cosechado';
+      const current = map.get(name) || { name, units: 0, cost: 0 };
+      current.units += Number(harvest.tuppersCount || 0);
+      current.cost += Number(harvest.totalCost ?? (Number(harvest.seedCost || 0) + Number(harvest.substrateCost || 0) + Number(harvest.packagingCost || 0) + Number(harvest.labelCost || 0)));
+      map.set(name, current);
+      return map;
+    }, new Map()).values()].sort((a, b) => b.cost - a.cost);
 
     const lowStock = (articles || [])
       .map(article => ({
@@ -281,6 +317,8 @@ export default function Dashboard() {
       margin: grossMargin,
       marginPercent: tracedRevenue > 0 ? (grossMargin / tracedRevenue) * 100 : 0,
       costCoverage: monthSales > 0 ? (tracedRevenue / monthSales) * 100 : 0,
+      generalExpensesTotal,
+      operatingResult,
       costedUnits,
       mostProfitable,
       orderCount: periodOrders.length,
@@ -302,8 +340,18 @@ export default function Dashboard() {
       substrateExpenses,
       packagingExpenses,
       labelExpenses,
-      activeHarvestCountInPeriod: activeHarvestsInPeriod.length,
+      activeHarvestCountInPeriod: activeProductionRows.length,
       activeHarvestCostInPeriod,
+      activeProductionRows,
+      productionByVariety,
+      harvestCostByProduct,
+      productionBreakdown: [
+        { name: 'Semillas', value: seedExpenses + activeProductionRows.reduce((sum, row) => sum + row.seedCost, 0) },
+        { name: 'Sustrato', value: substrateExpenses + activeProductionRows.reduce((sum, row) => sum + row.substrateCost, 0) },
+        { name: 'Bandejas', value: activeProductionRows.reduce((sum, row) => sum + row.trayCost, 0) },
+        { name: 'Táperes', value: packagingExpenses },
+        { name: 'Etiquetas', value: labelExpenses }
+      ],
       chart,
       allClients,
       productSales,
@@ -381,6 +429,15 @@ export default function Dashboard() {
         </div>
       )}
 
+      <AdminExecutiveDashboards
+        data={data}
+        view={dashboardView}
+        onViewChange={setDashboardView}
+        openFinancial={openFinancial}
+        openOrders={() => navigate('/admin/orders')}
+      />
+
+      {dashboardView === 'legacy' && <>
       <section className="admin-metrics">
         <Metric icon={<CircleDollarSign />} label="Ventas del periodo" value={money(data.monthSales)} detail={`${data.orderCount} entregas · ${data.units} unidades`} tone="green" onClick={() => openFinancial('orders')} />
         <Metric icon={<PackageCheck />} label="Coste de lo vendido" value={money(data.totalCost)} detail={`${data.costCoverage.toFixed(1)} % de las ventas con coste trazado`} tone="blue" onClick={() => openFinancial('profit-products')} />
@@ -481,6 +538,7 @@ export default function Dashboard() {
           </div>
         </article>
       </section>
+      </>}
 
       <section className="admin-shortcuts">
         {shortcuts.map(item => (

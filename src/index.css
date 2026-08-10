@@ -956,3 +956,20 @@ body {
 .admin-metrics{grid-template-columns:repeat(3,minmax(0,1fr))}
 @media(max-width:1050px){.admin-metrics{grid-template-columns:repeat(2,minmax(0,1fr))}}
 @media(max-width:640px){.admin-metrics{grid-template-columns:1fr}}
+
+.executive-dashboard-tabs{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:.65rem;padding:.45rem;border:1px solid #dbe7e1;border-radius:1rem;background:#eef4f1}
+.executive-dashboard-tabs button{display:flex;align-items:center;gap:.7rem;padding:.8rem .9rem;border:0;border-radius:.75rem;background:transparent;color:#64748b;cursor:pointer;text-align:left;transition:.18s ease}
+.executive-dashboard-tabs button>svg{width:21px}.executive-dashboard-tabs button span{display:grid}.executive-dashboard-tabs strong{color:inherit;font-size:.85rem}.executive-dashboard-tabs small{font-size:.67rem;opacity:.78}
+.executive-dashboard-tabs button.active{background:#fff;color:#047857;box-shadow:0 5px 18px rgba(15,23,42,.08)}
+.executive-dashboard-view{display:grid;gap:1rem}.executive-dashboard-view>header{display:flex;align-items:flex-end;justify-content:space-between;gap:1rem;padding:.25rem .15rem}
+.executive-dashboard-view>header span{color:#059669;font-size:.66rem;font-weight:900;letter-spacing:.14em}.executive-dashboard-view>header h2{margin:.16rem 0;color:#102a22;font-size:1.45rem}.executive-dashboard-view>header p{margin:0;color:#718078;font-size:.78rem}
+.executive-dashboard-view>header button{padding:.62rem .8rem;border:1px solid #b7ddca;border-radius:.65rem;background:#fff;color:#047857;cursor:pointer;font-weight:850}
+.executive-kpis{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:.75rem}
+.executive-kpi{display:grid;grid-template-columns:2.55rem minmax(0,1fr);grid-template-rows:auto auto auto;column-gap:.75rem;padding:1rem;border:1px solid #e2ebe6;border-radius:1rem;background:#fff;box-shadow:0 8px 26px rgba(15,23,42,.045);cursor:pointer;text-align:left;transition:.18s ease}
+.executive-kpi:hover{transform:translateY(-2px);border-color:#acd9c3;box-shadow:0 12px 30px rgba(15,23,42,.08)}.executive-kpi i{grid-row:1/4;display:grid;place-items:center;width:2.55rem;height:2.55rem;border-radius:.75rem;background:#dcfce7;color:#15803d}.executive-kpi i svg{width:20px}
+.executive-kpi span{color:#718078;font-size:.69rem}.executive-kpi strong{overflow:hidden;color:#102a22;font-size:1.45rem;line-height:1.25;white-space:nowrap;text-overflow:ellipsis}.executive-kpi small{overflow:hidden;color:#718078;font-size:.68rem;white-space:nowrap;text-overflow:ellipsis}
+.executive-kpi-blue i{background:#e0f2fe;color:#0369a1}.executive-kpi-purple i{background:#f3e8ff;color:#7e22ce}.executive-kpi-amber i{background:#fef3c7;color:#b45309}.executive-kpi-red i{background:#fee2e2;color:#b91c1c}.executive-kpi-red strong{color:#b91c1c}
+.executive-charts{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:.8rem}.executive-chart{overflow:hidden;border:1px solid #e2ebe6;border-radius:1rem;background:#fff;box-shadow:0 8px 25px rgba(15,23,42,.04)}
+.executive-chart-wide{grid-column:span 2}.executive-chart>header{display:flex;align-items:flex-start;justify-content:space-between;gap:1rem;padding:.9rem 1rem .25rem}.executive-chart h3{margin:0;color:#102a22;font-size:.88rem}.executive-chart p{margin:.12rem 0 0;color:#94a39c;font-size:.67rem}.executive-chart>header>strong{color:#047857;font-size:1rem}.executive-chart>div{height:260px;padding:.35rem .75rem .8rem}.executive-chart .recharts-text{font-size:10px;fill:#718078}.executive-empty{display:grid;height:100%;margin:0;place-items:center;color:#94a3b8;font-size:.75rem;text-align:center}
+@media(max-width:1100px){.executive-kpis{grid-template-columns:repeat(2,minmax(0,1fr))}.executive-charts{grid-template-columns:repeat(2,minmax(0,1fr))}.executive-chart-wide{grid-column:span 2}}
+@media(max-width:700px){.executive-dashboard-tabs{grid-template-columns:1fr}.executive-dashboard-view>header{align-items:stretch;flex-direction:column}.executive-kpis,.executive-charts{grid-template-columns:1fr}.executive-chart-wide{grid-column:auto}.executive-chart>div{height:230px}}
