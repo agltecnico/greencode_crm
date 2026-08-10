@@ -721,6 +721,46 @@ export default function Profitability({
       };
     })
     .sort((a, b) => b.date.localeCompare(a.date));
+  const currentWeekStart = new Date();
+  currentWeekStart.setHours(0, 0, 0, 0);
+  currentWeekStart.setDate(currentWeekStart.getDate() - ((currentWeekStart.getDay() + 6) % 7));
+  const currentWeekEnd = new Date(currentWeekStart);
+  currentWeekEnd.setDate(currentWeekEnd.getDate() + 6);
+  currentWeekEnd.setHours(23, 59, 59, 999);
+  const activeHarvestCostRows = (crops || []).map(crop => {
+    if (['HARVESTED', 'DISCARDED'].includes(String(crop.status || '').toUpperCase()) || Number(crop.traysCount || 0) <= 0) return null;
+    const cropType = (cropTypes || []).find(item => String(item.id) === String(crop.cropTypeId || crop.seedId));
+    if (!cropType) return null;
+    const harvestDate = new Date(crop.datePlanted || crop.plantedAt);
+    if (Number.isNaN(harvestDate.getTime())) return null;
+    const cycleDays = (Number(cropType.soakingHours || 0) > 0 ? Math.max(1, Math.ceil(Number(cropType.soakingHours) / 24)) : 0)
+      + Number(cropType.germinationDays || 0) + Number(cropType.darknessDays || 0) + Number(cropType.lightDays || 0)
+      - Number(crop.cycleDayAdjustment || 0);
+    harvestDate.setDate(harvestDate.getDate() + cycleDays);
+    if (harvestDate < currentWeekStart || harvestDate > currentWeekEnd) return null;
+    const seedLot = (stockLots || []).find(lot => String(lot.id) === String(crop.seedStockLotId));
+    const seedUnitCost = Number(seedLot?.unitCost || latestVarietySeedCost(cropType.varietyId) || 0);
+    const seedCost = seedUnitCost * Number(crop.gramsPerTray || cropType.seedGrams || 0);
+    const substrateCost = latestArticleUnitCost(cropType.substrateId) * Number(cropType.substrateLiters || 0);
+    const trayCost = latestArticleUnitCost(cropType.containerId);
+    const trays = Number(crop.traysCount || 0);
+    return {
+      id: crop.id,
+      name: cropType.name || seedVarieties?.find(item => item.id === cropType.varietyId)?.name || 'Cultivo sin ficha',
+      batchNumber: crop.cultivationBatchNumber || crop.batchNumber || '-',
+      harvestDate,
+      trays,
+      status: crop.status,
+      seedCost: seedCost * trays,
+      substrateCost: substrateCost * trays,
+      trayCost: trayCost * trays,
+      costPerTray: seedCost + substrateCost + trayCost,
+      total: (seedCost + substrateCost + trayCost) * trays
+    };
+  }).filter(Boolean).sort((a, b) => a.harvestDate - b.harvestDate);
+  const activeHarvestCostTotal = activeHarvestCostRows.reduce((sum, row) => sum + row.total, 0);
+  const harvestedPackagingTotal = financialControl.harvestRows.reduce((sum, row) => sum + row.packagingCost, 0);
+  const harvestedLabelTotal = financialControl.harvestRows.reduce((sum, row) => sum + row.labelCost, 0);
   const varietyCostRows = [...cultivationRows.reduce((map, row) => {
     const current = map.get(row.name) || { id: row.name, name: row.name, crops: 0, trays: 0, harvestedTrays: 0, discardedTrays: 0, total: 0 };
     current.crops += 1;
@@ -1123,6 +1163,24 @@ export default function Profitability({
             {view === 'expenses' && <button className="profit-add-expense" type="button" onClick={() => setShowExpenseForm(value => !value)}>{showExpenseForm ? 'Cancelar' : '+ Registrar gasto'}</button>}
           </div>
         </div>
+
+        {section === 'production' && (
+          <section style={{ margin: '0 1rem 1rem', display: 'grid', gap: '0.8rem' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, minmax(0, 1fr))', gap: '0.65rem' }}>
+              <article style={{ padding: '0.8rem', border: '1px solid #fde68a', borderRadius: '0.8rem', background: '#fffbeb' }}><span style={{ display: 'block', color: '#a16207', fontSize: '0.68rem', fontWeight: 850 }}>EN MARCHA · ESTA SEMANA</span><strong style={{ display: 'block', color: '#92400e', fontSize: '1.15rem' }}>{money(activeHarvestCostTotal)}</strong><small style={{ color: '#a16207' }}>{activeHarvestCostRows.length} cultivos previstos</small></article>
+              <article style={{ padding: '0.8rem', border: '1px solid #bbf7d0', borderRadius: '0.8rem', background: '#f0fdf4' }}><span style={{ display: 'block', color: '#15803d', fontSize: '0.68rem', fontWeight: 850 }}>COSECHADO · PERIODO</span><strong style={{ display: 'block', color: '#166534', fontSize: '1.15rem' }}>{money(financialControl.productionCost)}</strong><small style={{ color: '#15803d' }}>{financialControl.producedUnits} unidades producidas</small></article>
+              <article style={{ padding: '0.8rem', border: '1px solid #bae6fd', borderRadius: '0.8rem', background: '#f0f9ff' }}><span style={{ display: 'block', color: '#0369a1', fontSize: '0.68rem', fontWeight: 850 }}>TÁPERES Y ETIQUETAS</span><strong style={{ display: 'block', color: '#075985', fontSize: '1.15rem' }}>{money(harvestedPackagingTotal + harvestedLabelTotal)}</strong><small style={{ color: '#0369a1' }}>Táperes {money(harvestedPackagingTotal)} · Etiquetas {money(harvestedLabelTotal)}</small></article>
+              <article style={{ padding: '0.8rem', border: '1px solid #ddd6fe', borderRadius: '0.8rem', background: '#f5f3ff' }}><span style={{ display: 'block', color: '#6d28d9', fontSize: '0.68rem', fontWeight: 850 }}>CONTROL DE PRODUCCIÓN</span><strong style={{ display: 'block', color: '#5b21b6', fontSize: '1.15rem' }}>{money(activeHarvestCostTotal + financialControl.productionCost)}</strong><small style={{ color: '#6d28d9' }}>En marcha + cosechado y envasado</small></article>
+            </div>
+            {activeHarvestCostRows.length > 0 && (
+              <div className="table-container" style={{ border: '1px solid #fde68a', borderRadius: '0.8rem', background: 'white' }}>
+                <table><thead><tr><th>Fecha prevista</th><th>Cultivo / lote</th><th>Fase</th><th>Bandejas</th><th>Semilla</th><th>Sustrato</th><th>Bandeja</th><th>Coste/bandeja</th><th>Total en marcha</th></tr></thead>
+                  <tbody>{activeHarvestCostRows.map(row => <tr key={row.id}><td>{row.harvestDate.toLocaleDateString('es-ES')}</td><td><strong>{row.name}</strong><small className="profit-cell-note">{row.batchNumber}</small></td><td>{row.status}</td><td>{row.trays}</td><td>{money(row.seedCost)}</td><td>{money(row.substrateCost)}</td><td>{money(row.trayCost)}</td><td>{money(row.costPerTray)}</td><td><strong>{money(row.total)}</strong></td></tr>)}</tbody>
+                </table>
+              </div>
+            )}
+          </section>
+        )}
 
         {view === 'expenses' && showExpenseForm && (
           <form className="profit-expense-form" onSubmit={saveExpense}>
