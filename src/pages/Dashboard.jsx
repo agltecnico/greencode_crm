@@ -56,7 +56,7 @@ const Metric = ({ icon, label, value, detail, tone, onClick }) => (
 export default function Dashboard() {
   const {
     companyProfile, updateCompanyProfile, clients, orders, deliveryNotes, invoices, expenses,
-    products, articles, stockEntries, harvests, productMovements
+    products, articles, stockEntries, stockLots, crops, cropTypes, harvests, productMovements
   } = useData();
   const navigate = useNavigate();
   const [today] = useState(() => new Date());
@@ -138,6 +138,41 @@ export default function Dashboard() {
     const labelExpenses = periodHarvests.reduce((sum, harvest) => sum + Number(harvest.labelCost || 0), 0);
     const productionExpenses = seedExpenses + substrateExpenses + packagingExpenses + labelExpenses;
     const productionMargin = monthSales - productionExpenses;
+
+    const weekStart = new Date(today);
+    weekStart.setHours(0, 0, 0, 0);
+    weekStart.setDate(weekStart.getDate() - ((weekStart.getDay() + 6) % 7));
+    const weekEnd = new Date(weekStart);
+    weekEnd.setDate(weekEnd.getDate() + 6);
+    weekEnd.setHours(23, 59, 59, 999);
+    const latestArticleUnitCost = articleId => {
+      const latestLot = (stockLots || [])
+        .filter(lot => String(lot.articleId) === String(articleId))
+        .sort((a, b) => String(b.receivedAt || b.createdAt || '').localeCompare(String(a.receivedAt || a.createdAt || '')))[0];
+      const article = (articles || []).find(item => String(item.id) === String(articleId));
+      return Number(latestLot?.unitCost ?? article?.currentUnitCost ?? article?.lastPurchaseUnitCost ?? 0);
+    };
+    const activeHarvestsThisWeek = (crops || []).filter(crop => {
+      if (['HARVESTED', 'DISCARDED'].includes(String(crop.status || '').toUpperCase()) || Number(crop.traysCount || 0) <= 0) return false;
+      const cropType = (cropTypes || []).find(type => String(type.id) === String(crop.cropTypeId || crop.seedId));
+      if (!cropType) return false;
+      const planted = new Date(crop.datePlanted || crop.plantedAt);
+      if (Number.isNaN(planted.getTime())) return false;
+      const cycleDays = (Number(cropType.soakingHours || 0) > 0 ? Math.max(1, Math.ceil(Number(cropType.soakingHours) / 24)) : 0)
+        + Number(cropType.germinationDays || 0) + Number(cropType.darknessDays || 0) + Number(cropType.lightDays || 0)
+        - Number(crop.cycleDayAdjustment || 0);
+      planted.setDate(planted.getDate() + cycleDays);
+      return planted >= weekStart && planted <= weekEnd;
+    });
+    const activeHarvestCostThisWeek = activeHarvestsThisWeek.reduce((sum, crop) => {
+      const cropType = (cropTypes || []).find(type => String(type.id) === String(crop.cropTypeId || crop.seedId));
+      const seedLot = (stockLots || []).find(lot => String(lot.id) === String(crop.seedStockLotId));
+      const seedUnitCost = Number(seedLot?.unitCost || latestArticleUnitCost(cropType?.seedId));
+      const seedCost = seedUnitCost * Number(crop.gramsPerTray || cropType?.seedGrams || 0);
+      const substrateCost = latestArticleUnitCost(cropType?.substrateId) * Number(cropType?.substrateLiters || 0);
+      const trayCost = latestArticleUnitCost(cropType?.containerId);
+      return sum + (seedCost + substrateCost + trayCost) * Number(crop.traysCount || 0);
+    }, 0);
 
     const boundsStart = new Date(`${selectedBounds.start}T12:00:00`);
     const boundsEnd = new Date(`${selectedBounds.end}T12:00:00`);
@@ -268,12 +303,14 @@ export default function Dashboard() {
       substrateExpenses,
       packagingExpenses,
       labelExpenses,
+      activeHarvestCountThisWeek: activeHarvestsThisWeek.length,
+      activeHarvestCostThisWeek,
       chart,
       allClients,
       productSales,
       lowStock
     };
-  }, [articles, clients, deliveryNotes, expenses, harvests, invoices, orders, productMovements, products, selectedBounds.end, selectedBounds.start, stockEntries]);
+  }, [articles, clients, cropTypes, crops, deliveryNotes, expenses, harvests, invoices, orders, productMovements, products, selectedBounds.end, selectedBounds.start, stockEntries, stockLots, today]);
 
   const saveCompany = async event => {
     event.preventDefault();
@@ -349,7 +386,7 @@ export default function Dashboard() {
         <Metric icon={<CircleDollarSign />} label="Ventas del periodo" value={money(data.monthSales)} detail={`${data.orderCount} entregas · ${data.units} unidades`} tone="green" onClick={() => openFinancial('orders')} />
         <Metric icon={<FileText />} label="Ticket medio" value={money(data.averageTicket)} detail={`${data.orderCount} ventas realizadas`} tone="blue" onClick={() => openFinancial('clients')} />
         <Metric icon={<ShoppingBag />} label="Pedidos abiertos" value={data.pendingOrders} detail={money(data.pendingOrderValue)} tone="purple" onClick={() => navigate('/admin/orders')} />
-        <Metric icon={<Receipt />} label="Costes de producción" value={money(data.productionExpenses)} detail={`Semillas ${money(data.seedExpenses)} · Sustrato ${money(data.substrateExpenses)} · Táperes ${money(data.packagingExpenses)} · Etiquetas ${money(data.labelExpenses)}`} tone="amber" onClick={() => openFinancial('harvests')} />
+        <Metric icon={<Receipt />} label="Costes de producción" value={money(data.productionExpenses + data.activeHarvestCostThisWeek)} detail={`En marcha esta semana ${money(data.activeHarvestCostThisWeek)} (${data.activeHarvestCountThisWeek}) · Cosechado y envasado ${money(data.productionExpenses)}`} tone="amber" onClick={() => openFinancial('harvests')} />
         <Metric icon={<TrendingUp />} label="Margen del periodo" value={money(data.margin)} detail={`${data.marginPercent.toFixed(1)} % · Ventas menos producción`} tone="green" onClick={() => openFinancial('summary')} />
       </section>
 
