@@ -660,6 +660,11 @@
 .tv-crop-toolbar button.active { border-color: #34d399; background: rgba(16, 185, 129, 0.16); color: #6ee7b7; }
 .tv-crop-toolbar button.active strong { background: #10b981; }
 
+.crop-day-controls { display: inline-flex; overflow: hidden; border: 1px solid #93c5fd; border-radius: 0.5rem; background: #eff6ff; }
+.crop-day-controls button { padding: 0.35rem 0.5rem; border: 0; border-right: 1px solid #bfdbfe; background: transparent; color: #1d4ed8; font-size: 0.7rem; font-weight: 850; cursor: pointer; white-space: nowrap; }
+.crop-day-controls button:last-child { border-right: 0; }
+.crop-day-controls button:hover { background: #dbeafe; }
+
 /* Compact label board for the greenhouse TV */
 .tv-crop-screen { display: grid; grid-template-columns: 154px minmax(0, 1fr); gap: 0.75rem; min-height: calc(100vh - 94px); }
 .tv-crop-sidebar { align-self: start; position: sticky; top: 0.65rem; padding: 0.7rem; border: 1px solid #334155; border-radius: 13px; background: rgba(15, 23, 42, 0.94); }

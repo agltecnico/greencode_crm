@@ -70,6 +70,15 @@ const suggestedStatusForSowingDate = (cropType, dateValue) => {
   return 'READY';
 };
 
+const expectedHarvestDate = (cropType, dateValue) => {
+  if (!cropType || !dateValue) return null;
+  const planted = new Date(dateValue);
+  if (Number.isNaN(planted.getTime())) return null;
+  const harvest = new Date(planted);
+  harvest.setDate(harvest.getDate() + getCropCycleOffsets(cropType).harvest);
+  return harvest;
+};
+
 const CROP_PHASE_OPTIONS = [
   ['SOAKING', 'Remojo'],
   ['GERMINATING', 'Germinación'],
@@ -287,6 +296,9 @@ export default function Crops() {
   const [showPhaseChangeModal, setShowPhaseChangeModal] = useState(null);
   const [pendingPhase, setPendingPhase] = useState(null);
   const [editingCropTrays, setEditingCropTrays] = useState(null);
+  const [editingCropSchedule, setEditingCropSchedule] = useState(null);
+  const [cropScheduleDate, setCropScheduleDate] = useState('');
+  const [savingCropSchedule, setSavingCropSchedule] = useState(false);
   const [cropTrayEdit, setCropTrayEdit] = useState({ newTrays: 1, consumeStock: false });
   const [savingCropTrays, setSavingCropTrays] = useState(false);
   const readinessSyncRef = useRef(new Set());
@@ -402,6 +414,60 @@ export default function Crops() {
       Swal.fire({ title: 'No se pudo actualizar', text: error.message, icon: 'error', confirmButtonColor: '#ef4444' });
     } finally {
       setSavingCropTrays(false);
+    }
+  };
+
+  const adjustCropDay = async (crop, daysForward) => {
+    const cropType = cropTypes?.find(type => type.id === crop.cropTypeId || type.id === crop.seedId);
+    if (!cropType) return;
+    const planted = new Date(crop.datePlanted || crop.plantedAt);
+    if (Number.isNaN(planted.getTime())) return;
+    planted.setDate(planted.getDate() - daysForward);
+    if (planted > new Date()) {
+      await Swal.fire('No se puede atrasar más', 'La fecha de siembra no puede quedar en el futuro.', 'warning');
+      return;
+    }
+    await updateCrop(crop.id, {
+      datePlanted: planted.toISOString(),
+      status: suggestedStatusForSowingDate(cropType, planted),
+      phaseConfirmedAt: new Date().toISOString()
+    });
+  };
+
+  const openCropScheduleEditor = crop => {
+    const cropType = cropTypes?.find(type => type.id === crop.cropTypeId || type.id === crop.seedId);
+    const harvest = expectedHarvestDate(cropType, crop.datePlanted || crop.plantedAt);
+    setEditingCropSchedule(crop);
+    setCropScheduleDate(harvest ? toLocalDateKey(harvest) : '');
+  };
+
+  const saveCropSchedule = async event => {
+    event.preventDefault();
+    if (!editingCropSchedule || !cropScheduleDate) return;
+    const cropType = cropTypes?.find(type => type.id === editingCropSchedule.cropTypeId || type.id === editingCropSchedule.seedId);
+    if (!cropType) return;
+    const originalPlanting = new Date(editingCropSchedule.datePlanted || editingCropSchedule.plantedAt);
+    const targetHarvest = new Date(`${cropScheduleDate}T12:00:00`);
+    const newPlanting = new Date(targetHarvest);
+    newPlanting.setDate(newPlanting.getDate() - getCropCycleOffsets(cropType).harvest);
+    if (!Number.isNaN(originalPlanting.getTime())) {
+      newPlanting.setHours(originalPlanting.getHours(), originalPlanting.getMinutes(), originalPlanting.getSeconds(), originalPlanting.getMilliseconds());
+    }
+    if (newPlanting > new Date()) {
+      await Swal.fire('Fecha no válida', 'Esa previsión dejaría la fecha de siembra en el futuro.', 'warning');
+      return;
+    }
+    setSavingCropSchedule(true);
+    try {
+      await updateCrop(editingCropSchedule.id, {
+        datePlanted: newPlanting.toISOString(),
+        status: suggestedStatusForSowingDate(cropType, newPlanting),
+        phaseConfirmedAt: new Date().toISOString()
+      });
+      setEditingCropSchedule(null);
+      await Swal.fire({ title: 'Calendario actualizado', text: `La cosecha queda prevista para el ${targetHarvest.toLocaleDateString('es-ES')}. La fase se ha recalculado automáticamente.`, icon: 'success', confirmButtonColor: '#10b981' });
+    } finally {
+      setSavingCropSchedule(false);
     }
   };
   const estimatedPackagingCost = Object.entries(newHarvest.packagingQuantities || {})
@@ -944,6 +1010,7 @@ export default function Crops() {
                         const cType = cropTypes?.find(c => c.id === crop.seedId || c.id === crop.cropTypeId);
                         const daysAlive = calendarDaysSince(crop.datePlanted || crop.plantedAt);
                         const expectedDays = cType ? ((Number(cType.germinationDays || 0) + Number(cType.darknessDays || 0) + Number(cType.lightDays || 0)) || 14) : 14;
+                        const plannedHarvest = expectedHarvestDate(cType, crop.datePlanted || crop.plantedAt);
                         const progressPercentage = Math.min(100, Math.max(0, (daysAlive / expectedDays) * 100));
                         
                         let statusColor = { bg: '#f1f5f9', text: '#475569', bar: '#94a3b8' };
@@ -985,15 +1052,22 @@ export default function Crops() {
                                   Día {daysAlive >= 0 ? daysAlive : 0} / {expectedDays}
                                 </span>
                               </div>
+                              <button type="button" onClick={() => openCropScheduleEditor(crop)} style={{ marginTop: '0.25rem', padding: 0, border: 0, background: 'transparent', color: '#0f766e', fontSize: '0.68rem', fontWeight: 800, cursor: 'pointer' }}>
+                                Cosecha prevista: {plannedHarvest ? plannedHarvest.toLocaleDateString('es-ES', { day: '2-digit', month: '2-digit' }) : 'Sin fecha'} · editar
+                              </button>
                             </td>
                             <td style={{ padding: '0.5rem 1rem', textAlign: 'right' }}>
                               <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'flex-end' }}>
                                 <button onClick={() => openCropTrayEditor(crop)} title="Aumentar bandejas" style={{ padding: '0.35rem 0.75rem', borderRadius: '0.5rem', border: '1px solid #86efac', backgroundColor: '#f0fdf4', color: '#166534', fontWeight: 'bold', fontSize: '0.75rem', cursor: 'pointer' }}>+ Bandejas</button>
+                                <div className="crop-day-controls" title="Ajustar el cultivo día a día">
+                                  <button type="button" onClick={() => adjustCropDay(crop, -1)} title="Atrasar la cosecha un día">−1 día</button>
+                                  <button type="button" onClick={() => adjustCropDay(crop, 1)} title="Adelantar la cosecha un día">+1 día</button>
+                                </div>
                                 <button onClick={() => handleDeleteCrop(crop)} title="Eliminar Registro" style={{ padding: '0.25rem 0.5rem', borderRadius: '0.35rem', border: '1px solid #fecaca', color: '#dc2626', backgroundColor: '#fee2e2', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
   <svg width="14" height="14" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
 </button>
 
-                                <button onClick={() => { setShowPhaseChangeModal(crop); setPendingPhase(crop.status || "SOWED"); }} title="Cambiar Fase" style={{ padding: '0.35rem 0.75rem', borderRadius: '0.5rem', border: '1px solid #cbd5e1', backgroundColor: '#f8fafc', color: '#334155', fontWeight: 'bold', fontSize: '0.75rem', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.35rem', boxShadow: '0 1px 2px rgba(0,0,0,0.05)' }}>Cambiar Fase</button>
+                                <button onClick={() => { setShowPhaseChangeModal(crop); setPendingPhase(crop.status || "SOWED"); }} title="Corrección manual de fase" style={{ padding: '0.35rem 0.75rem', borderRadius: '0.5rem', border: '1px solid #cbd5e1', backgroundColor: '#f8fafc', color: '#334155', fontWeight: 'bold', fontSize: '0.75rem', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.35rem', boxShadow: '0 1px 2px rgba(0,0,0,0.05)' }}>Fase manual</button>
                               </div>
                             </td>
                           </tr>
@@ -2792,6 +2866,36 @@ export default function Crops() {
           </div>
         </form>
       </div>
+    </div>
+  );
+})()}
+
+{editingCropSchedule && (() => {
+  const cropType = cropTypes?.find(type => type.id === editingCropSchedule.cropTypeId || type.id === editingCropSchedule.seedId);
+  const currentHarvest = expectedHarvestDate(cropType, editingCropSchedule.datePlanted || editingCropSchedule.plantedAt);
+  return (
+    <div style={modalOverlayStyle}>
+      <form onSubmit={saveCropSchedule} style={{ ...modalCardStyle, maxWidth: '520px' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '1rem' }}>
+          <div><span style={{ color: '#0f766e', fontSize: '0.7rem', fontWeight: 900, letterSpacing: '0.08em' }}>AJUSTE POR DÍAS</span><h3 style={{ margin: '0.2rem 0', color: '#0f172a' }}>{cropType?.name || 'Cultivo'}</h3><small style={{ color: '#64748b' }}>{editingCropSchedule.cultivationBatchNumber || editingCropSchedule.batchNumber}</small></div>
+          <button type="button" onClick={() => setEditingCropSchedule(null)} style={{ border: 0, background: 'transparent', fontSize: '1.5rem', cursor: 'pointer' }}>&times;</button>
+        </div>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.65rem', marginBottom: '1rem' }}>
+          <button type="button" className="btn btn-secondary" onClick={() => { const date = new Date(`${cropScheduleDate}T12:00:00`); date.setDate(date.getDate() + 1); setCropScheduleDate(toLocalDateKey(date)); }}>Atrasar 1 día</button>
+          <button type="button" className="btn btn-primary" onClick={() => { const date = new Date(`${cropScheduleDate}T12:00:00`); date.setDate(date.getDate() - 1); setCropScheduleDate(toLocalDateKey(date)); }}>Adelantar 1 día</button>
+        </div>
+        <label>
+          <span className="form-label">Fecha prevista de cosecha</span>
+          <input className="form-control" type="date" required value={cropScheduleDate} onChange={event => setCropScheduleDate(event.target.value)} />
+        </label>
+        <div style={{ marginTop: '0.8rem', padding: '0.8rem', borderRadius: '0.7rem', background: '#ecfdf5', color: '#166534', fontSize: '0.78rem' }}>
+          Previsión actual: <strong>{currentHarvest?.toLocaleDateString('es-ES') || 'Sin fecha'}</strong>. Al guardar, la fase y el día de crecimiento se recalcularán automáticamente.
+        </div>
+        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.65rem', marginTop: '1rem' }}>
+          <button type="button" className="btn btn-secondary" onClick={() => setEditingCropSchedule(null)}>Cancelar</button>
+          <button type="submit" className="btn btn-primary" disabled={savingCropSchedule}>{savingCropSchedule ? 'Guardando…' : 'Guardar fecha'}</button>
+        </div>
+      </form>
     </div>
   );
 })()}
