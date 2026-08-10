@@ -300,6 +300,7 @@ export default function Crops() {
   const [harvestBatchQueue, setHarvestBatchQueue] = useState([]);
   const [searchParams, setSearchParams] = useSearchParams();
   const [showPhaseChangeModal, setShowPhaseChangeModal] = useState(null);
+  const [savingCycleAdjustment, setSavingCycleAdjustment] = useState(false);
   const [editingCropTrays, setEditingCropTrays] = useState(null);
   const [editingCropSchedule, setEditingCropSchedule] = useState(null);
   const [cropScheduleDate, setCropScheduleDate] = useState('');
@@ -430,37 +431,65 @@ export default function Crops() {
     confirmButtonColor: '#0f766e'
   });
 
-  const adjustCropCycleDay = async (crop, change) => {
+  const openCropCycleEditor = crop => setShowPhaseChangeModal({
+    ...crop,
+    draftCycleDayAdjustment: Number(crop.cycleDayAdjustment || 0),
+    cycleAdjustmentInfoShown: false
+  });
+
+  const adjustCropCycleDayDraft = async change => {
+    const crop = showPhaseChangeModal;
+    if (!crop) return;
     const cropType = cropTypes?.find(type => type.id === crop.cropTypeId || type.id === crop.seedId);
     if (!cropType) return;
-    const currentAdjustment = Number(crop.cycleDayAdjustment || 0);
+    const currentAdjustment = Number(crop.draftCycleDayAdjustment || 0);
     const currentDay = cropCycleDay(crop.datePlanted || crop.plantedAt, currentAdjustment);
     if (change < 0 && currentDay === 0) {
       await Swal.fire({ title: 'Inicio del ciclo', text: 'El cultivo ya está en el día 0.', icon: 'info', customClass: { container: 'crop-confirmation-layer' } });
       return;
     }
+    if (!crop.cycleAdjustmentInfoShown) {
+      await Swal.fire({
+        title: 'Ajuste del ciclo',
+        text: 'Los cambios se mostrarán como una vista previa. No se aplicarán al cultivo hasta que pulses “Guardar cambios”.',
+        icon: 'info',
+        customClass: { container: 'crop-confirmation-layer' },
+        confirmButtonText: 'Entendido',
+        confirmButtonColor: '#0f766e'
+      });
+    }
     const nextAdjustment = currentAdjustment + change;
-    const nextDay = cropCycleDay(crop.datePlanted || crop.plantedAt, nextAdjustment);
     const nextStatus = suggestedStatusForSowingDate(cropType, crop.datePlanted || crop.plantedAt, nextAdjustment);
-    const result = await Swal.fire({
-      title: change > 0 ? '¿Avanzar un día?' : '¿Retroceder un día?',
-      text: `El cultivo pasará del día ${currentDay} al día ${nextDay} del ciclo${nextStatus !== crop.status ? ` y cambiará a ${translateStatus(nextStatus)}` : ''}.`,
-      icon: 'question',
-      customClass: { container: 'crop-confirmation-layer' },
-      showCancelButton: true,
-      confirmButtonText: change > 0 ? 'Sí, avanzar' : 'Sí, retroceder',
-      cancelButtonText: 'Cancelar',
-      confirmButtonColor: '#0f766e'
-    });
-    if (!result.isConfirmed) return;
-    await updateCrop(crop.id, {
-      cycleDayAdjustment: nextAdjustment,
-      status: nextStatus,
-      phaseConfirmedAt: new Date().toISOString()
-    });
-    setShowPhaseChangeModal(previous => previous?.id === crop.id
-      ? { ...previous, cycleDayAdjustment: nextAdjustment, status: nextStatus }
-      : previous);
+    setShowPhaseChangeModal(previous => previous?.id === crop.id ? {
+      ...previous,
+      draftCycleDayAdjustment: nextAdjustment,
+      draftStatus: nextStatus,
+      cycleAdjustmentInfoShown: true
+    } : previous);
+  };
+
+  const saveCropCycleAdjustment = async () => {
+    const crop = showPhaseChangeModal;
+    if (!crop) return;
+    const nextAdjustment = Number(crop.draftCycleDayAdjustment || 0);
+    if (nextAdjustment === Number(crop.cycleDayAdjustment || 0)) {
+      setShowPhaseChangeModal(null);
+      return;
+    }
+    const cropType = cropTypes?.find(type => type.id === crop.cropTypeId || type.id === crop.seedId);
+    const nextStatus = suggestedStatusForSowingDate(cropType, crop.datePlanted || crop.plantedAt, nextAdjustment);
+    setSavingCycleAdjustment(true);
+    try {
+      await updateCrop(crop.id, {
+        cycleDayAdjustment: nextAdjustment,
+        status: nextStatus,
+        phaseConfirmedAt: new Date().toISOString()
+      });
+      setShowPhaseChangeModal(null);
+      await Swal.fire({ title: 'Ciclo actualizado', text: `El cultivo queda en el día ${cropCycleDay(crop.datePlanted || crop.plantedAt, nextAdjustment)} y en fase ${translateStatus(nextStatus)}.`, icon: 'success', customClass: { container: 'crop-confirmation-layer' }, timer: 1800, showConfirmButton: false });
+    } finally {
+      setSavingCycleAdjustment(false);
+    }
   };
 
   const openCropScheduleEditor = async crop => {
@@ -1098,7 +1127,7 @@ export default function Crops() {
   <svg width="14" height="14" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
 </button>
 
-                                <button onClick={() => setShowPhaseChangeModal(crop)} title="Ajustar día del ciclo o calendario" style={{ padding: '0.35rem 0.75rem', borderRadius: '0.5rem', border: '1px solid #cbd5e1', backgroundColor: '#f8fafc', color: '#334155', fontWeight: 'bold', fontSize: '0.75rem', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.35rem', boxShadow: '0 1px 2px rgba(0,0,0,0.05)' }}>Ajustar</button>
+                                <button onClick={() => openCropCycleEditor(crop)} title="Ajustar día del ciclo o calendario" style={{ padding: '0.35rem 0.75rem', borderRadius: '0.5rem', border: '1px solid #cbd5e1', backgroundColor: '#f8fafc', color: '#334155', fontWeight: 'bold', fontSize: '0.75rem', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.35rem', boxShadow: '0 1px 2px rgba(0,0,0,0.05)' }}>Ajustar</button>
                               </div>
                             </td>
                           </tr>
@@ -2928,27 +2957,37 @@ export default function Crops() {
 
 {showPhaseChangeModal && (() => {
         const cType = cropTypes?.find(c => c.id === showPhaseChangeModal.seedId || c.id === showPhaseChangeModal.cropTypeId);
-        const cycleDay = cropCycleDay(showPhaseChangeModal.datePlanted || showPhaseChangeModal.plantedAt, showPhaseChangeModal.cycleDayAdjustment);
+        const draftAdjustment = Number(showPhaseChangeModal.draftCycleDayAdjustment || 0);
+        const originalAdjustment = Number(showPhaseChangeModal.cycleDayAdjustment || 0);
+        const cycleDay = cropCycleDay(showPhaseChangeModal.datePlanted || showPhaseChangeModal.plantedAt, draftAdjustment);
         const harvestDay = getCropCycleOffsets(cType).harvest;
-        const plannedHarvest = expectedHarvestDate(cType, showPhaseChangeModal.datePlanted || showPhaseChangeModal.plantedAt, showPhaseChangeModal.cycleDayAdjustment);
+        const draftStatus = suggestedStatusForSowingDate(cType, showPhaseChangeModal.datePlanted || showPhaseChangeModal.plantedAt, draftAdjustment);
+        const plannedHarvest = expectedHarvestDate(cType, showPhaseChangeModal.datePlanted || showPhaseChangeModal.plantedAt, draftAdjustment);
+        const hasChanges = draftAdjustment !== originalAdjustment;
         return (
         <div style={modalOverlayStyle}>
           <div style={modalCardStyle}>
             <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '1.5rem', alignItems: 'center' }}>
-              <h3 style={{ fontSize: '1.5rem', fontWeight: '900', color: '#0f172a', margin: 0 }}>Ajustar día del ciclo</h3>
+              <div>
+                <span style={{ color: '#0f766e', fontSize: '0.7rem', fontWeight: 900, letterSpacing: '0.08em' }}>AJUSTAR DÍA DEL CICLO</span>
+                <h3 style={{ fontSize: '1.5rem', fontWeight: '900', color: '#0f172a', margin: '0.15rem 0' }}>{cType?.name || 'Cultivo sin identificar'}</h3>
+                <small style={{ color: '#64748b' }}>Lote {showPhaseChangeModal.cultivationBatchNumber || showPhaseChangeModal.batchNumber || 'sin número'}</small>
+              </div>
               <button onClick={() => setShowPhaseChangeModal(null)} style={{ background: 'transparent', border: 'none', fontSize: '1.5rem', cursor: 'pointer', color: '#64748b' }}>&times;</button>
             </div>
             <p style={{ margin: '0 0 1rem', color: '#475569', fontSize: '0.9rem' }}>
               Avanza o retrocede de uno en uno. La fase cambiará automáticamente al cruzar el límite configurado en la ficha del cultivo.
             </p>
             <div style={{ marginBottom: '1.25rem', padding: '1rem', borderRadius: '12px', background: '#ecfdf5', textAlign: 'center' }}>
-              <span style={{ display: 'block', color: '#64748b', fontSize: '0.75rem', fontWeight: 800 }}>POSICIÓN ACTUAL</span>
+              <span style={{ display: 'block', color: '#64748b', fontSize: '0.75rem', fontWeight: 800 }}>{hasChanges ? 'VISTA PREVIA' : 'POSICIÓN ACTUAL'}</span>
               <strong style={{ display: 'block', margin: '0.2rem 0', color: '#0f766e', fontSize: '1.8rem' }}>Día {cycleDay} de {harvestDay}</strong>
-              <span style={{ color: '#334155', fontSize: '0.85rem' }}>{translateStatus(showPhaseChangeModal.status)} · Cosecha prevista {plannedHarvest?.toLocaleDateString('es-ES') || 'sin fecha'}</span>
+              <span style={{ display: 'inline-block', padding: '0.25rem 0.65rem', borderRadius: '999px', background: hasChanges && draftStatus !== showPhaseChangeModal.status ? '#fef3c7' : '#d1fae5', color: hasChanges && draftStatus !== showPhaseChangeModal.status ? '#92400e' : '#166534', fontSize: '0.82rem', fontWeight: 900 }}>{translateStatus(draftStatus)}</span>
+              {hasChanges && draftStatus !== showPhaseChangeModal.status && <small style={{ display: 'block', marginTop: '0.45rem', color: '#64748b' }}>Antes: {translateStatus(showPhaseChangeModal.status)}</small>}
+              <span style={{ display: 'block', marginTop: '0.45rem', color: '#334155', fontSize: '0.8rem' }}>Cosecha prevista {plannedHarvest?.toLocaleDateString('es-ES') || 'sin fecha'}</span>
             </div>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem', marginBottom: '1.5rem' }}>
-              <button type="button" className="btn btn-secondary" onClick={() => adjustCropCycleDay(showPhaseChangeModal, -1)}>−1 día</button>
-              <button type="button" className="btn btn-primary" onClick={() => adjustCropCycleDay(showPhaseChangeModal, 1)}>+1 día</button>
+              <button type="button" className="btn btn-secondary" onClick={() => adjustCropCycleDayDraft(-1)}>−1 día</button>
+              <button type="button" className="btn btn-primary" onClick={() => adjustCropCycleDayDraft(1)}>+1 día</button>
             </div>
 
             <div style={{ marginBottom: '1.5rem', padding: '0.9rem', border: '1px solid #e2e8f0', borderRadius: '12px', background: '#f8fafc' }}>
@@ -2973,8 +3012,9 @@ export default function Crops() {
               </div>
             </div>
 
-            <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
-              <button onClick={() => setShowPhaseChangeModal(null)} className="btn btn-secondary">Cerrar</button>
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.65rem' }}>
+              <button onClick={() => setShowPhaseChangeModal(null)} className="btn btn-secondary" disabled={savingCycleAdjustment}>Cancelar</button>
+              <button onClick={saveCropCycleAdjustment} className="btn btn-primary" disabled={!hasChanges || savingCycleAdjustment}>{savingCycleAdjustment ? 'Guardando…' : 'Guardar cambios'}</button>
             </div>
           </div>
         </div>
