@@ -401,7 +401,7 @@ export default function Profitability({
       return { id: article.id, name: article.name, type: article.type, quantity, unitCost, total };
     }).filter(row => row.quantity > 0).sort((a, b) => b.total - a.total);
     const materialStockValue = stockValueRows.reduce((sum, row) => sum + row.total, 0);
-    const operatingProfit = report.revenue - report.cost - generalExpensesTotal;
+    const operatingProfit = report.tracedRevenue - report.cost - generalExpensesTotal;
     const cashOut = purchases + paidGeneralExpenses;
 
     return {
@@ -428,7 +428,7 @@ export default function Profitability({
       cashOut,
       cashBalance: collected - cashOut
     };
-  }, [articles, clients, deliveryNotes, expenses, harvests, invoices, latestArticleUnitCost, productMovements, products, providers, purchaseDeliveryNotes, report.cost, report.revenue, selectedBounds.end, selectedBounds.start, stockLots]);
+  }, [articles, clients, deliveryNotes, expenses, harvests, invoices, latestArticleUnitCost, productMovements, products, providers, purchaseDeliveryNotes, report.cost, report.tracedRevenue, selectedBounds.end, selectedBounds.start, stockLots]);
 
   const intelligence = useMemo(() => {
     const isAllProducts = intelligenceProductId === '__ALL__';
@@ -721,12 +721,8 @@ export default function Profitability({
       };
     })
     .sort((a, b) => b.date.localeCompare(a.date));
-  const currentWeekStart = new Date();
-  currentWeekStart.setHours(0, 0, 0, 0);
-  currentWeekStart.setDate(currentWeekStart.getDate() - ((currentWeekStart.getDay() + 6) % 7));
-  const currentWeekEnd = new Date(currentWeekStart);
-  currentWeekEnd.setDate(currentWeekEnd.getDate() + 6);
-  currentWeekEnd.setHours(23, 59, 59, 999);
+  const currentWeekStart = new Date(`${selectedBounds.start}T00:00:00`);
+  const currentWeekEnd = new Date(`${selectedBounds.end}T23:59:59`);
   const activeHarvestCostRows = (crops || []).map(crop => {
     if (['HARVESTED', 'DISCARDED'].includes(String(crop.status || '').toUpperCase()) || Number(crop.traysCount || 0) <= 0) return null;
     const cropType = (cropTypes || []).find(item => String(item.id) === String(crop.cropTypeId || crop.seedId));
@@ -1167,7 +1163,7 @@ export default function Profitability({
         {section === 'production' && (
           <section style={{ margin: '0 1rem 1rem', display: 'grid', gap: '0.8rem' }}>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, minmax(0, 1fr))', gap: '0.65rem' }}>
-              <article style={{ padding: '0.8rem', border: '1px solid #fde68a', borderRadius: '0.8rem', background: '#fffbeb' }}><span style={{ display: 'block', color: '#a16207', fontSize: '0.68rem', fontWeight: 850 }}>EN MARCHA · ESTA SEMANA</span><strong style={{ display: 'block', color: '#92400e', fontSize: '1.15rem' }}>{money(activeHarvestCostTotal)}</strong><small style={{ color: '#a16207' }}>{activeHarvestCostRows.length} cultivos previstos</small></article>
+              <article style={{ padding: '0.8rem', border: '1px solid #fde68a', borderRadius: '0.8rem', background: '#fffbeb' }}><span style={{ display: 'block', color: '#a16207', fontSize: '0.68rem', fontWeight: 850 }}>EN MARCHA · PERIODO</span><strong style={{ display: 'block', color: '#92400e', fontSize: '1.15rem' }}>{money(activeHarvestCostTotal)}</strong><small style={{ color: '#a16207' }}>{activeHarvestCostRows.length} cultivos con cosecha prevista</small></article>
               <article style={{ padding: '0.8rem', border: '1px solid #bbf7d0', borderRadius: '0.8rem', background: '#f0fdf4' }}><span style={{ display: 'block', color: '#15803d', fontSize: '0.68rem', fontWeight: 850 }}>COSECHADO · PERIODO</span><strong style={{ display: 'block', color: '#166534', fontSize: '1.15rem' }}>{money(financialControl.productionCost)}</strong><small style={{ color: '#15803d' }}>{financialControl.producedUnits} unidades producidas</small></article>
               <article style={{ padding: '0.8rem', border: '1px solid #bae6fd', borderRadius: '0.8rem', background: '#f0f9ff' }}><span style={{ display: 'block', color: '#0369a1', fontSize: '0.68rem', fontWeight: 850 }}>TÁPERES Y ETIQUETAS</span><strong style={{ display: 'block', color: '#075985', fontSize: '1.15rem' }}>{money(harvestedPackagingTotal + harvestedLabelTotal)}</strong><small style={{ color: '#0369a1' }}>Táperes {money(harvestedPackagingTotal)} · Etiquetas {money(harvestedLabelTotal)}</small></article>
               <article style={{ padding: '0.8rem', border: '1px solid #ddd6fe', borderRadius: '0.8rem', background: '#f5f3ff' }}><span style={{ display: 'block', color: '#6d28d9', fontSize: '0.68rem', fontWeight: 850 }}>CONTROL DE PRODUCCIÓN</span><strong style={{ display: 'block', color: '#5b21b6', fontSize: '1.15rem' }}>{money(activeHarvestCostTotal + financialControl.productionCost)}</strong><small style={{ color: '#6d28d9' }}>En marcha + cosechado y envasado</small></article>
