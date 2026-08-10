@@ -10,6 +10,7 @@ import '../crops.css';
 import React from 'react';
 import Swal from 'sweetalert2';
 import { useAdminMode } from '../context/AdminModeContext';
+import { useAuth } from '../context/AuthContext';
 
 const productLotInitials = productName => {
   const cleanName = String(productName || 'LOTE')
@@ -190,6 +191,8 @@ class ErrorBoundary extends React.Component {
 export default function Crops() {
   const navigate = useNavigate();
   const { requireAdmin } = useAdminMode();
+  const { profile } = useAuth();
+  const canEditTraceability = ['admin', 'superadmin'].includes(profile?.role);
   const { 
     crops, sowCrop, updateCrop, increaseCropTrays, advanceCropStatus, setCropPhase, discardCrop, deleteCrop,
     stockEntries, stockLots, articles, seedVarieties, providers,
@@ -417,7 +420,19 @@ export default function Crops() {
     }
   };
 
+  const showTraceabilityRestriction = () => Swal.fire({
+    title: 'Cambio restringido',
+    text: 'Las fechas del cultivo forman parte de la trazabilidad. Comunica la corrección a un administrador.',
+    icon: 'info',
+    confirmButtonText: 'Entendido',
+    confirmButtonColor: '#0f766e'
+  });
+
   const adjustCropDay = async (crop, daysForward) => {
+    if (!canEditTraceability) {
+      await showTraceabilityRestriction();
+      return;
+    }
     const cropType = cropTypes?.find(type => type.id === crop.cropTypeId || type.id === crop.seedId);
     if (!cropType) return;
     const planted = new Date(crop.datePlanted || crop.plantedAt);
@@ -434,7 +449,11 @@ export default function Crops() {
     });
   };
 
-  const openCropScheduleEditor = crop => {
+  const openCropScheduleEditor = async crop => {
+    if (!canEditTraceability) {
+      await showTraceabilityRestriction();
+      return;
+    }
     const cropType = cropTypes?.find(type => type.id === crop.cropTypeId || type.id === crop.seedId);
     const harvest = expectedHarvestDate(cropType, crop.datePlanted || crop.plantedAt);
     setEditingCropSchedule(crop);
@@ -443,6 +462,11 @@ export default function Crops() {
 
   const saveCropSchedule = async event => {
     event.preventDefault();
+    if (!canEditTraceability) {
+      setEditingCropSchedule(null);
+      await showTraceabilityRestriction();
+      return;
+    }
     if (!editingCropSchedule || !cropScheduleDate) return;
     const cropType = cropTypes?.find(type => type.id === editingCropSchedule.cropTypeId || type.id === editingCropSchedule.seedId);
     if (!cropType) return;
@@ -1052,22 +1076,18 @@ export default function Crops() {
                                   Día {daysAlive >= 0 ? daysAlive : 0} / {expectedDays}
                                 </span>
                               </div>
-                              <button type="button" onClick={() => openCropScheduleEditor(crop)} style={{ marginTop: '0.25rem', padding: 0, border: 0, background: 'transparent', color: '#0f766e', fontSize: '0.68rem', fontWeight: 800, cursor: 'pointer' }}>
-                                Cosecha prevista: {plannedHarvest ? plannedHarvest.toLocaleDateString('es-ES', { day: '2-digit', month: '2-digit' }) : 'Sin fecha'} · editar
-                              </button>
+                              <div style={{ marginTop: '0.25rem', color: '#0f766e', fontSize: '0.68rem', fontWeight: 800 }}>
+                                Cosecha prevista: {plannedHarvest ? plannedHarvest.toLocaleDateString('es-ES', { day: '2-digit', month: '2-digit' }) : 'Sin fecha'}
+                              </div>
                             </td>
                             <td style={{ padding: '0.5rem 1rem', textAlign: 'right' }}>
                               <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'flex-end' }}>
                                 <button onClick={() => openCropTrayEditor(crop)} title="Aumentar bandejas" style={{ padding: '0.35rem 0.75rem', borderRadius: '0.5rem', border: '1px solid #86efac', backgroundColor: '#f0fdf4', color: '#166534', fontWeight: 'bold', fontSize: '0.75rem', cursor: 'pointer' }}>+ Bandejas</button>
-                                <div className="crop-day-controls" title="Ajustar el cultivo día a día">
-                                  <button type="button" onClick={() => adjustCropDay(crop, -1)} title="Atrasar la cosecha un día">−1 día</button>
-                                  <button type="button" onClick={() => adjustCropDay(crop, 1)} title="Adelantar la cosecha un día">+1 día</button>
-                                </div>
                                 <button onClick={() => handleDeleteCrop(crop)} title="Eliminar Registro" style={{ padding: '0.25rem 0.5rem', borderRadius: '0.35rem', border: '1px solid #fecaca', color: '#dc2626', backgroundColor: '#fee2e2', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
   <svg width="14" height="14" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
 </button>
 
-                                <button onClick={() => { setShowPhaseChangeModal(crop); setPendingPhase(crop.status || "SOWED"); }} title="Corrección manual de fase" style={{ padding: '0.35rem 0.75rem', borderRadius: '0.5rem', border: '1px solid #cbd5e1', backgroundColor: '#f8fafc', color: '#334155', fontWeight: 'bold', fontSize: '0.75rem', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.35rem', boxShadow: '0 1px 2px rgba(0,0,0,0.05)' }}>Fase manual</button>
+                                <button onClick={() => { setShowPhaseChangeModal(crop); setPendingPhase(crop.status || "SOWED"); }} title="Ajustar fase o calendario" style={{ padding: '0.35rem 0.75rem', borderRadius: '0.5rem', border: '1px solid #cbd5e1', backgroundColor: '#f8fafc', color: '#334155', fontWeight: 'bold', fontSize: '0.75rem', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.35rem', boxShadow: '0 1px 2px rgba(0,0,0,0.05)' }}>Ajustar</button>
                               </div>
                             </td>
                           </tr>
@@ -2961,16 +2981,53 @@ export default function Crops() {
                 });
               })()}
             </div>
-            
+
+            <div style={{ marginBottom: '1.5rem', padding: '0.9rem', border: '1px solid #e2e8f0', borderRadius: '12px', background: '#f8fafc' }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '1rem' }}>
+                <div>
+                  <strong style={{ display: 'block', color: '#334155', fontSize: '0.88rem' }}>Fechas y calendario</strong>
+                  <span style={{ color: '#64748b', fontSize: '0.76rem' }}>
+                    {canEditTraceability ? 'Ajuste administrativo con repercusión en la trazabilidad.' : 'Solo un administrador puede modificar estos datos.'}
+                  </span>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    const crop = showPhaseChangeModal;
+                    setShowPhaseChangeModal(null);
+                    setPendingPhase(null);
+                    openCropScheduleEditor(crop);
+                  }}
+                  style={{ flexShrink: 0, padding: '0.55rem 0.8rem', borderRadius: '8px', border: `1px solid ${canEditTraceability ? '#99f6e4' : '#cbd5e1'}`, background: canEditTraceability ? '#f0fdfa' : '#f1f5f9', color: canEditTraceability ? '#0f766e' : '#64748b', fontWeight: 800, cursor: 'pointer', fontSize: '0.76rem' }}
+                >
+                  {canEditTraceability ? 'Editar calendario' : '🔒 Solicitar cambio'}
+                </button>
+              </div>
+            </div>
+
             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '1rem' }}>
               <button onClick={() => { setShowPhaseChangeModal(null); setPendingPhase(null); }} style={{ padding: '0.75rem 1.5rem', borderRadius: '8px', border: '1px solid #cbd5e1', backgroundColor: 'white', color: '#475569', fontWeight: 'bold', cursor: 'pointer' }}>
                 Cancelar
               </button>
               <button 
-                onClick={() => {
-                  if (pendingPhase && pendingPhase !== (showPhaseChangeModal.status || 'SOWED')) {
-                    setCropPhase(showPhaseChangeModal, pendingPhase);
+                onClick={async () => {
+                  const currentPhase = showPhaseChangeModal.status || 'SOWED';
+                  if (!pendingPhase || pendingPhase === currentPhase) {
+                    setShowPhaseChangeModal(null);
+                    setPendingPhase(null);
+                    return;
                   }
+                  const result = await Swal.fire({
+                    title: '¿Cambiar la fase?',
+                    text: `El cultivo pasará de ${translateStatus(currentPhase)} a ${translateStatus(pendingPhase)}.`,
+                    icon: 'question',
+                    showCancelButton: true,
+                    confirmButtonText: 'Sí, cambiar fase',
+                    cancelButtonText: 'Cancelar',
+                    confirmButtonColor: '#0f766e'
+                  });
+                  if (!result.isConfirmed) return;
+                  await setCropPhase(showPhaseChangeModal, pendingPhase);
                   setShowPhaseChangeModal(null);
                   setPendingPhase(null);
                 }} 
