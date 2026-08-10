@@ -3011,25 +3011,31 @@ export default function Crops() {
               </button>
               <button 
                 onClick={async () => {
-                  const currentPhase = showPhaseChangeModal.status || 'SOWED';
+                  const cropToUpdate = showPhaseChangeModal;
+                  const selectedPhase = pendingPhase;
+                  const currentPhase = cropToUpdate.status || 'SOWED';
                   if (!pendingPhase || pendingPhase === currentPhase) {
                     setShowPhaseChangeModal(null);
                     setPendingPhase(null);
                     return;
                   }
+                  setShowPhaseChangeModal(null);
+                  setPendingPhase(null);
                   const result = await Swal.fire({
                     title: '¿Cambiar la fase?',
-                    text: `El cultivo pasará de ${translateStatus(currentPhase)} a ${translateStatus(pendingPhase)}.`,
+                    text: `El cultivo pasará de ${translateStatus(currentPhase)} a ${translateStatus(selectedPhase)}.`,
                     icon: 'question',
                     showCancelButton: true,
                     confirmButtonText: 'Sí, cambiar fase',
                     cancelButtonText: 'Cancelar',
                     confirmButtonColor: '#0f766e'
                   });
-                  if (!result.isConfirmed) return;
-                  await setCropPhase(showPhaseChangeModal, pendingPhase);
-                  setShowPhaseChangeModal(null);
-                  setPendingPhase(null);
+                  if (!result.isConfirmed) {
+                    setShowPhaseChangeModal(cropToUpdate);
+                    setPendingPhase(selectedPhase);
+                    return;
+                  }
+                  await setCropPhase(cropToUpdate, selectedPhase);
                 }} 
                 style={{ padding: '0.75rem 1.5rem', borderRadius: '8px', border: 'none', backgroundColor: '#0f172a', color: 'white', fontWeight: 'bold', cursor: 'pointer', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.1)' }}>
                 Aplicar Cambio
