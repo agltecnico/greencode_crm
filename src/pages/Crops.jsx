@@ -3025,6 +3025,7 @@ export default function Crops() {
                     title: '¿Cambiar la fase?',
                     text: `El cultivo pasará de ${translateStatus(currentPhase)} a ${translateStatus(selectedPhase)}.`,
                     icon: 'question',
+                    customClass: { container: 'crop-confirmation-layer' },
                     showCancelButton: true,
                     confirmButtonText: 'Sí, cambiar fase',
                     cancelButtonText: 'Cancelar',
