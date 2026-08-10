@@ -67,7 +67,7 @@ export default function Layout() {
           <button className="menu-btn" onClick={() => setSidebarOpen(true)} aria-label="Abrir menú">
             <Menu size={24} />
           </button>
-          <h1 className="page-title">Microgreens CRM</h1>
+          <h1 className="page-title">Administración</h1>
           <div className="user-profile">
             <span style={{ fontSize: '.75rem', color: '#64748b' }}>{profile?.display_name}</span>
             <AdminModeButton />

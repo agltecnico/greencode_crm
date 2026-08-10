@@ -398,13 +398,11 @@ export default function Dashboard() {
     <div className="admin-dashboard">
       <header className="admin-welcome">
         <div>
-          <h1>Dashboard <span>{companyProfile?.commercialName || companyProfile?.fiscalName || 'GreenCode'}</span></h1>
-          <p>{data.periodLabel}</p>
+          <span className="admin-welcome-eyebrow">CONTROL EJECUTIVO</span>
+          <h1>Panel de gestión</h1>
+          <p>Ventas, producción y rentabilidad en una sola vista</p>
         </div>
-        <div className="admin-header-actions">
-          <button className="admin-secondary-action" onClick={() => setDetailsOpen(true)}>Ver informe completo</button>
-          <button className="admin-primary-action" onClick={() => openFinancial('summary')}>Centro financiero <ArrowRight size={17} /></button>
-        </div>
+        <div className="admin-welcome-period"><span>Periodo analizado</span><strong>{data.periodLabel}</strong></div>
       </header>
 
       <section className="admin-period-filter">
