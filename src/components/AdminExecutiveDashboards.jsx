@@ -1,4 +1,4 @@
-import { BarChart3, CircleDollarSign, PackageCheck, ShoppingBag, Sprout, TrendingUp, Users, WalletCards } from 'lucide-react';
+import { BarChart3, CircleDollarSign, Clock3, PackageCheck, ShoppingBag, Sprout, TrendingUp, Truck, Users, WalletCards } from 'lucide-react';
 import {
   Area, AreaChart, Bar, BarChart, CartesianGrid, Cell, Legend, Pie, PieChart,
   ResponsiveContainer, Tooltip, XAxis, YAxis
@@ -15,6 +15,12 @@ const Kpi = ({ icon, label, value, detail, tone = 'green', onClick }) => (
 );
 
 const Empty = ({ children }) => <p className="executive-empty">{children}</p>;
+
+const OrderStat = ({ icon, label, value, detail, tone, onClick }) => (
+  <button type="button" className={`executive-order-stat order-stat-${tone}`} onClick={onClick}>
+    <i>{icon}</i><span>{label}</span><strong>{value}</strong><small>{detail}</small>
+  </button>
+);
 
 export default function AdminExecutiveDashboards({ data, view, onViewChange, openFinancial, openOrders }) {
   const topProducts = data.productSales.slice(0, 6).map(row => ({ ...row, shortName: short(row.name) }));
@@ -33,10 +39,18 @@ export default function AdminExecutiveDashboards({ data, view, onViewChange, ope
     </nav>
 
     {view === 'sales' && <section className="executive-dashboard-view">
-      <header><div><span>VENTAS</span><h2>Actividad comercial del periodo</h2><p>Pedidos, facturación y comportamiento de clientes y productos.</p></div><button onClick={() => openFinancial('orders')}>Ver detalle de ventas</button></header>
+      <header><div><span>CONTROL DE PEDIDOS</span><h2>Operativa comercial de la semana</h2><p>Qué se ha solicitado, qué se ha entregado y qué queda por preparar o repartir.</p></div><button onClick={openOrders}>Abrir pedidos</button></header>
+      <div className="executive-order-control">
+        <OrderStat icon={<ShoppingBag />} label="Pedidos solicitados" value={data.requestedOrderCount} detail={`${data.requestedUnits} unidades · ${money(data.requestedOrderValue)}`} tone="navy" onClick={openOrders} />
+        <OrderStat icon={<PackageCheck />} label="Entregados" value={data.requestedDeliveredCount} detail={`${data.requestedOrderCount ? Math.round((data.requestedDeliveredCount / data.requestedOrderCount) * 100) : 0} % completado`} tone="green" onClick={openOrders} />
+        <OrderStat icon={<Clock3 />} label="Por preparar" value={data.preparingOrderCount} detail="Pedidos todavía pendientes" tone="amber" onClick={openOrders} />
+        <OrderStat icon={<PackageCheck />} label="Preparados" value={data.preparedOrderCount} detail="Listos para salir" tone="blue" onClick={openOrders} />
+        <OrderStat icon={<Truck />} label="En reparto" value={data.inTransitOrderCount} detail="En camino al cliente" tone="purple" onClick={openOrders} />
+        <OrderStat icon={<Clock3 />} label="Queda por entregar" value={data.pendingOrders} detail={`${data.pendingOrderUnits} unidades · ${money(data.pendingOrderValue)}`} tone="red" onClick={openOrders} />
+      </div>
       <div className="executive-kpis">
-        <Kpi icon={<CircleDollarSign />} label="Ventas" value={money(data.monthSales)} detail={`${data.orderCount} pedidos entregados`} onClick={() => openFinancial('orders')} />
-        <Kpi icon={<ShoppingBag />} label="Pedidos" value={data.orderCount + data.pendingOrders} detail={`${data.orderCount} entregados · ${data.pendingOrders} abiertos`} tone="purple" onClick={openOrders} />
+        <Kpi icon={<CircleDollarSign />} label="Ventas entregadas" value={money(data.monthSales)} detail={`${data.orderCount} pedidos entregados en el periodo`} onClick={() => openFinancial('orders')} />
+        <Kpi icon={<ShoppingBag />} label="Venta solicitada" value={money(data.requestedOrderValue)} detail={`${data.requestedOrderCount} pedidos · ${data.requestedUnits} unidades`} tone="purple" onClick={openOrders} />
         <Kpi icon={<Sprout />} label="Costes de producción" value={money(productionTotal)} detail={`Cultivos del periodo ${money(data.activeHarvestCostInPeriod + data.seedExpenses + data.substrateExpenses)} · táperes ${money(data.packagingExpenses)} · etiquetas ${money(data.labelExpenses)}`} tone="amber" onClick={() => openFinancial('harvests')} />
         <Kpi icon={<TrendingUp />} label="Margen bruto" value={money(data.margin)} detail={`${data.marginPercent.toFixed(1)} % sobre venta trazada`} onClick={() => openFinancial('profit-products')} />
         <Kpi icon={<BarChart3 />} label="Producto principal" value={topProducts[0]?.name || '—'} detail={topProducts[0] ? `${topProducts[0].units} uds. · ${money(topProducts[0].total)}` : 'Sin ventas'} tone="amber" onClick={() => openFinancial('products')} />

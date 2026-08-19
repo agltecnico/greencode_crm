@@ -62,7 +62,7 @@ export default function Dashboard() {
   const navigate = useNavigate();
   const [today] = useState(() => new Date());
   const defaultMonth = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}`;
-  const [filterMode, setFilterMode] = useState('month');
+  const [filterMode, setFilterMode] = useState('week');
   const [selectedMonth, setSelectedMonth] = useState(defaultMonth);
   const [selectedYear, setSelectedYear] = useState(String(today.getFullYear()));
   const [selectedWeek, setSelectedWeek] = useState(`${today.getFullYear()}-W${String(Math.ceil((((today - new Date(today.getFullYear(), 0, 1)) / 86400000) + new Date(today.getFullYear(), 0, 1).getDay() + 1) / 7)).padStart(2, '0')}`);
@@ -110,8 +110,17 @@ export default function Dashboard() {
       return inPeriod(noteByOrder.get(order.id)?.date || order.date);
     });
     const monthSales = periodOrders.reduce((sum, order) => sum + Number(order.total || 0), 0);
-    const pendingOrders = (orders || []).filter(order => order.status !== 'DELIVERED' && inPeriod(order.date || order.createdAt));
+    const requestedOrders = (orders || []).filter(order => inPeriod(order.date || order.createdAt));
+    const ordersByStatus = status => requestedOrders.filter(order => String(order.status || 'PENDING').toUpperCase() === status);
+    const requestedDeliveredOrders = ordersByStatus('DELIVERED');
+    const preparingOrders = ordersByStatus('PENDING');
+    const preparedOrders = ordersByStatus('PREPARED');
+    const inTransitOrders = ordersByStatus('IN_TRANSIT');
+    const pendingOrders = requestedOrders.filter(order => String(order.status || '').toUpperCase() !== 'DELIVERED');
     const pendingOrderValue = pendingOrders.reduce((sum, order) => sum + Number(order.total || 0), 0);
+    const requestedOrderValue = requestedOrders.reduce((sum, order) => sum + Number(order.total || 0), 0);
+    const requestedUnits = requestedOrders.reduce((sum, order) => sum + (order.items || []).reduce((itemSum, item) => itemSum + Number(item.quantity || 0), 0), 0);
+    const pendingOrderUnits = pendingOrders.reduce((sum, order) => sum + (order.items || []).reduce((itemSum, item) => itemSum + Number(item.quantity || 0), 0), 0);
     const periodInvoices = (invoices || []).filter(invoice => inPeriod(invoice.date));
     const collectedInvoices = periodInvoices.filter(invoice => invoice.isPaid === true);
     const pendingInvoices = periodInvoices.filter(invoice => invoice.isPaid !== true);
@@ -322,10 +331,18 @@ export default function Dashboard() {
       costedUnits,
       mostProfitable,
       orderCount: periodOrders.length,
+      requestedOrderCount: requestedOrders.length,
+      requestedOrderValue,
+      requestedUnits,
+      requestedDeliveredCount: requestedDeliveredOrders.length,
+      preparingOrderCount: preparingOrders.length,
+      preparedOrderCount: preparedOrders.length,
+      inTransitOrderCount: inTransitOrders.length,
       units: [...productTotals.values()].reduce((sum, item) => sum + item.units, 0),
       averageTicket: periodOrders.length ? monthSales / periodOrders.length : 0,
       pendingOrders: pendingOrders.length,
       pendingOrderValue,
+      pendingOrderUnits,
       collected,
       collectedInvoiceCount: collectedInvoices.length,
       pendingCollection,
