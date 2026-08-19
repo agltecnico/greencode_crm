@@ -13,6 +13,14 @@ const money = value => new Intl.NumberFormat('es-ES', {
   currency: 'EUR'
 }).format(Number(value || 0));
 
+const cropPhaseLabel = status => ({
+  SOAKING: 'Remojo',
+  GERMINATING: 'Germinación',
+  DARKNESS: 'Oscuridad',
+  LIGHT: 'Luz',
+  READY: 'Lista para cosechar'
+}[String(status || '').toUpperCase()] || status || '—');
+
 const monthBounds = () => {
   const now = new Date();
   const start = new Date(now.getFullYear(), now.getMonth(), 1);
@@ -1169,9 +1177,11 @@ export default function Profitability({
               <article style={{ padding: '0.8rem', border: '1px solid #ddd6fe', borderRadius: '0.8rem', background: '#f5f3ff' }}><span style={{ display: 'block', color: '#6d28d9', fontSize: '0.68rem', fontWeight: 850 }}>CONTROL DE PRODUCCIÓN</span><strong style={{ display: 'block', color: '#5b21b6', fontSize: '1.15rem' }}>{money(activeHarvestCostTotal + financialControl.productionCost)}</strong><small style={{ color: '#6d28d9' }}>En marcha + cosechado y envasado</small></article>
             </div>
             {activeHarvestCostRows.length > 0 && (
-              <div className="table-container" style={{ border: '1px solid #fde68a', borderRadius: '0.8rem', background: 'white' }}>
-                <table><thead><tr><th>Fecha prevista</th><th>Cultivo / lote</th><th>Fase</th><th>Bandejas</th><th>Semilla</th><th>Sustrato</th><th>Bandeja</th><th>Coste/bandeja</th><th>Total en marcha</th></tr></thead>
-                  <tbody>{activeHarvestCostRows.map(row => <tr key={row.id}><td>{row.harvestDate.toLocaleDateString('es-ES')}</td><td><strong>{row.name}</strong><small className="profit-cell-note">{row.batchNumber}</small></td><td>{row.status}</td><td>{row.trays}</td><td>{money(row.seedCost)}</td><td>{money(row.substrateCost)}</td><td>{money(row.trayCost)}</td><td>{money(row.costPerTray)}</td><td><strong>{money(row.total)}</strong></td></tr>)}</tbody>
+              <div className="table-container profit-active-crops-table">
+                <table>
+                  <colgroup><col className="col-date"/><col className="col-crop"/><col className="col-phase"/><col className="col-trays"/><col/><col/><col/><col className="col-unit-cost"/><col className="col-total"/></colgroup>
+                  <thead><tr><th>Fecha prevista</th><th>Cultivo / lote</th><th>Fase</th><th>Bandejas</th><th>Semilla</th><th>Sustrato</th><th>Bandeja</th><th>Coste/bandeja</th><th>Total en marcha</th></tr></thead>
+                  <tbody>{activeHarvestCostRows.map(row => <tr key={row.id}><td><strong>{row.harvestDate.toLocaleDateString('es-ES')}</strong></td><td><strong className="profit-crop-name">{row.name}</strong><small className="profit-cell-note">{row.batchNumber}</small></td><td><span className={`profit-phase-badge phase-${String(row.status || '').toLowerCase()}`}>{cropPhaseLabel(row.status)}</span></td><td className="profit-number-cell"><strong>{row.trays}</strong></td><td className="profit-money-cell">{money(row.seedCost)}</td><td className="profit-money-cell">{money(row.substrateCost)}</td><td className="profit-money-cell">{money(row.trayCost)}</td><td className="profit-money-cell">{money(row.costPerTray)}</td><td className="profit-total-cell"><strong>{money(row.total)}</strong></td></tr>)}</tbody>
                 </table>
               </div>
             )}
