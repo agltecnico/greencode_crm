@@ -3,7 +3,7 @@ import { createContext, useContext, useState } from 'react';
 import Swal from 'sweetalert2';
 
 const AdminModeContext = createContext(null);
-const ADMIN_PASSWORD_HASH = '050882dde08083177a10aeb37cd6e9b66e22faa97794fa7eb0efe9a9b600dab1';
+const ADMIN_PASSWORD_HASH = '609c48c21393c72ca38665dc42b24aafb89609676604633fd028df967ae691c7';
 
 const sha256 = async (value) => {
   const bytes = new TextEncoder().encode(value);
