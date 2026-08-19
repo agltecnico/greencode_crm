@@ -193,7 +193,10 @@ export default function Dashboard() {
           name: new Intl.DateTimeFormat('es-ES', { day: '2-digit', month: 'short' }).format(cursor).replace('.', ''),
           Ventas: 0,
           'Coste vendido': 0,
-          'Gastos generales': 0
+          'Gastos generales': 0,
+          'Coste cultivo': 0,
+          Envases: 0,
+          Etiquetas: 0
         });
       }
     } else {
@@ -207,7 +210,10 @@ export default function Dashboard() {
           name: new Intl.DateTimeFormat('es-ES', { month: 'short', year: '2-digit' }).format(cursor).replace('.', ''),
           Ventas: 0,
           'Coste vendido': 0,
-          'Gastos generales': 0
+          'Gastos generales': 0,
+          'Coste cultivo': 0,
+          Envases: 0,
+          Etiquetas: 0
         });
         cursor.setMonth(cursor.getMonth() + 1);
       }
@@ -232,6 +238,22 @@ export default function Dashboard() {
       const key = periodDays <= 62 ? String(expenseDate || '').slice(0, 10) : monthKey(expenseDate);
       const item = chartMap.get(key);
       if (item) item['Gastos generales'] += Number(expense.total ?? expense.amount ?? 0);
+    });
+    activeProductionRows.forEach(crop => {
+      const harvestKey = localDate(crop.harvestDate);
+      const key = periodDays <= 62 ? harvestKey : monthKey(harvestKey);
+      const item = chartMap.get(key);
+      if (item) item['Coste cultivo'] += crop.seedCost + crop.substrateCost + crop.trayCost;
+    });
+    periodHarvests.forEach(harvest => {
+      const harvestDate = harvest.harvestDate || harvest.createdAt;
+      const harvestDateKey = harvestDate ? localDate(new Date(harvestDate)) : '';
+      const key = periodDays <= 62 ? harvestDateKey : monthKey(harvestDateKey);
+      const item = chartMap.get(key);
+      if (!item) return;
+      item['Coste cultivo'] += Number(harvest.seedCost || 0) + Number(harvest.substrateCost || 0);
+      item.Envases += Number(harvest.packagingCost || 0);
+      item.Etiquetas += Number(harvest.labelCost || 0);
     });
 
     const productTotals = new Map();
