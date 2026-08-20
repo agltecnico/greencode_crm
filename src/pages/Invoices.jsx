@@ -1,7 +1,18 @@
 import Swal from 'sweetalert2';
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
+import { Banknote, CalendarClock, CheckCircle2, CircleAlert, Search, UsersRound, WalletCards } from 'lucide-react';
 import { useData } from '../context/DataContext';
 import { generateInvoicePDF, generateInvoiceBlob } from '../utils/pdf';
+
+const money = value => Number(value || 0).toLocaleString('es-ES', { style: 'currency', currency: 'EUR' });
+
+const getDueDate = invoice => {
+  const date = new Date(invoice.date);
+  const termMatch = String(invoice.paymentMethod || '').match(/(\d+)/);
+  const days = termMatch ? Number(termMatch[1]) : 0;
+  date.setDate(date.getDate() + days);
+  return date;
+};
 
 export default function Invoices() {
   const { clients, deliveryNotes, invoices, addInvoice, deleteInvoice, markInvoiceAsPaid } = useData();
@@ -13,6 +24,10 @@ export default function Invoices() {
   const [documentType, setDocumentType] = useState('INVOICE');
   const [invoiceDate, setInvoiceDate] = useState(new Date().toISOString().split('T')[0]);
   const [filterStatus, setFilterStatus] = useState('ALL');
+  const [filterClientId, setFilterClientId] = useState('');
+  const [filterQuery, setFilterQuery] = useState('');
+  const [filterStartDate, setFilterStartDate] = useState('');
+  const [filterEndDate, setFilterEndDate] = useState('');
 
   // Sharing state
   const [sharingInvoice, setSharingInvoice] = useState(null);
@@ -123,9 +138,6 @@ export default function Invoices() {
     // Use context to add and update status
     addInvoice(newInvoice, selectedNotes);
 
-    // Get the full delivery note objects to print
-    const notesToPrint = deliveryNotes.filter(dn => selectedNotes.includes(dn.id));
-    
     // Auto download PDF is disabled per user request
     // await generateInvoicePDF(newInvoice, client, notesToPrint);
 
@@ -203,24 +215,128 @@ export default function Invoices() {
     }
   };
 
-  const filteredInvoices = invoices.filter(inv => {
-    if (filterStatus === 'ALL') return true;
-    if (filterStatus === 'PENDING') return !inv.isPaid;
-    if (filterStatus === 'PAID') return inv.isPaid;
+  const invoiceRows = useMemo(() => invoices.map(invoice => {
+    const client = clients.find(item => item.id === invoice.clientId);
+    const dueDate = getDueDate(invoice);
+    const isOverdue = invoice.isPaid !== true && dueDate.getTime() < new Date().setHours(0, 0, 0, 0);
+    return { ...invoice, client, dueDate, isOverdue };
+  }), [clients, invoices]);
+
+  const filteredInvoices = useMemo(() => invoiceRows.filter(invoice => {
+    if (filterStatus === 'PENDING' && invoice.isPaid) return false;
+    if (filterStatus === 'PAID' && !invoice.isPaid) return false;
+    if (filterStatus === 'OVERDUE' && !invoice.isOverdue) return false;
+    if (filterClientId && invoice.clientId !== filterClientId) return false;
+    const invoiceTime = new Date(invoice.date).getTime();
+    if (filterStartDate && invoiceTime < new Date(`${filterStartDate}T00:00:00`).getTime()) return false;
+    if (filterEndDate && invoiceTime > new Date(`${filterEndDate}T23:59:59`).getTime()) return false;
+    const haystack = `${invoice.invoiceNumber || ''} ${invoice.client?.name || ''} ${invoice.client?.commercialName || ''}`.toLocaleLowerCase('es');
+    if (filterQuery.trim() && !haystack.includes(filterQuery.trim().toLocaleLowerCase('es'))) return false;
     return true;
-  });
+  }), [filterClientId, filterEndDate, filterQuery, filterStartDate, filterStatus, invoiceRows]);
+
+  const collectionSummary = useMemo(() => invoiceRows.reduce((summary, invoice) => {
+    const total = Number(invoice.total || 0);
+    summary.invoiced += total;
+    if (invoice.isPaid) summary.collected += total;
+    else {
+      summary.pending += total;
+      summary.pendingCount += 1;
+      if (invoice.isOverdue) {
+        summary.overdue += total;
+        summary.overdueCount += 1;
+      }
+    }
+    return summary;
+  }, { invoiced: 0, collected: 0, pending: 0, overdue: 0, pendingCount: 0, overdueCount: 0 }), [invoiceRows]);
+
+  const debtorClients = useMemo(() => {
+    const grouped = new Map();
+    invoiceRows.filter(invoice => !invoice.isPaid).forEach(invoice => {
+      const key = invoice.clientId || 'unknown';
+      const current = grouped.get(key) || {
+        id: key,
+        name: invoice.client?.commercialName || invoice.client?.name || 'Cliente desconocido',
+        pending: 0,
+        overdue: 0,
+        documents: 0,
+        oldest: invoice.date
+      };
+      current.pending += Number(invoice.total || 0);
+      current.documents += 1;
+      if (invoice.isOverdue) current.overdue += Number(invoice.total || 0);
+      if (new Date(invoice.date) < new Date(current.oldest)) current.oldest = invoice.date;
+      grouped.set(key, current);
+    });
+    return Array.from(grouped.values()).sort((a, b) => b.pending - a.pending);
+  }, [invoiceRows]);
+
+  const unbilledSummary = useMemo(() => deliveryNotes.reduce((summary, note) => {
+    if (note.status !== 'BILLED') {
+      summary.total += Number(note.total || 0);
+      summary.count += 1;
+    }
+    return summary;
+  }, { total: 0, count: 0 }), [deliveryNotes]);
+
+  const clearFilters = () => {
+    setFilterStatus('ALL');
+    setFilterClientId('');
+    setFilterQuery('');
+    setFilterStartDate('');
+    setFilterEndDate('');
+  };
+
+  const handlePaymentStatusChange = async (invoice, isPaid) => {
+    const result = await Swal.fire({
+      title: isPaid ? 'Confirmar cobro' : 'Reabrir factura',
+      text: isPaid
+        ? `Se marcará ${invoice.invoiceNumber} por ${money(invoice.total)} como cobrada.`
+        : `La factura ${invoice.invoiceNumber} volverá a figurar como pendiente.`,
+      icon: isPaid ? 'question' : 'warning',
+      showCancelButton: true,
+      confirmButtonText: isPaid ? 'Sí, registrar cobro' : 'Sí, reabrir',
+      cancelButtonText: 'Cancelar',
+      confirmButtonColor: isPaid ? '#059669' : '#d97706'
+    });
+    if (result.isConfirmed) await markInvoiceAsPaid(invoice.id, isPaid);
+  };
 
   return (
-    <div className="admin-container">
-      <div className="admin-header" style={{ marginBottom: '1.5rem' }}>
+    <div className="admin-container billing-page">
+      <div className="admin-header billing-header">
         <div>
-          <h2 className="text-2xl font-bold">Facturación</h2>
-          <p className="text-muted" style={{ marginTop: '0.25rem' }}>Emisión de facturas y control de pagos.</p>
+          <span>ADMINISTRACIÓN DE VENTAS</span>
+          <h2>Facturación y cobros</h2>
+          <p>Controla lo facturado, quién debe dinero y los albaranes que todavía faltan por facturar.</p>
         </div>
-        <button className="btn btn-primary shadow-sm" onClick={() => setIsAdding(true)}>
-          + Nueva Factura
+        <button className="billing-primary-action" onClick={() => setIsAdding(true)}>
+          + Crear factura
         </button>
       </div>
+
+      <section className="billing-kpis">
+        <article><WalletCards /><div><span>Total facturado</span><strong>{money(collectionSummary.invoiced)}</strong><small>{invoiceRows.length} documentos emitidos</small></div></article>
+        <article className="is-positive"><CheckCircle2 /><div><span>Total cobrado</span><strong>{money(collectionSummary.collected)}</strong><small>Ingresos confirmados</small></div></article>
+        <article className="is-warning"><Banknote /><div><span>Pendiente de cobro</span><strong>{money(collectionSummary.pending)}</strong><small>{collectionSummary.pendingCount} facturas pendientes</small></div></article>
+        <article className="is-danger"><CircleAlert /><div><span>Vencido</span><strong>{money(collectionSummary.overdue)}</strong><small>{collectionSummary.overdueCount} facturas fuera de plazo</small></div></article>
+        <article className="is-purple"><CalendarClock /><div><span>Sin facturar</span><strong>{money(unbilledSummary.total)}</strong><small>{unbilledSummary.count} albaranes entregados</small></div></article>
+      </section>
+
+      <section className="billing-debtors">
+        <header><div><span>CUENTAS POR COBRAR</span><h3>Clientes con saldo pendiente</h3></div><strong>{debtorClients.length} clientes</strong></header>
+        {debtorClients.length ? (
+          <div className="billing-debtor-list">
+            {debtorClients.slice(0, 6).map(client => (
+              <button key={client.id} onClick={() => { setFilterClientId(client.id === 'unknown' ? '' : client.id); setFilterStatus('PENDING'); }}>
+                <span className="billing-debtor-avatar"><UsersRound size={18} /></span>
+                <span className="billing-debtor-name"><strong>{client.name}</strong><small>{client.documents} factura{client.documents === 1 ? '' : 's'} · desde {new Date(client.oldest).toLocaleDateString('es-ES')}</small></span>
+                <span className="billing-debtor-amount"><strong>{money(client.pending)}</strong><small className={client.overdue > 0 ? 'has-overdue' : ''}>{client.overdue > 0 ? `${money(client.overdue)} vencido` : 'En plazo'}</small></span>
+              </button>
+            ))}
+          </div>
+        ) : <div className="billing-all-clear"><CheckCircle2 /><span><strong>Todo cobrado</strong><small>No hay clientes con facturas pendientes.</small></span></div>}
+      </section>
 
       {isAdding && (
         <div style={modalOverlayStyle}>
@@ -368,36 +484,30 @@ export default function Invoices() {
       )}
 
       <div>
-
-        <div className="flex gap-2 mb-4" style={{ borderBottom: '1px solid var(--color-border)', paddingBottom: '10px' }}>
-          <button 
-            className={`btn ${filterStatus === 'ALL' ? 'btn-primary' : 'btn-outline'}`}
-            style={{ borderRadius: '20px', padding: '0.4rem 1rem', fontSize: '0.85rem' }}
-            onClick={() => setFilterStatus('ALL')}
-          >
-            Todas
-          </button>
-          <button 
-            className={`btn ${filterStatus === 'PENDING' ? 'btn-primary' : 'btn-outline'}`}
-            style={{ borderRadius: '20px', padding: '0.4rem 1rem', fontSize: '0.85rem', backgroundColor: filterStatus === 'PENDING' ? '#f59e0b' : 'transparent', borderColor: '#f59e0b', color: filterStatus === 'PENDING' ? 'white' : '#b45309' }}
-            onClick={() => setFilterStatus('PENDING')}
-          >
-            ⏳ Pendientes
-          </button>
-          <button 
-            className={`btn ${filterStatus === 'PAID' ? 'btn-primary' : 'btn-outline'}`}
-            style={{ borderRadius: '20px', padding: '0.4rem 1rem', fontSize: '0.85rem', backgroundColor: filterStatus === 'PAID' ? '#10b981' : 'transparent', borderColor: '#10b981', color: filterStatus === 'PAID' ? 'white' : '#047857' }}
-            onClick={() => setFilterStatus('PAID')}
-          >
-            ✅ Cobradas
-          </button>
-        </div>
+        <section className="billing-register">
+          <header><div><span>REGISTRO DE FACTURAS</span><h3>Documentos y situación de cobro</h3></div><strong>{filteredInvoices.length} resultados</strong></header>
+          <div className="billing-filters">
+            <label className="billing-search"><Search size={17} /><input value={filterQuery} onChange={event => setFilterQuery(event.target.value)} placeholder="Buscar factura o cliente" /></label>
+            <select value={filterClientId} onChange={event => setFilterClientId(event.target.value)}>
+              <option value="">Todos los clientes</option>
+              {clients.map(client => <option key={client.id} value={client.id}>{client.commercialName || client.name}</option>)}
+            </select>
+            <label><span>Desde</span><input type="date" value={filterStartDate} onChange={event => setFilterStartDate(event.target.value)} /></label>
+            <label><span>Hasta</span><input type="date" value={filterEndDate} onChange={event => setFilterEndDate(event.target.value)} /></label>
+            <button onClick={clearFilters}>Limpiar</button>
+          </div>
+          <nav className="billing-status-tabs">
+            <button className={filterStatus === 'ALL' ? 'active' : ''} onClick={() => setFilterStatus('ALL')}>Todas <strong>{invoiceRows.length}</strong></button>
+            <button className={filterStatus === 'PENDING' ? 'active pending' : ''} onClick={() => setFilterStatus('PENDING')}>Pendientes <strong>{collectionSummary.pendingCount}</strong></button>
+            <button className={filterStatus === 'OVERDUE' ? 'active overdue' : ''} onClick={() => setFilterStatus('OVERDUE')}>Vencidas <strong>{collectionSummary.overdueCount}</strong></button>
+            <button className={filterStatus === 'PAID' ? 'active paid' : ''} onClick={() => setFilterStatus('PAID')}>Cobradas <strong>{invoiceRows.length - collectionSummary.pendingCount}</strong></button>
+          </nav>
 
         {filteredInvoices.length === 0 ? (
-           <p className="text-muted text-center py-4">No se han generado facturas todavía.</p>
+           <div className="billing-empty"><Search /><strong>No hay facturas con estos filtros</strong><span>Prueba a cambiar el cliente, las fechas o el estado.</span></div>
         ) : (
-          <div className="table-container">
-            <table className="table">
+          <div className="table-container billing-table-wrap">
+            <table className="table billing-table">
               <thead>
                 <tr>
                   <th>Referencia</th>
@@ -405,16 +515,17 @@ export default function Invoices() {
                   <th>Fecha</th>
                   <th>Cliente</th>
                   <th>Total</th>
+                  <th>Vencimiento</th>
                   <th>Estado</th>
                   <th>Acciones</th>
                 </tr>
               </thead>
               <tbody>
-                {filteredInvoices.map(inv => {
-                  const client = clients.find(c => c.id === inv.clientId);
+                {[...filteredInvoices].reverse().map(inv => {
+                  const client = inv.client;
                   const isSummary = inv.type === 'SUMMARY';
                   return (
-                    <tr key={inv.id}>
+                    <tr key={inv.id} className={inv.isOverdue ? 'is-overdue' : ''}>
                       <td className="font-mono font-bold text-secondary">{inv.invoiceNumber}</td>
                       <td>
                         <span style={{ padding: '0.2rem 0.6rem', borderRadius: '4px', fontSize: '0.75rem', fontWeight: 'bold', backgroundColor: isSummary ? '#e0e7ff' : '#dcfce7', color: isSummary ? '#4338ca' : '#166534' }}>
@@ -423,12 +534,15 @@ export default function Invoices() {
                       </td>
                       <td>{new Date(inv.date).toLocaleDateString()}</td>
                       <td className="font-medium">{client ? (client.commercialName || client.name) : 'Desconocido'}</td>
-                      <td className="font-bold text-success">{inv.total.toFixed(2)} €</td>
+                      <td className="font-bold">{money(inv.total)}</td>
+                      <td><span className={inv.isOverdue ? 'billing-due overdue' : 'billing-due'}>{inv.isPaid ? '—' : inv.dueDate.toLocaleDateString('es-ES')}</span></td>
                       <td>
                         {inv.isPaid ? (
-                          <span className="badge bg-green-500 text-white">Cobrado</span>
+                          <span className="billing-state paid">Cobrado</span>
+                        ) : inv.isOverdue ? (
+                          <span className="billing-state overdue">Vencida</span>
                         ) : (
-                          <span className="badge badge-warning">Pendiente</span>
+                          <span className="billing-state pending">Pendiente</span>
                         )}
                       </td>
                       <td className="flex gap-2 items-center flex-wrap">
@@ -436,7 +550,7 @@ export default function Invoices() {
                           <button 
                             className="btn btn-outline" 
                             style={{ padding: '0.3rem 0.6rem', fontSize: '0.8rem', color: 'green', borderColor: 'green' }}
-                            onClick={() => markInvoiceAsPaid(inv.id, true)}
+                            onClick={() => handlePaymentStatusChange(inv, true)}
                             title="Establecer como Cobrado"
                           >
                             Cobrar
@@ -445,7 +559,7 @@ export default function Invoices() {
                           <button 
                             className="btn btn-outline" 
                             style={{ padding: '0.3rem 0.6rem', fontSize: '0.8rem', color: 'gray', borderColor: 'gray' }}
-                            onClick={() => markInvoiceAsPaid(inv.id, false)}
+                            onClick={() => handlePaymentStatusChange(inv, false)}
                             title="Desmarcar Cobrado"
                           >
                             Des-cobrar
@@ -486,11 +600,12 @@ export default function Invoices() {
                       </td>
                     </tr>
                   );
-                }).reverse()}
+                })}
               </tbody>
             </table>
           </div>
         )}
+        </section>
       </div>
 
       {sharingInvoice && (

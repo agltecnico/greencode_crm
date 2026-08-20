@@ -1,5 +1,6 @@
 import Swal from 'sweetalert2';
-import { useState, Fragment } from 'react';
+import { useMemo, useState, Fragment } from 'react';
+import { CircleDollarSign, FileCheck2, FileClock, Search } from 'lucide-react';
 import { useData } from '../context/DataContext';
 import { generateDeliveryNotePDF, generateDeliveryNoteBlob } from '../utils/pdf';
 
@@ -7,6 +8,8 @@ export default function DeliveryNotes() {
   const [filterStartDate, setFilterStartDate] = useState('');
   const [filterEndDate, setFilterEndDate] = useState('');
   const [filterClientId, setFilterClientId] = useState('');
+  const [filterStatus, setFilterStatus] = useState('ALL');
+  const [filterQuery, setFilterQuery] = useState('');
   const { deliveryNotes, updateDeliveryNote, deleteDeliveryNote, clients, products } = useData();
   const [sharingAlbaran, setSharingAlbaran] = useState(null);
   const [sharePhone, setSharePhone] = useState('');
@@ -105,7 +108,7 @@ export default function DeliveryNotes() {
     let parsedDate = '';
     try {
       parsedDate = albaran.date ? albaran.date.split('T')[0] : new Date().toISOString().split('T')[0];
-    } catch(e) { parsedDate = ''; }
+    } catch { parsedDate = ''; }
 
     setEditFormData({
       date: parsedDate,
@@ -179,6 +182,19 @@ export default function DeliveryNotes() {
     setEditFormData(null);
   };
 
+  const noteSummary = useMemo(() => deliveryNotes.reduce((summary, note) => {
+    const total = Number(note.total || 0);
+    summary.total += total;
+    if (note.status === 'BILLED') {
+      summary.billed += total;
+      summary.billedCount += 1;
+    } else {
+      summary.unbilled += total;
+      summary.unbilledCount += 1;
+    }
+    return summary;
+  }, { total: 0, billed: 0, unbilled: 0, billedCount: 0, unbilledCount: 0 }), [deliveryNotes]);
+
   const filteredNotes = deliveryNotes.filter(dn => {
     if (filterStartDate) {
       const start = new Date(filterStartDate).getTime();
@@ -193,18 +209,29 @@ export default function DeliveryNotes() {
     if (filterClientId && dn.clientId !== filterClientId) {
       return false;
     }
+    if (filterStatus === 'BILLED' && dn.status !== 'BILLED') return false;
+    if (filterStatus === 'UNBILLED' && dn.status === 'BILLED') return false;
+    const client = clients.find(item => item.id === dn.clientId);
+    const haystack = `${dn.albaranNumber || ''} ${client?.name || ''} ${client?.commercialName || ''}`.toLocaleLowerCase('es');
+    if (filterQuery.trim() && !haystack.includes(filterQuery.trim().toLocaleLowerCase('es'))) return false;
     return true;
   });
 
   return (
-    <div>
-      <div className="flex justify-between items-center mb-6">
-        <h2 className="text-2xl font-bold">Albaranes de Entrega</h2>
+    <div className="delivery-management-page">
+      <div className="delivery-management-header">
+        <div><span>DOCUMENTOS DE VENTA</span><h2>Albaranes de entrega</h2><p>Localiza entregas y controla qué importes siguen pendientes de facturar.</p></div>
       </div>
 
+      <section className="delivery-management-kpis">
+        <article><CircleDollarSign /><div><span>Total entregado</span><strong>{noteSummary.total.toLocaleString('es-ES', { style: 'currency', currency: 'EUR' })}</strong><small>{deliveryNotes.length} albaranes</small></div></article>
+        <article className="billed"><FileCheck2 /><div><span>Ya facturado</span><strong>{noteSummary.billed.toLocaleString('es-ES', { style: 'currency', currency: 'EUR' })}</strong><small>{noteSummary.billedCount} albaranes</small></div></article>
+        <article className="unbilled"><FileClock /><div><span>Pendiente de facturar</span><strong>{noteSummary.unbilled.toLocaleString('es-ES', { style: 'currency', currency: 'EUR' })}</strong><small>{noteSummary.unbilledCount} albaranes</small></div></article>
+      </section>
+
       {/* Filtros */}
-      <div className="card mb-4" style={{ padding: '0.75rem 1rem', display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '0.75rem', backgroundColor: 'var(--color-surface)', borderColor: 'var(--color-border)' }}>
-        <span style={{ fontSize: '0.85rem', fontWeight: '700', color: 'var(--color-secondary)' }}>Buscar:</span>
+      <div className="card mb-4 delivery-management-filters">
+        <label className="delivery-management-search"><Search size={17} /><input value={filterQuery} onChange={event => setFilterQuery(event.target.value)} placeholder="Buscar albarán o cliente" /></label>
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.75rem', flex: 1, alignItems: 'center' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
             <span style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)', whiteSpace: 'nowrap' }}>Desde:</span>
@@ -221,12 +248,15 @@ export default function DeliveryNotes() {
               {clients.map(c => <option key={c.id} value={c.id}>{c.commercialName || c.name}</option>)}
             </select>
           </div>
+          <select className="form-control" style={{ width: 'auto', minWidth: '170px', height: '32px', padding: '0.35rem 0.5rem', fontSize: '0.8rem' }} value={filterStatus} onChange={event => setFilterStatus(event.target.value)}><option value="ALL">Todos los estados</option><option value="UNBILLED">Pendientes de facturar</option><option value="BILLED">Facturados</option></select>
         </div>
         <div>
            <button className="btn btn-secondary" style={{ padding: '0.3rem 0.5rem', fontSize: '0.75rem', height: '32px' }} onClick={() => {
              setFilterStartDate('');
              setFilterEndDate('');
              setFilterClientId('');
+             setFilterStatus('ALL');
+             setFilterQuery('');
            }}>Limpiar</button>
         </div>
       </div>
