@@ -11,6 +11,7 @@ import React from 'react';
 import Swal from 'sweetalert2';
 import { useAdminMode } from '../context/AdminModeContext';
 import { useAuth } from '../context/AuthContext';
+import { linkHarvestToDeliveredOrders } from '../services/harvestTraceability';
 
 const productLotInitials = productName => {
   const cleanName = String(productName || 'LOTE')
@@ -204,7 +205,7 @@ export default function Crops() {
     harvests, registerHarvest, editHarvestPackaging,
     productMovements,
     products, packagingFormats,
-    orders, clients, updateOrderList, companyProfile
+    orders, clients, updateOrderList, companyProfile, refreshData
   } = useData();
 
   const cropVarietyId = (crop) => {
@@ -263,6 +264,77 @@ export default function Crops() {
     };
   };
 
+  const pendingTraceabilityForProduct = productId => (productMovements || [])
+    .filter(movement =>
+      movement.type === 'ORDER'
+      && movement.productId === productId
+      && Number(movement.quantity || 0) < 0
+      && String(movement.referenceId || '').endsWith('|PENDING-TRACEABILITY')
+    )
+    .sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt));
+
+  const linkedUnitsForHarvest = harvest => (productMovements || [])
+    .filter(movement => {
+      if (movement.type !== 'ORDER' || movement.productId !== harvest.productId || Number(movement.quantity || 0) >= 0) return false;
+      if (movement.harvestId === harvest.id) return true;
+      const [, batchNumber] = String(movement.referenceId || '').split('|');
+      return batchNumber === harvest.batchNumber;
+    })
+    .reduce((sum, movement) => sum + Math.abs(Number(movement.quantity || 0)), 0);
+
+  const freeUnitsForHarvest = harvest => Math.max(0, Number(harvest.tuppersCount || 0) - linkedUnitsForHarvest(harvest));
+
+  const openHarvestTraceabilityLinker = harvest => {
+    const pending = pendingTraceabilityForProduct(harvest.productId);
+    let remaining = freeUnitsForHarvest(harvest);
+    if (remaining <= 0) {
+      Swal.fire('Cosecha asignada', 'Todas las unidades de esta cosecha ya están vinculadas a pedidos.', 'info');
+      return;
+    }
+    if (pending.length === 0) {
+      Swal.fire('Sin entregas pendientes', 'No hay pedidos entregados de este producto pendientes de trazabilidad.', 'info');
+      return;
+    }
+    const suggested = {};
+    pending.forEach(movement => {
+      const quantity = Math.min(remaining, Math.abs(Number(movement.quantity || 0)));
+      if (quantity > 0) suggested[movement.id] = quantity;
+      remaining -= quantity;
+    });
+    setTraceabilityAllocations(suggested);
+    setLinkingHarvest(harvest);
+  };
+
+  const saveHarvestTraceabilityLinks = async () => {
+    if (!linkingHarvest || savingTraceabilityLink) return;
+    const allocations = Object.entries(traceabilityAllocations)
+      .map(([movementId, quantity]) => ({ movementId, quantity: Number(quantity || 0) }))
+      .filter(allocation => allocation.quantity > 0);
+    if (allocations.length === 0) {
+      Swal.fire('Faltan unidades', 'Indica al menos una cantidad para vincular.', 'warning');
+      return;
+    }
+    setSavingTraceabilityLink(true);
+    try {
+      const result = await linkHarvestToDeliveredOrders(linkingHarvest.id, allocations);
+      await refreshData({ force: true });
+      setLinkingHarvest(null);
+      setTraceabilityAllocations({});
+      Swal.fire({
+        title: 'Trazabilidad vinculada',
+        text: `${result.linkedUnits} unidades se han asociado al lote ${result.batchNumber}.`,
+        icon: 'success',
+        timer: 2200,
+        showConfirmButton: false
+      });
+    } catch (error) {
+      console.error('No se pudo vincular la cosecha con las entregas:', error);
+      Swal.fire('No se pudo vincular', error.message || 'Revisa las cantidades e inténtalo de nuevo.', 'error');
+    } finally {
+      setSavingTraceabilityLink(false);
+    }
+  };
+
   
   const handleDeleteCrop = async (crop) => {
     if (!(await requireAdmin())) return;
@@ -297,6 +369,9 @@ export default function Crops() {
   // Modals state
   const [isSowModalOpen, setIsSowModalOpen] = useState(false);
   const [isHarvestModalOpen, setIsHarvestModalOpen] = useState(false);
+  const [linkingHarvest, setLinkingHarvest] = useState(null);
+  const [traceabilityAllocations, setTraceabilityAllocations] = useState({});
+  const [savingTraceabilityLink, setSavingTraceabilityLink] = useState(false);
   const [harvestBatchQueue, setHarvestBatchQueue] = useState([]);
   const [searchParams, setSearchParams] = useSearchParams();
   const [showPhaseChangeModal, setShowPhaseChangeModal] = useState(null);
@@ -666,21 +741,39 @@ export default function Crops() {
     setHarvestBatchQueue(remainingHarvestQueue);
     setNewHarvest(emptyHarvestForm);
     setIsHarvestModalOpen(false);
+    const registeredHarvest = {
+      id: harvestResult.harvestId,
+      productId: newHarvest.productId,
+      batchNumber: batchNum,
+      tuppersCount: totalTuppers,
+      harvestDate: selectedHarvestDate.toISOString(),
+      packagingBreakdown
+    };
+    const pendingDeliveredUnits = pendingTraceabilityForProduct(newHarvest.productId)
+      .reduce((sum, movement) => sum + Math.abs(Number(movement.quantity || 0)), 0);
     
     setTimeout(() => {
-      Swal.fire({ 
+      const hasPendingTraceability = pendingDeliveredUnits > 0;
+      Swal.fire({
         title: '¡Cosecha Registrada!', 
-        text: `Se ha guardado el lote de Sanidad: ${batchNum}. ¿Deseas imprimir las etiquetas ahora?`, 
+        text: hasPendingTraceability
+          ? `Lote ${batchNum} guardado. Hay ${pendingDeliveredUnits} unidades ya entregadas pendientes de vincular.`
+          : `Se ha guardado el lote de Sanidad: ${batchNum}. ¿Deseas imprimir las etiquetas ahora?`,
         icon: 'success', 
         showCancelButton: true,
+        showDenyButton: hasPendingTraceability,
         confirmButtonColor: '#10b981',
+        denyButtonColor: '#334155',
         cancelButtonColor: '#64748b',
-        confirmButtonText: 'Sí, imprimir PDF',
+        confirmButtonText: hasPendingTraceability ? 'Vincular entregas' : 'Sí, imprimir PDF',
+        denyButtonText: 'Imprimir PDF',
         cancelButtonText: 'Cerrar'
       }).then((result) => {
         if (result.isConfirmed) {
-          handlePrintLabelsSafe(product, batchNum, totalTuppers, selectedHarvestDate);
+          if (hasPendingTraceability) openHarvestTraceabilityLinker(registeredHarvest);
+          else handlePrintLabelsSafe(product, batchNum, totalTuppers, selectedHarvestDate);
         }
+        if (result.isDenied) handlePrintLabelsSafe(product, batchNum, totalTuppers, selectedHarvestDate);
         if (wasBatchHarvest && remainingHarvestQueue.length > 0) {
           openHarvestModalForCrop(remainingHarvestQueue[0]);
         }
@@ -1201,6 +1294,10 @@ export default function Crops() {
                 <div style={{ padding: '0.75rem', display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '0.65rem' }}>
                   {week.harvests.map(harvest => {
                     const product = products?.find(item => item.id === harvest.productId);
+                    const linkedUnits = linkedUnitsForHarvest(harvest);
+                    const freeUnits = freeUnitsForHarvest(harvest);
+                    const pendingUnits = pendingTraceabilityForProduct(harvest.productId)
+                      .reduce((sum, movement) => sum + Math.abs(Number(movement.quantity || 0)), 0);
                     return (
                       <article key={harvest.id} style={{ border: '1px solid #e2e8f0', borderRadius: '10px', padding: '0.8rem', display: 'grid', gap: '0.5rem', background: '#fff' }}>
                         <div style={{ display: 'flex', justifyContent: 'space-between', gap: '0.75rem' }}>
@@ -1217,8 +1314,11 @@ export default function Crops() {
                               || packagingFormats?.find(candidate => candidate.id === item.formatId);
                             return <span key={item.articleId || item.formatId} className="badge badge-primary">{format?.name || 'Formato'}: {item.quantity}</span>;
                           })}
+                          {linkedUnits > 0 && <span className="badge" style={{ background: '#ecfdf5', color: '#047857', border: '1px solid #a7f3d0' }}>{linkedUnits} vinculadas</span>}
+                          {pendingUnits > 0 && freeUnits > 0 && <span className="badge" style={{ background: '#fff7ed', color: '#c2410c', border: '1px solid #fed7aa' }}>{pendingUnits} entregadas sin lote</span>}
                         </div>
                         <div style={{ display: 'flex', gap: '0.45rem', justifyContent: 'flex-end', flexWrap: 'wrap' }}>
+                          {pendingUnits > 0 && freeUnits > 0 && <button type="button" className="btn btn-primary" onClick={() => openHarvestTraceabilityLinker(harvest)}>Vincular entregas</button>}
                           <button type="button" className="btn btn-secondary" onClick={() => openHarvestPackagingEditor(harvest)}>Corregir envases</button>
                           <button type="button" className="btn btn-secondary" onClick={() => handlePrintLabelsSafe(product, harvest.batchNumber, harvest.tuppersCount, harvest.harvestDate || harvest.createdAt)}>Reimprimir PDF</button>
                         </div>
@@ -1251,21 +1351,24 @@ export default function Crops() {
     };
     const pendingOrders = orders?.filter(order =>
       ['PENDING', 'PENDIENTE', 'PREPARED', 'IN_TRANSIT'].includes(order.status)
-      && isInsideInventoryRange(order.date || order.createdAt)
     ) || [];
 
     const rows = (products || []).map(product => {
-      const movements = productMovements?.filter(movement =>
-        movement.productId === product.id
-        && isInsideInventoryRange(movement.createdAt)
-      ) || [];
-      const harvested = movements
+      const allMovements = productMovements?.filter(movement => movement.productId === product.id) || [];
+      const periodMovements = allMovements.filter(movement => isInsideInventoryRange(movement.createdAt));
+      const harvested = periodMovements
         .filter(movement => movement.type === 'HARVEST')
         .reduce((sum, movement) => sum + Number(movement.quantity || 0), 0);
-      const delivered = movements
+      const delivered = periodMovements
         .filter(movement => movement.type === 'ORDER')
         .reduce((sum, movement) => sum + Math.abs(Number(movement.quantity || 0)), 0);
-      const physical = Math.max(0, harvested - delivered);
+      const physicalBalance = allMovements
+        .filter(movement => ['HARVEST', 'ORDER'].includes(movement.type))
+        .reduce((sum, movement) => sum + Number(movement.quantity || 0), 0);
+      const physical = Math.max(0, physicalBalance);
+      const pendingTraceability = allMovements
+        .filter(movement => movement.type === 'ORDER' && String(movement.referenceId || '').endsWith('|PENDING-TRACEABILITY'))
+        .reduce((sum, movement) => sum + Math.abs(Number(movement.quantity || 0)), 0);
       const reserved = pendingOrders.reduce((sum, order) =>
         sum + (order.items || [])
           .filter(item => item.productId === product.id)
@@ -1275,9 +1378,9 @@ export default function Crops() {
       const shortage = Math.max(0, reserved - physical);
       const formats = packagingArticlesForProduct(product).map(format => format.name).join(', ');
 
-      return { product, formats, harvested, delivered, physical, reserved, available, shortage };
+      return { product, formats, harvested, delivered, physical, reserved, available, shortage, pendingTraceability };
     })
-      .filter(row => row.physical > 0 || row.reserved > 0)
+      .filter(row => row.physical > 0 || row.reserved > 0 || row.pendingTraceability > 0)
       .sort((a, b) => String(a.product.name).localeCompare(String(b.product.name), 'es', { sensitivity: 'base', numeric: true }));
 
     return (
@@ -1285,7 +1388,7 @@ export default function Crops() {
         <div style={{ padding: '0.85rem 1.1rem', background: '#f8fafc', borderBottom: '1px solid #e2e8f0', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '1rem', flexWrap: 'wrap' }}>
           <div>
             <h3 style={{ margin: 0, color: '#0f172a', fontSize: '1.15rem' }}>Inventario de producto terminado</h3>
-            <span style={{ color: '#64748b', fontSize: '0.8rem' }}>Producción, entregas y reservas del periodo seleccionado</span>
+            <span style={{ color: '#64748b', fontSize: '0.8rem' }}>Stock actual global; producción y entregas se muestran para el periodo seleccionado</span>
           </div>
           <div style={{ display: 'flex', alignItems: 'flex-end', gap: '0.55rem', flexWrap: 'wrap' }}>
             <label style={{ display: 'grid', gap: '0.15rem', color: '#64748b', fontSize: '0.65rem', fontWeight: 900, textTransform: 'uppercase' }}>
@@ -1339,6 +1442,7 @@ export default function Crops() {
                 <th style={{ textAlign: 'center' }}>Balance físico</th>
                 <th style={{ textAlign: 'center' }}>Reservado</th>
                 <th style={{ textAlign: 'center' }}>Disponible</th>
+                <th style={{ textAlign: 'center' }}>Sin vincular</th>
                 <th>Estado</th>
               </tr>
             </thead>
@@ -1352,8 +1456,11 @@ export default function Crops() {
                   <td style={{ textAlign: 'center', fontWeight: 900, color: '#075985' }}>{row.physical}</td>
                   <td style={{ textAlign: 'center', fontWeight: 900, color: '#d97706' }}>{row.reserved}</td>
                   <td style={{ textAlign: 'center', fontWeight: 900, color: '#059669', fontSize: '1.05rem' }}>{row.available}</td>
+                  <td style={{ textAlign: 'center', fontWeight: 900, color: row.pendingTraceability > 0 ? '#dc2626' : '#64748b' }}>{row.pendingTraceability}</td>
                   <td>
-                    {row.shortage > 0
+                    {row.pendingTraceability > 0
+                      ? <span className="badge" style={{ background: '#fff7ed', color: '#c2410c', border: '1px solid #fed7aa' }}>Trazabilidad pendiente</span>
+                      : row.shortage > 0
                       ? <span className="badge" style={{ background: '#fef2f2', color: '#b91c1c', border: '1px solid #fecaca' }}>Faltan {row.shortage}</span>
                       : row.available > 0
                         ? <span className="badge" style={{ background: '#ecfdf5', color: '#047857', border: '1px solid #a7f3d0' }}>Disponible</span>
@@ -1362,7 +1469,7 @@ export default function Crops() {
                 </tr>
               ))}
               {rows.length === 0 && (
-                <tr><td colSpan="8" style={{ padding: '2rem', textAlign: 'center', color: '#94a3b8' }}>No hay producto terminado ni reservas pendientes.</td></tr>
+                <tr><td colSpan="9" style={{ padding: '2rem', textAlign: 'center', color: '#94a3b8' }}>No hay producto terminado ni reservas pendientes.</td></tr>
               )}
             </tbody>
           </table>
@@ -2596,6 +2703,67 @@ export default function Crops() {
             </div>
           </div>
         )}
+
+{linkingHarvest && (() => {
+  const product = products?.find(item => item.id === linkingHarvest.productId);
+  const pendingMovements = pendingTraceabilityForProduct(linkingHarvest.productId);
+  const freeUnits = freeUnitsForHarvest(linkingHarvest);
+  const selectedUnits = Object.values(traceabilityAllocations).reduce((sum, value) => sum + Number(value || 0), 0);
+  return (
+    <div className="modal-overlay" style={{ zIndex: 1800 }}>
+      <div className="premium-modal" style={{ width: 'min(860px, 96vw)', maxHeight: '92vh', overflowY: 'auto' }}>
+        <div className="premium-modal-header" style={{ background: 'linear-gradient(135deg, #0f172a, #134e4a)', color: '#fff' }}>
+          <div>
+            <span style={{ color: '#a7f3d0', fontSize: '0.72rem', fontWeight: 900, letterSpacing: '0.1em' }}>TRAZABILIDAD RETROACTIVA</span>
+            <h3 style={{ margin: '0.25rem 0' }}>Vincular cosecha con pedidos entregados</h3>
+            <p style={{ margin: 0, color: '#d1fae5', fontSize: '0.82rem' }}>{product?.name || 'Producto'} · lote {linkingHarvest.batchNumber}</p>
+          </div>
+          <button type="button" onClick={() => setLinkingHarvest(null)} disabled={savingTraceabilityLink} style={{ border: 0, borderRadius: '999px', width: '2rem', height: '2rem', cursor: 'pointer' }}>×</button>
+        </div>
+
+        <div style={{ padding: '1rem 1.2rem', display: 'grid', gap: '1rem' }}>
+          <section style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', gap: '0.65rem' }}>
+            <div style={{ padding: '0.75rem', borderRadius: '10px', background: '#f8fafc', border: '1px solid #e2e8f0' }}><span style={{ display: 'block', color: '#64748b', fontSize: '0.68rem' }}>UNIDADES COSECHADAS</span><strong style={{ fontSize: '1.35rem', color: '#0f172a' }}>{linkingHarvest.tuppersCount}</strong></div>
+            <div style={{ padding: '0.75rem', borderRadius: '10px', background: '#ecfdf5', border: '1px solid #a7f3d0' }}><span style={{ display: 'block', color: '#047857', fontSize: '0.68rem' }}>LIBRES EN ESTE LOTE</span><strong style={{ fontSize: '1.35rem', color: '#047857' }}>{freeUnits}</strong></div>
+            <div style={{ padding: '0.75rem', borderRadius: '10px', background: selectedUnits > freeUnits ? '#fef2f2' : '#fff7ed', border: `1px solid ${selectedUnits > freeUnits ? '#fecaca' : '#fed7aa'}` }}><span style={{ display: 'block', color: selectedUnits > freeUnits ? '#b91c1c' : '#c2410c', fontSize: '0.68rem' }}>SELECCIONADAS</span><strong style={{ fontSize: '1.35rem', color: selectedUnits > freeUnits ? '#b91c1c' : '#c2410c' }}>{selectedUnits}</strong></div>
+          </section>
+
+          <div style={{ padding: '0.7rem 0.8rem', borderRadius: '9px', background: '#eff6ff', color: '#1e40af', fontSize: '0.78rem', lineHeight: 1.45 }}>
+            Se proponen primero las entregas más antiguas. Puedes cambiar las cantidades. Esta operación no vuelve a descontar stock: reemplaza la referencia provisional por este lote real.
+          </div>
+
+          <div className="table-container" style={{ margin: 0 }}>
+            <table className="admin-table" style={{ minWidth: '680px' }}>
+              <thead><tr><th>Pedido</th><th>Cliente</th><th>Fecha de entrega</th><th style={{ textAlign: 'center' }}>Pendiente</th><th style={{ width: '150px' }}>Vincular</th></tr></thead>
+              <tbody>
+                {pendingMovements.map(movement => {
+                  const orderId = String(movement.referenceId || '').split('|')[0];
+                  const order = orders?.find(item => item.id === orderId);
+                  const client = clients?.find(item => item.id === order?.clientId);
+                  const pendingQuantity = Math.abs(Number(movement.quantity || 0));
+                  return (
+                    <tr key={movement.id}>
+                      <td><strong>#{order?.orderNumber || orderId.slice(-6)}</strong></td>
+                      <td>{client?.commercialName || client?.name || order?.clientCommercialName || order?.clientName || 'Cliente sin identificar'}</td>
+                      <td>{new Date(movement.createdAt).toLocaleString('es-ES', { dateStyle: 'short', timeStyle: 'short' })}</td>
+                      <td style={{ textAlign: 'center', fontWeight: 900 }}>{pendingQuantity}</td>
+                      <td><input type="number" min="0" max={pendingQuantity} step="1" className="premium-input" value={traceabilityAllocations[movement.id] || ''} onChange={event => { const value = Math.max(0, Math.min(pendingQuantity, Number(event.target.value || 0))); setTraceabilityAllocations(previous => ({ ...previous, [movement.id]: value })); }} style={{ width: '100%', padding: '0.42rem' }} /></td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <div className="premium-modal-footer" style={{ display: 'flex', justifyContent: 'space-between', gap: '0.75rem', alignItems: 'center' }}>
+          <span style={{ color: selectedUnits > freeUnits ? '#b91c1c' : '#64748b', fontSize: '0.78rem', fontWeight: selectedUnits > freeUnits ? 900 : 600 }}>{selectedUnits > freeUnits ? `Sobran ${selectedUnits - freeUnits} unidades en la selección` : `${freeUnits - selectedUnits} unidades quedarán libres`}</span>
+          <div style={{ display: 'flex', gap: '0.55rem' }}><button type="button" className="btn btn-secondary" disabled={savingTraceabilityLink} onClick={() => setLinkingHarvest(null)}>Cancelar</button><button type="button" className="btn btn-primary" disabled={savingTraceabilityLink || selectedUnits <= 0 || selectedUnits > freeUnits} onClick={saveHarvestTraceabilityLinks}>{savingTraceabilityLink ? 'Vinculando...' : 'Finalizar y vincular'}</button></div>
+        </div>
+      </div>
+    </div>
+  );
+})()}
 
 {isHarvestModalOpen && (
   <div style={modalOverlayStyle}>
