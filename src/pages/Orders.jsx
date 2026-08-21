@@ -453,60 +453,62 @@ export default function Orders() {
               <button type="button" aria-label="Cerrar" onClick={() => setEditingOrder(null)}>×</button>
             </header>
 
-            {editingInventoryLocked && (
-              <div className="order-edit-warning">
-                Este pedido ya descontó producto con trazabilidad. Puedes corregir cliente, fecha, entrega, precios y descuentos, pero no cambiar productos ni cantidades.
+            <div className="order-edit-body">
+              {editingInventoryLocked && (
+                <div className="order-edit-warning">
+                  Este pedido ya descontó producto con trazabilidad. Puedes corregir cliente, fecha, entrega, precios y descuentos, pero no cambiar productos ni cantidades.
+                </div>
+              )}
+
+              <div className="order-edit-fields">
+                <label>Cliente
+                  <select className="form-control" value={editFormData.clientId} onChange={event => setEditFormData({ ...editFormData, clientId: event.target.value })}>
+                    <option value="">Selecciona un cliente</option>
+                    {clients.map(client => <option key={client.id} value={client.id}>{client.commercialName || client.name}</option>)}
+                  </select>
+                </label>
+                <label>Fecha del pedido
+                  <input className="form-control" type="date" value={editFormData.date} onChange={event => setEditFormData({ ...editFormData, date: event.target.value })} />
+                </label>
+                <label>Persona que recibió
+                  <input className="form-control" value={editFormData.deliveredTo} onChange={event => setEditFormData({ ...editFormData, deliveredTo: event.target.value })} placeholder="Opcional" />
+                </label>
               </div>
-            )}
 
-            <div className="order-edit-fields">
-              <label>Cliente
-                <select className="form-control" value={editFormData.clientId} onChange={event => setEditFormData({ ...editFormData, clientId: event.target.value })}>
-                  <option value="">Selecciona un cliente</option>
-                  {clients.map(client => <option key={client.id} value={client.id}>{client.commercialName || client.name}</option>)}
-                </select>
-              </label>
-              <label>Fecha del pedido
-                <input className="form-control" type="date" value={editFormData.date} onChange={event => setEditFormData({ ...editFormData, date: event.target.value })} />
-              </label>
-              <label>Persona que recibió
-                <input className="form-control" value={editFormData.deliveredTo} onChange={event => setEditFormData({ ...editFormData, deliveredTo: event.target.value })} placeholder="Opcional" />
-              </label>
-            </div>
+              {!editingInventoryLocked && (
+                <div className="order-edit-add-line">
+                  <select className="form-control" value={editNewItemProduct} onChange={handleEditNewProductChange}>
+                    <option value="">Añadir producto…</option>
+                    {products.map(product => <option key={product.id} value={product.id}>{product.name}</option>)}
+                  </select>
+                  <input className="form-control" type="number" min="0" step="0.01" value={editNewItemPrice} onChange={event => setEditNewItemPrice(event.target.value)} placeholder="Precio" />
+                  <input className="form-control" type="number" min="1" value={editNewItemQuantity} onChange={event => setEditNewItemQuantity(Number(event.target.value))} aria-label="Cantidad" />
+                  <input className="form-control" type="number" min="0" max="100" value={editNewItemDiscount} onChange={event => setEditNewItemDiscount(Number(event.target.value))} aria-label="Descuento" />
+                  <label className="order-edit-free"><input type="checkbox" checked={editNewIsFree} onChange={event => setEditNewIsFree(event.target.checked)} /> Gratis</label>
+                  <button type="button" className="btn btn-secondary" onClick={handleAddEditItem}>Añadir</button>
+                </div>
+              )}
 
-            {!editingInventoryLocked && (
-              <div className="order-edit-add-line">
-                <select className="form-control" value={editNewItemProduct} onChange={handleEditNewProductChange}>
-                  <option value="">Añadir producto…</option>
-                  {products.map(product => <option key={product.id} value={product.id}>{product.name}</option>)}
-                </select>
-                <input className="form-control" type="number" min="0" step="0.01" value={editNewItemPrice} onChange={event => setEditNewItemPrice(event.target.value)} placeholder="Precio" />
-                <input className="form-control" type="number" min="1" value={editNewItemQuantity} onChange={event => setEditNewItemQuantity(Number(event.target.value))} aria-label="Cantidad" />
-                <input className="form-control" type="number" min="0" max="100" value={editNewItemDiscount} onChange={event => setEditNewItemDiscount(Number(event.target.value))} aria-label="Descuento" />
-                <label className="order-edit-free"><input type="checkbox" checked={editNewIsFree} onChange={event => setEditNewIsFree(event.target.checked)} /> Gratis</label>
-                <button type="button" className="btn btn-secondary" onClick={handleAddEditItem}>Añadir</button>
+              <div className="order-edit-lines">
+                <table>
+                  <thead><tr><th>Producto</th><th>Precio</th><th>Cantidad</th><th>Dto.</th><th>Total</th><th /></tr></thead>
+                  <tbody>
+                    {editFormData.items.map((item, index) => {
+                      const lineTotal = Number(item.price || 0) * Number(item.quantity || 0) * (1 - Number(item.discount || 0) / 100);
+                      return (
+                        <tr key={`${item.productId}-${index}`}>
+                          <td><strong>{products.find(product => product.id === item.productId)?.name || item.name}</strong></td>
+                          <td><input type="number" min="0" step="0.01" value={item.price} onChange={event => handleEditItemChange(index, 'price', event.target.value)} /></td>
+                          <td><input type="number" min="1" disabled={editingInventoryLocked} value={item.quantity} onChange={event => handleEditItemChange(index, 'quantity', event.target.value)} /></td>
+                          <td><input type="number" min="0" max="100" value={item.discount || 0} onChange={event => handleEditItemChange(index, 'discount', event.target.value)} /></td>
+                          <td><strong>{lineTotal.toFixed(2)} €</strong></td>
+                          <td>{!editingInventoryLocked && <button type="button" onClick={() => handleRemoveEditItem(index)}>Quitar</button>}</td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
               </div>
-            )}
-
-            <div className="order-edit-lines">
-              <table>
-                <thead><tr><th>Producto</th><th>Precio</th><th>Cantidad</th><th>Dto.</th><th>Total</th><th /></tr></thead>
-                <tbody>
-                  {editFormData.items.map((item, index) => {
-                    const lineTotal = Number(item.price || 0) * Number(item.quantity || 0) * (1 - Number(item.discount || 0) / 100);
-                    return (
-                      <tr key={`${item.productId}-${index}`}>
-                        <td><strong>{products.find(product => product.id === item.productId)?.name || item.name}</strong></td>
-                        <td><input type="number" min="0" step="0.01" value={item.price} onChange={event => handleEditItemChange(index, 'price', event.target.value)} /></td>
-                        <td><input type="number" min="1" disabled={editingInventoryLocked} value={item.quantity} onChange={event => handleEditItemChange(index, 'quantity', event.target.value)} /></td>
-                        <td><input type="number" min="0" max="100" value={item.discount || 0} onChange={event => handleEditItemChange(index, 'discount', event.target.value)} /></td>
-                        <td><strong>{lineTotal.toFixed(2)} €</strong></td>
-                        <td>{!editingInventoryLocked && <button type="button" onClick={() => handleRemoveEditItem(index)}>Quitar</button>}</td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
             </div>
 
             <footer>

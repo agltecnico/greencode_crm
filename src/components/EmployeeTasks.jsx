@@ -33,6 +33,7 @@ export default function EmployeeTasks({ onTaskAction, onHarvestBatchAction }) {
   } = useData();
   
   const [timeFilter, setTimeFilter] = useState(1);
+  const [monthOffset, setMonthOffset] = useState(0);
   const [selectedDayTasks, setSelectedDayTasks] = useState(null);
   
   const [isMultiSelectMode, setIsMultiSelectMode] = useState(false);
@@ -68,8 +69,9 @@ export default function EmployeeTasks({ onTaskAction, onHarvestBatchAction }) {
   const today = new Date();
   today.setHours(0,0,0,0);
   
-  const currentMonth = today.getMonth();
-  const currentYear = today.getFullYear();
+  const displayedMonth = new Date(today.getFullYear(), today.getMonth() + monthOffset, 1);
+  const displayedMonthIndex = displayedMonth.getMonth();
+  const displayedYear = displayedMonth.getFullYear();
   const datesToAnalyze = (() => {
     if (timeFilter !== 30) {
       return Array.from({ length: timeFilter }).map((_, i) => {
@@ -79,8 +81,8 @@ export default function EmployeeTasks({ onTaskAction, onHarvestBatchAction }) {
       });
     }
 
-    const monthStart = new Date(currentYear, currentMonth, 1);
-    const monthEnd = new Date(currentYear, currentMonth + 1, 0);
+    const monthStart = new Date(displayedYear, displayedMonthIndex, 1);
+    const monthEnd = new Date(displayedYear, displayedMonthIndex + 1, 0);
     const calendarStart = new Date(monthStart);
     const leadingDays = (monthStart.getDay() + 6) % 7;
     calendarStart.setDate(monthStart.getDate() - leadingDays);
@@ -229,7 +231,8 @@ export default function EmployeeTasks({ onTaskAction, onHarvestBatchAction }) {
     allTasks.push({
       date: targetDate,
       isToday,
-      isOutsideMonth: timeFilter === 30 && targetDate.getMonth() !== currentMonth,
+      isOutsideMonth: timeFilter === 30
+        && (targetDate.getMonth() !== displayedMonthIndex || targetDate.getFullYear() !== displayedYear),
       items: tasksForDate
     });
   });
@@ -420,7 +423,10 @@ export default function EmployeeTasks({ onTaskAction, onHarvestBatchAction }) {
             ].map(f => (
               <button 
                 key={f.v}
-                onClick={() => setTimeFilter(f.v)}
+                onClick={() => {
+                  setTimeFilter(f.v);
+                  if (f.v === 30) setMonthOffset(0);
+                }}
                 className={`time-filter-btn ${timeFilter === f.v ? 'active' : ''}`}
               >
                 {f.l}
@@ -458,11 +464,36 @@ export default function EmployeeTasks({ onTaskAction, onHarvestBatchAction }) {
         ) : timeFilter === 30 ? (
           <div style={{ overflowX: 'auto', paddingBottom: '0.5rem' }}>
             <div style={{ minWidth: '760px' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '0.75rem', marginBottom: '1rem', flexWrap: 'wrap' }}>
                 <h3 style={{ margin: 0, fontSize: '1.25rem', fontWeight: 800, color: '#1e293b', textTransform: 'capitalize' }}>
-                  {today.toLocaleDateString('es-ES', { month: 'long', year: 'numeric' })}
+                  {displayedMonth.toLocaleDateString('es-ES', { month: 'long', year: 'numeric' })}
                 </h3>
-                <span style={{ color: '#64748b', fontSize: '0.85rem' }}>Calendario mensual de tareas</span>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem' }}>
+                  <button
+                    type="button"
+                    className="btn btn-secondary"
+                    disabled={monthOffset === 0}
+                    onClick={() => setMonthOffset(previous => Math.max(0, previous - 1))}
+                    style={{ padding: '0.45rem 0.7rem', minWidth: '2.35rem' }}
+                    aria-label="Mes anterior"
+                  >
+                    ‹
+                  </button>
+                  {monthOffset > 0 && (
+                    <button type="button" className="btn btn-secondary" onClick={() => setMonthOffset(0)} style={{ padding: '0.45rem 0.75rem' }}>
+                      Mes actual
+                    </button>
+                  )}
+                  <button
+                    type="button"
+                    className="btn btn-primary"
+                    onClick={() => setMonthOffset(previous => previous + 1)}
+                    style={{ padding: '0.45rem 0.7rem', minWidth: '2.35rem' }}
+                    aria-label="Mes siguiente"
+                  >
+                    ›
+                  </button>
+                </div>
               </div>
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, minmax(0, 1fr))', border: '1px solid #cbd5e1', borderRadius: '12px', overflow: 'hidden', background: '#cbd5e1', gap: '1px' }}>
                 {['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom'].map(day => (
@@ -472,12 +503,14 @@ export default function EmployeeTasks({ onTaskAction, onHarvestBatchAction }) {
                 ))}
                 {allTasks.map((dayGroup, idx) => {
                   const taskCount = dayGroup.items.length;
+                  const plantingTasks = dayGroup.items.filter(task => task.type === 'plant');
+                  const otherTasks = dayGroup.items.filter(task => task.type !== 'plant');
                   return (
                     <div
                       key={idx}
                       onClick={() => setSelectedDayTasks(dayGroup)}
                       style={{
-                        minHeight: '108px',
+                        minHeight: '138px',
                         padding: '0.55rem',
                         cursor: 'pointer',
                         background: dayGroup.isToday ? '#ecfdf5' : dayGroup.isOutsideMonth ? '#f1f5f9' : 'white',
@@ -496,12 +529,33 @@ export default function EmployeeTasks({ onTaskAction, onHarvestBatchAction }) {
                       </div>
                       {taskCount > 0 ? (
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
-                          {dayGroup.items.slice(0, 3).map((task, taskIndex) => (
+                          {plantingTasks.length > 0 && (
+                            <div
+                              title={plantingTasks.map(task => task.title).join(' · ')}
+                              style={{
+                                background: dayGroup.isOutsideMonth ? '#dcfce7' : '#ecfdf5',
+                                border: '1px solid #bbf7d0',
+                                borderRadius: '6px',
+                                padding: '0.35rem 0.4rem',
+                                color: '#166534',
+                                fontSize: '0.66rem',
+                                lineHeight: 1.35
+                              }}
+                            >
+                              <strong style={{ display: 'block', marginBottom: '0.15rem', fontSize: '0.68rem' }}>🌱 {plantingTasks.length} siembras</strong>
+                              <span>{plantingTasks.map(task => task.title.replace(/^Plantar\s+/i, '')).join(' · ')}</span>
+                            </div>
+                          )}
+                          {otherTasks.slice(0, plantingTasks.length > 0 ? 2 : 3).map((task, taskIndex) => (
                             <div key={task.id || taskIndex} title={`${task.title}: ${task.desc}`} style={{ background: dayGroup.isOutsideMonth ? '#e2e8f0' : '#f8fafc', borderRadius: '5px', padding: '0.25rem 0.35rem', fontSize: '0.7rem', color: dayGroup.isOutsideMonth ? '#64748b' : '#334155', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                               {task.icon} {task.title}
                             </div>
                           ))}
-                          {taskCount > 3 && <span style={{ fontSize: '0.68rem', fontWeight: 700, color: '#64748b' }}>+{taskCount - 3} tareas</span>}
+                          {otherTasks.length > (plantingTasks.length > 0 ? 2 : 3) && (
+                            <span style={{ fontSize: '0.68rem', fontWeight: 700, color: '#64748b' }}>
+                              +{otherTasks.length - (plantingTasks.length > 0 ? 2 : 3)} tareas adicionales
+                            </span>
+                          )}
                         </div>
                       ) : (
                         <span style={{ fontSize: '0.7rem', color: dayGroup.isOutsideMonth ? '#cbd5e1' : '#94a3b8' }}>Sin tareas</span>
