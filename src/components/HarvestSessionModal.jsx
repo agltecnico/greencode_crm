@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import Swal from 'sweetalert2';
 import { useData } from '../context/DataContext';
 import './HarvestSessionModal.css';
@@ -61,19 +61,35 @@ export default function HarvestSessionModal({ open, onClose }) {
     return { start, end };
   }, [harvestDate]);
 
+  const expectedHarvestForCrop = useCallback(crop => {
+    const type = cropTypes?.find(item => item.id === crop.cropTypeId || item.id === crop.seedId);
+    const planted = new Date(crop.datePlanted || crop.plantedAt);
+    if (Number.isNaN(planted.getTime()) || !type) return null;
+    const soakingDays = Number(type.soakingHours || 0) > 0 ? Math.max(1, Math.ceil(Number(type.soakingHours) / 24)) : 0;
+    const cycleDays = soakingDays + Number(type.germinationDays || 0) + Number(type.darknessDays || 0) + Number(type.lightDays || 0);
+    const expected = new Date(planted);
+    expected.setDate(expected.getDate() + cycleDays - Number(crop.cycleDayAdjustment || 0));
+    return expected;
+  }, [cropTypes]);
+
   const readyCrops = useMemo(() => (crops || [])
     .filter(crop => crop.status === 'READY' && Number(crop.traysCount || crop.trays || 0) > 0)
     .filter(crop => {
-      const type = cropTypes?.find(item => item.id === crop.cropTypeId || item.id === crop.seedId);
       const planted = new Date(crop.datePlanted || crop.plantedAt);
-      if (Number.isNaN(planted.getTime()) || !type) return false;
-      const soakingDays = Number(type.soakingHours || 0) > 0 ? Math.max(1, Math.ceil(Number(type.soakingHours) / 24)) : 0;
-      const cycleDays = soakingDays + Number(type.germinationDays || 0) + Number(type.darknessDays || 0) + Number(type.lightDays || 0);
-      const expected = new Date(planted);
-      expected.setDate(expected.getDate() + cycleDays - Number(crop.cycleDayAdjustment || 0));
-      return expected >= harvestWeek.start && expected < harvestWeek.end;
+      return !Number.isNaN(planted.getTime()) && planted <= new Date(harvestDate);
     })
-    .sort((a, b) => new Date(a.datePlanted || a.plantedAt) - new Date(b.datePlanted || b.plantedAt)), [crops, cropTypes, harvestWeek]);
+    .sort((a, b) => {
+      const aExpected = expectedHarvestForCrop(a);
+      const bExpected = expectedHarvestForCrop(b);
+      const aInWeek = aExpected >= harvestWeek.start && aExpected < harvestWeek.end;
+      const bInWeek = bExpected >= harvestWeek.start && bExpected < harvestWeek.end;
+      return Number(bInWeek) - Number(aInWeek) || new Date(a.datePlanted || a.plantedAt) - new Date(b.datePlanted || b.plantedAt);
+    }), [crops, expectedHarvestForCrop, harvestDate, harvestWeek]);
+
+  const weeklyReadyCropIds = useMemo(() => new Set(readyCrops.filter(crop => {
+    const expected = expectedHarvestForCrop(crop);
+    return expected && expected >= harvestWeek.start && expected < harvestWeek.end;
+  }).map(crop => crop.id)), [expectedHarvestForCrop, readyCrops, harvestWeek]);
 
   useEffect(() => {
     if (!open) return;
@@ -84,8 +100,11 @@ export default function HarvestSessionModal({ open, onClose }) {
 
   useEffect(() => {
     if (!open) return;
-    setSelectedCropTrays(Object.fromEntries(readyCrops.map(crop => [crop.id, Number(crop.traysCount || crop.trays || 0)])));
-  }, [open, readyCrops]);
+    setSelectedCropTrays(Object.fromEntries(readyCrops.map(crop => [
+      crop.id,
+      weeklyReadyCropIds.has(crop.id) ? Number(crop.traysCount || crop.trays || 0) : 0
+    ])));
+  }, [open, readyCrops, weeklyReadyCropIds]);
 
   const cropVarietyId = crop => {
     const type = cropTypes?.find(item => item.id === crop.cropTypeId || item.id === crop.seedId);
@@ -201,16 +220,18 @@ export default function HarvestSessionModal({ open, onClose }) {
         <div className="harvest-session__columns">
           <section className="harvest-session__crops">
             <div className="harvest-session__title"><div><span>1</span><h3>Cultivos listos</h3></div><strong>{totalSelectedTrays} bandejas</strong></div>
-            <p>Semana {isoWeek(harvestDate)} · {harvestWeek.start.toLocaleDateString('es-ES')}–{new Date(harvestWeek.end.getTime() - 86400000).toLocaleDateString('es-ES')}. Están seleccionados por defecto.</p>
+            <p>Semana {isoWeek(harvestDate)} · {harvestWeek.start.toLocaleDateString('es-ES')}–{new Date(harvestWeek.end.getTime() - 86400000).toLocaleDateString('es-ES')}. Los previstos están seleccionados; puedes añadir otros listos.</p>
             <div className="harvest-session__crop-list">
               {readyCrops.map(crop => {
                 const maxTrays = Number(crop.traysCount || crop.trays || 0);
                 const selectedTrays = Number(selectedCropTrays[crop.id] || 0);
                 const selected = selectedTrays > 0;
                 const covered = selected && selectedProductVarietyIds.has(cropVarietyId(crop));
+                const expected = expectedHarvestForCrop(crop);
+                const expectedThisWeek = weeklyReadyCropIds.has(crop.id);
                 return <div key={crop.id} className={`harvest-crop ${selected ? 'is-selected' : ''} ${covered ? 'is-used' : ''}`}>
                   <input type="checkbox" aria-label={`Seleccionar ${varietyName(crop)}`} checked={selected} onChange={() => setSelectedCropTrays(current => ({ ...current, [crop.id]: selected ? 0 : maxTrays }))} />
-                  <div><strong>{varietyName(crop)}</strong><small>Sembrado {new Date(crop.datePlanted || crop.plantedAt).toLocaleDateString('es-ES')} · lote {crop.batchNumber || 'sin lote'}</small></div>
+                  <div><strong>{varietyName(crop)}</strong><small>Sembrado {new Date(crop.datePlanted || crop.plantedAt).toLocaleDateString('es-ES')} · previsto {expected?.toLocaleDateString('es-ES') || 'sin fecha'} · lote {crop.batchNumber || 'sin lote'}</small><span className={expectedThisWeek ? 'harvest-crop__week is-current' : 'harvest-crop__week'}>{expectedThisWeek ? 'Semana seleccionada' : 'Otro cultivo listo'}</span></div>
                   <label className="harvest-crop__trays">
                     <input type="number" min="0" max={maxTrays} step="1" value={selectedTrays} onChange={event => setSelectedCropTrays(current => ({ ...current, [crop.id]: Math.min(maxTrays, Math.max(0, Number(event.target.value || 0))) }))} />
                     <small>de {maxTrays} bandejas</small>
@@ -218,7 +239,7 @@ export default function HarvestSessionModal({ open, onClose }) {
                   {covered && <em>Asignada</em>}
                 </div>;
               })}
-              {!readyCrops.length && <div className="harvest-session__empty">No hay cultivos listos previstos para la semana {isoWeek(harvestDate)}.</div>}
+              {!readyCrops.length && <div className="harvest-session__empty">No hay cultivos listos sembrados antes de esta fecha.</div>}
             </div>
           </section>
 
