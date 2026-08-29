@@ -31,7 +31,7 @@ export default function HarvestSessionModal({ open, onClose }) {
     registerHarvestSession
   } = useData();
   const [harvestDate, setHarvestDate] = useState(localInputValue());
-  const [selectedCrops, setSelectedCrops] = useState({});
+  const [selectedCropTrays, setSelectedCropTrays] = useState({});
   const [lines, setLines] = useState([makeLine()]);
   const [notes, setNotes] = useState('');
   const [saving, setSaving] = useState(false);
@@ -43,7 +43,7 @@ export default function HarvestSessionModal({ open, onClose }) {
   useEffect(() => {
     if (!open) return;
     setHarvestDate(localInputValue());
-    setSelectedCrops(Object.fromEntries(readyCrops.map(crop => [crop.id, true])));
+    setSelectedCropTrays(Object.fromEntries(readyCrops.map(crop => [crop.id, Number(crop.traysCount || crop.trays || 0)])));
     setLines([makeLine()]);
     setNotes('');
   }, [open, readyCrops]);
@@ -68,8 +68,10 @@ export default function HarvestSessionModal({ open, onClose }) {
   const lineUnits = line => Object.values(line.packagingQuantities || {}).reduce((sum, value) => sum + Number(value || 0), 0);
   const activeLines = lines.filter(line => line.productId && lineUnits(line) > 0);
   const usedVarietyIds = new Set(activeLines.flatMap(line => recipeIds(products?.find(product => product.id === line.productId))));
-  const selectedReadyCrops = readyCrops.filter(crop => selectedCrops[crop.id]);
-  const totalSelectedTrays = selectedReadyCrops.reduce((sum, crop) => sum + Number(crop.traysCount || crop.trays || 0), 0);
+  const selectedReadyCrops = readyCrops.filter(crop => Number(selectedCropTrays[crop.id] || 0) > 0);
+  const totalSelectedTrays = selectedReadyCrops.reduce((sum, crop) => sum + Number(selectedCropTrays[crop.id] || 0), 0);
+  const totalReadyTrays = readyCrops.reduce((sum, crop) => sum + Number(crop.traysCount || crop.trays || 0), 0);
+  const remainingTrays = totalReadyTrays - totalSelectedTrays;
   const totalUnits = activeLines.reduce((sum, line) => sum + lineUnits(line), 0);
 
   if (!open) return null;
@@ -84,7 +86,7 @@ export default function HarvestSessionModal({ open, onClose }) {
       const compatible = activeLines.filter(line => recipeIds(products.find(product => product.id === line.productId)).includes(varietyId));
       const weight = compatible.reduce((sum, line) => sum + lineUnits(line), 0);
       compatible.forEach((line, index) => {
-        const trays = Number(crop.traysCount || crop.trays || 0);
+        const trays = Number(selectedCropTrays[crop.id] || 0);
         const allocated = index === compatible.length - 1
           ? trays - compatible.slice(0, -1).reduce((sum, previous) => sum + Number(allocations[previous.id][crop.id] || 0), 0)
           : Number((trays * lineUnits(line) / weight).toFixed(3));
@@ -156,14 +158,19 @@ export default function HarvestSessionModal({ open, onClose }) {
             <p>Están seleccionados por defecto. Desmarca lo que deba seguir pendiente.</p>
             <div className="harvest-session__crop-list">
               {readyCrops.map(crop => {
-                const selected = Boolean(selectedCrops[crop.id]);
+                const maxTrays = Number(crop.traysCount || crop.trays || 0);
+                const selectedTrays = Number(selectedCropTrays[crop.id] || 0);
+                const selected = selectedTrays > 0;
                 const covered = selected && usedVarietyIds.has(cropVarietyId(crop));
-                return <label key={crop.id} className={`harvest-crop ${selected ? 'is-selected' : ''} ${covered ? 'is-used' : ''}`}>
-                  <input type="checkbox" checked={selected} onChange={() => setSelectedCrops(current => ({ ...current, [crop.id]: !selected }))} />
+                return <div key={crop.id} className={`harvest-crop ${selected ? 'is-selected' : ''} ${covered ? 'is-used' : ''}`}>
+                  <input type="checkbox" aria-label={`Seleccionar ${varietyName(crop)}`} checked={selected} onChange={() => setSelectedCropTrays(current => ({ ...current, [crop.id]: selected ? 0 : maxTrays }))} />
                   <div><strong>{varietyName(crop)}</strong><small>Sembrado {new Date(crop.datePlanted || crop.plantedAt).toLocaleDateString('es-ES')} · lote {crop.batchNumber || 'sin lote'}</small></div>
-                  <b>{crop.traysCount || crop.trays} <small>bandejas</small></b>
+                  <label className="harvest-crop__trays">
+                    <input type="number" min="0" max={maxTrays} step="1" value={selectedTrays} onChange={event => setSelectedCropTrays(current => ({ ...current, [crop.id]: Math.min(maxTrays, Math.max(0, Number(event.target.value || 0))) }))} />
+                    <small>de {maxTrays} bandejas</small>
+                  </label>
                   {covered && <em>Asignada</em>}
-                </label>;
+                </div>;
               })}
               {!readyCrops.length && <div className="harvest-session__empty">No hay cultivos listos para cosechar.</div>}
             </div>
@@ -200,7 +207,7 @@ export default function HarvestSessionModal({ open, onClose }) {
         </div>
 
         <footer className="harvest-session__footer">
-          <div><strong>{activeLines.length} productos · {totalUnits} táperes</strong><span>{selectedReadyCrops.length} cultivos seleccionados · {readyCrops.length - selectedReadyCrops.length} quedan pendientes</span></div>
+          <div><strong>{activeLines.length} productos · {totalUnits} táperes</strong><span>{totalSelectedTrays} bandejas a cosechar · {remainingTrays} quedarán pendientes</span></div>
           <button type="button" onClick={onClose}>Cancelar</button>
           <button type="submit" disabled={saving || !readyCrops.length}>{saving ? 'Registrando todo…' : 'Registrar cosecha completa'}</button>
         </footer>
