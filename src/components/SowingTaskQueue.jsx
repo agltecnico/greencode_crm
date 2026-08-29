@@ -29,6 +29,7 @@ export default function SowingTaskQueue() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [loadError, setLoadError] = useState('');
+  const [expanded, setExpanded] = useState(false);
 
   useEffect(() => {
     if (syncStarted.current) return;
@@ -159,6 +160,18 @@ export default function SowingTaskQueue() {
   const allSelected = selectedCount === pendingTasks.length;
   const toggleAll = () => setDeselectedIds(allSelected ? new Set(pendingTasks.map(task => task.id)) : new Set());
 
+  if (!expanded) {
+    return (
+      <button type="button" onClick={() => setExpanded(true)} style={{ width: '100%', marginBottom: '1.25rem', padding: '1rem 1.15rem', border: '1px solid #bbf7d0', borderLeft: '6px solid #22c55e', borderRadius: '14px', background: 'white', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '1rem', textAlign: 'left', cursor: 'pointer', boxShadow: '0 4px 12px rgba(15, 23, 42, 0.06)' }}>
+        <span style={{ display: 'flex', alignItems: 'center', gap: '0.85rem' }}>
+          <span style={{ width: '42px', height: '42px', display: 'grid', placeItems: 'center', borderRadius: '12px', background: '#dcfce7', fontSize: '1.35rem' }}>🌱</span>
+          <span><strong style={{ display: 'block', color: '#14532d', fontSize: '1.05rem' }}>Siembras del día</strong><small style={{ display: 'block', color: '#64748b', marginTop: '0.2rem' }}>{pendingTasks.length} variedades pendientes{overdueCount ? ` · ${overdueCount} atrasadas` : ''}</small></span>
+        </span>
+        <span style={{ color: '#15803d', fontWeight: 800, whiteSpace: 'nowrap' }}>Ver listado →</span>
+      </button>
+    );
+  }
+
   return (
     <section style={{ marginBottom: '1.5rem', border: '1px solid #dbe4df', borderRadius: '14px', background: 'white', overflow: 'hidden', boxShadow: '0 4px 14px rgba(15, 23, 42, 0.05)' }}>
       <header style={{ padding: '0.9rem 1rem', display: 'flex', justifyContent: 'space-between', gap: '1rem', alignItems: 'center', flexWrap: 'wrap', background: '#f8faf9', borderBottom: '1px solid #e2e8f0' }}>
@@ -166,9 +179,12 @@ export default function SowingTaskQueue() {
           <h3 style={{ margin: 0, color: '#14532d', fontSize: '1.05rem' }}>🌱 Preparar siembras pendientes</h3>
           <p style={{ margin: '0.2rem 0 0', color: '#64748b', fontSize: '0.85rem' }}>{pendingTasks.length} siembras{overdueCount ? ` · ${overdueCount} atrasadas` : ''}. Desmarca una variedad para dejarla pendiente.</p>
         </div>
-        <button type="button" className="btn btn-success" disabled={!selectedCount || saving} onClick={() => executeSelected()}>
-          {saving ? 'Realizando…' : `Realizar siembras seleccionadas (${selectedCount})`}
-        </button>
+        <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+          <button type="button" className="btn btn-secondary" disabled={saving} onClick={() => setExpanded(false)}>Cerrar listado</button>
+          <button type="button" className="btn btn-success" disabled={!selectedCount || saving} onClick={() => executeSelected()}>
+            {saving ? 'Realizando…' : `Realizar siembras seleccionadas (${selectedCount})`}
+          </button>
+        </div>
       </header>
       <div style={{ overflowX: 'auto' }}>
         <table style={{ width: '100%', minWidth: '920px', borderCollapse: 'collapse', textAlign: 'left' }}>

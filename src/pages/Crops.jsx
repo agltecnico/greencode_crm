@@ -1037,8 +1037,6 @@ export default function Crops() {
           </button>
         </div>
 
-        <SowingTaskQueue />
-
           {/* Tab Navigation */}
         <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '2rem', backgroundColor: '#f1f5f9', padding: '0.25rem', borderRadius: '0.75rem', width: 'fit-content' }}>
           <button 
@@ -2460,6 +2458,7 @@ export default function Crops() {
         
         {activeTab === 'tareas' && (
           <div>
+            <SowingTaskQueue />
             <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '1rem' }}>
               <button 
                 onClick={() => window.open('/tv', 'TVMode', 'width=1920,height=1080,menubar=no,toolbar=no,location=no,status=no,resizable=yes')} 
