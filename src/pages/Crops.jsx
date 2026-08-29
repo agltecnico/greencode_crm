@@ -1037,25 +1037,29 @@ export default function Crops() {
           </button>
         </div>
 
-        <SowingTaskQueue />
-
           {/* Tab Navigation */}
-        <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '2rem', backgroundColor: '#f1f5f9', padding: '0.25rem', borderRadius: '0.75rem', width: 'fit-content' }}>
+        <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '1.5rem', backgroundColor: '#f1f5f9', padding: '0.25rem', borderRadius: '0.75rem', width: 'fit-content', maxWidth: '100%', overflowX: 'auto' }}>
+          <button
+            onClick={() => setSowTab('pendientes')}
+            style={{ padding: '0.625rem 1.5rem', borderRadius: '0.5rem', fontWeight: 'bold', fontSize: '0.875rem', transition: 'all 0.2s', cursor: 'pointer', border: 'none', whiteSpace: 'nowrap', backgroundColor: sowTab === 'pendientes' ? 'white' : 'transparent', color: sowTab === 'pendientes' ? '#166534' : '#64748b', boxShadow: sowTab === 'pendientes' ? '0 1px 3px rgba(0,0,0,0.1)' : 'none' }}
+          >
+            🌱 Siembras Pendientes
+          </button>
           <button 
             onClick={() => setSowTab('activos')}
-            style={{ padding: '0.625rem 1.5rem', borderRadius: '0.5rem', fontWeight: 'bold', fontSize: '0.875rem', transition: 'all 0.2s', cursor: 'pointer', border: 'none', backgroundColor: sowTab === 'activos' ? 'white' : 'transparent', color: sowTab === 'activos' ? '#047857' : '#64748b', boxShadow: sowTab === 'activos' ? '0 1px 3px rgba(0,0,0,0.1)' : 'none' }}
+            style={{ padding: '0.625rem 1.5rem', borderRadius: '0.5rem', fontWeight: 'bold', fontSize: '0.875rem', transition: 'all 0.2s', cursor: 'pointer', border: 'none', whiteSpace: 'nowrap', backgroundColor: sowTab === 'activos' ? 'white' : 'transparent', color: sowTab === 'activos' ? '#047857' : '#64748b', boxShadow: sowTab === 'activos' ? '0 1px 3px rgba(0,0,0,0.1)' : 'none' }}
           >
             🪴 Bandejas Activas ({activeCropsList.length})
           </button>
           <button 
             onClick={() => setSowTab('historico')}
-            style={{ padding: '0.625rem 1.5rem', borderRadius: '0.5rem', fontWeight: 'bold', fontSize: '0.875rem', transition: 'all 0.2s', cursor: 'pointer', border: 'none', backgroundColor: sowTab === 'historico' ? 'white' : 'transparent', color: sowTab === 'historico' ? '#1e293b' : '#64748b', boxShadow: sowTab === 'historico' ? '0 1px 3px rgba(0,0,0,0.1)' : 'none' }}
+            style={{ padding: '0.625rem 1.5rem', borderRadius: '0.5rem', fontWeight: 'bold', fontSize: '0.875rem', transition: 'all 0.2s', cursor: 'pointer', border: 'none', whiteSpace: 'nowrap', backgroundColor: sowTab === 'historico' ? 'white' : 'transparent', color: sowTab === 'historico' ? '#1e293b' : '#64748b', boxShadow: sowTab === 'historico' ? '0 1px 3px rgba(0,0,0,0.1)' : 'none' }}
           >
             📖 Histórico de Cultivos
           </button>
         </div>
 
-        
+        {sowTab === 'pendientes' && <SowingTaskQueue />}
 
         {sowTab === 'activos' && (
             <div style={{ animation: 'fadeIn 0.3s ease' }}>
@@ -2478,7 +2482,7 @@ export default function Crops() {
                 }
               }}
               onHarvestBatchAction={openHarvestBatch}
-              onSowingGroupAction={() => setActiveTab('lotes')}
+              onSowingGroupAction={() => { setSowTab('pendientes'); setActiveTab('lotes'); }}
             />
           </div>
         )}

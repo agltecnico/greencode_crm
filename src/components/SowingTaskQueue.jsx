@@ -151,7 +151,10 @@ export default function SowingTaskQueue({ summaryOnly = false, onOpen }) {
 
   if (loading) return <div style={{ padding: '1rem', marginBottom: '1rem', borderRadius: '14px', background: '#f0fdf4', color: '#166534' }}>⏳ Preparando siembras pendientes…</div>;
   if (loadError) return <div style={{ padding: '1rem', marginBottom: '1rem', borderRadius: '14px', background: '#fef2f2', color: '#991b1b' }}>⚠️ {loadError}</div>;
-  if (!pendingTasks.length) return null;
+  if (!pendingTasks.length) {
+    if (summaryOnly) return null;
+    return <div style={{ padding: '2.5rem 1rem', textAlign: 'center', border: '1px solid #d1fae5', borderRadius: '14px', background: '#f0fdf4', color: '#166534' }}><strong>✓ No hay siembras pendientes de validar</strong><p style={{ margin: '0.4rem 0 0', color: '#64748b' }}>Las nuevas propuestas aparecerán aquí según el planificador.</p></div>;
+  }
 
   const todayKey = localDateKey();
   const overdueCount = pendingTasks.filter(task => task.plannedDate < todayKey).length;
