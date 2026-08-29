@@ -156,69 +156,66 @@ export default function SowingTaskQueue() {
   const todayKey = localDateKey();
   const overdueCount = pendingTasks.filter(task => task.plannedDate < todayKey).length;
   const selectedCount = pendingTasks.filter(task => !deselectedIds.has(task.id)).length;
+  const allSelected = selectedCount === pendingTasks.length;
+  const toggleAll = () => setDeselectedIds(allSelected ? new Set(pendingTasks.map(task => task.id)) : new Set());
 
   return (
-    <section style={{ marginBottom: '2rem', border: '1px solid #bbf7d0', borderRadius: '18px', background: '#f0fdf4', overflow: 'hidden', boxShadow: '0 8px 24px rgba(22, 101, 52, 0.08)' }}>
-      <header style={{ padding: '1.1rem 1.25rem', display: 'flex', justifyContent: 'space-between', gap: '1rem', alignItems: 'center', flexWrap: 'wrap', borderBottom: '1px solid #bbf7d0' }}>
+    <section style={{ marginBottom: '1.5rem', border: '1px solid #dbe4df', borderRadius: '14px', background: 'white', overflow: 'hidden', boxShadow: '0 4px 14px rgba(15, 23, 42, 0.05)' }}>
+      <header style={{ padding: '0.9rem 1rem', display: 'flex', justifyContent: 'space-between', gap: '1rem', alignItems: 'center', flexWrap: 'wrap', background: '#f8faf9', borderBottom: '1px solid #e2e8f0' }}>
         <div>
-          <h3 style={{ margin: 0, color: '#14532d', fontSize: '1.2rem' }}>🌱 Siembras pendientes</h3>
-          <p style={{ margin: '0.3rem 0 0', color: '#4d7c0f' }}>{pendingTasks.length} previstas{overdueCount ? ` · ${overdueCount} atrasadas` : ''}. La fecha prevista siempre se conserva.</p>
+          <h3 style={{ margin: 0, color: '#14532d', fontSize: '1.05rem' }}>🌱 Preparar siembras pendientes</h3>
+          <p style={{ margin: '0.2rem 0 0', color: '#64748b', fontSize: '0.85rem' }}>{pendingTasks.length} siembras{overdueCount ? ` · ${overdueCount} atrasadas` : ''}. Desmarca una variedad para dejarla pendiente.</p>
         </div>
         <button type="button" className="btn btn-success" disabled={!selectedCount || saving} onClick={() => executeSelected()}>
-          {saving ? 'Realizando…' : `Realizar ${selectedCount} siembra${selectedCount === 1 ? '' : 's'}`}
+          {saving ? 'Realizando…' : `Realizar siembras seleccionadas (${selectedCount})`}
         </button>
       </header>
-      <div style={{ display: 'grid', gap: '0.75rem', padding: '1rem' }}>
-        {groupedTasks.map(([plannedDate, dayTasks]) => {
-          const selectedForDay = dayTasks.filter(task => !deselectedIds.has(task.id)).length;
-          const isOverdueDay = plannedDate < todayKey;
-          return <div key={plannedDate} style={{ display: 'grid', gap: '0.75rem' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap', padding: '0.2rem 0.15rem' }}>
-              <strong style={{ color: isOverdueDay ? '#c2410c' : '#166534', textTransform: 'capitalize' }}>
-                {isOverdueDay ? '⚠️ Atrasadas' : plannedDate === todayKey ? '🎯 Hoy' : '📅 Previstas'} · {new Date(`${plannedDate}T12:00:00`).toLocaleDateString('es-ES', { weekday: 'long', day: 'numeric', month: 'long' })}
-              </strong>
-              <button type="button" className="btn btn-secondary" disabled={!selectedForDay || saving} onClick={() => executeSelected(dayTasks)} style={{ padding: '0.45rem 0.75rem' }}>
-                Realizar las {selectedForDay} de este día
-              </button>
-            </div>
-            {dayTasks.map(task => {
-          const lots = compatibleLots(task);
-          const trays = Number(valueFor(task, 'trays') || 0);
-          const cropType = cropTypeFor(task);
-          const requiredSeed = trays * Number(cropType?.seedGrams || 0);
-          const selectedLot = lots.find(lot => String(lot.id) === String(valueFor(task, 'stockLotId')));
-          const insufficient = selectedLot && Number(selectedLot.remainingQuantity || 0) < requiredSeed;
-          const overdue = task.plannedDate < todayKey;
-          return (
-            <article key={task.id} style={{ padding: '1rem', background: 'white', border: `1px solid ${overdue ? '#fdba74' : '#d1fae5'}`, borderLeft: `5px solid ${overdue ? '#f97316' : '#22c55e'}`, borderRadius: '12px', opacity: deselectedIds.has(task.id) ? 0.62 : 1 }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start', gap: '0.75rem', marginBottom: '0.85rem' }}>
-                <label style={{ display: 'flex', gap: '0.65rem', alignItems: 'start', cursor: 'pointer' }}>
-                  <input type="checkbox" checked={!deselectedIds.has(task.id)} onChange={() => toggleSelected(task.id)} style={{ marginTop: '0.25rem', transform: 'scale(1.2)', accentColor: '#16a34a' }} />
-                  <span><strong style={{ color: '#1e293b', fontSize: '1.05rem' }}>{varietyNameFor(task)}</strong><small style={{ display: 'block', color: overdue ? '#c2410c' : '#64748b', marginTop: '0.2rem' }}>{overdue ? '⚠️ Atrasada · ' : ''}Prevista: {new Date(`${task.plannedDate}T12:00:00`).toLocaleDateString('es-ES')}</small></span>
-                </label>
-                <button type="button" onClick={() => cancelTask(task)} style={{ border: 0, background: '#fee2e2', color: '#b91c1c', borderRadius: '8px', padding: '0.45rem 0.65rem', cursor: 'pointer', fontWeight: 700 }}>Eliminar</button>
-              </div>
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '0.75rem' }}>
-                <label style={{ color: '#475569', fontSize: '0.78rem', fontWeight: 700 }}>BANDEJAS
-                  <input type="number" min="1" step="1" value={valueFor(task, 'trays')} onChange={event => setEdit(task.id, 'trays', event.target.value)} onBlur={event => persistField(task, 'trays', Number(event.target.value))} className="driver-input" style={{ marginTop: '0.3rem' }} />
-                </label>
-                <label style={{ color: '#475569', fontSize: '0.78rem', fontWeight: 700 }}>FECHA REAL DE SIEMBRA
-                  <input type="datetime-local" value={localDateTimeValue(valueFor(task, 'actualPlantedAt'))} onChange={event => setEdit(task.id, 'actualPlantedAt', event.target.value)} onBlur={event => persistField(task, 'actualPlantedAt', event.target.value)} className="driver-input" style={{ marginTop: '0.3rem' }} />
-                  <button type="button" onClick={() => { const now = todayAtCurrentTime(); setEdit(task.id, 'actualPlantedAt', now); persistField(task, 'actualPlantedAt', now); }} style={{ border: 0, padding: '0.25rem 0', background: 'transparent', color: '#2563eb', cursor: 'pointer', fontWeight: 700 }}>Usar ahora</button>
-                </label>
-                <label style={{ color: '#475569', fontSize: '0.78rem', fontWeight: 700 }}>LOTE DE SEMILLA
-                  <select value={valueFor(task, 'stockLotId') || ''} onChange={event => { setEdit(task.id, 'stockLotId', event.target.value); persistField(task, 'stockLotId', event.target.value); }} className="driver-input" style={{ marginTop: '0.3rem' }}>
-                    <option value="">Seleccionar lote…</option>
-                    {lots.map(lot => <option key={lot.id} value={lot.id}>{lot.supplierBatch} · {Number(lot.remainingQuantity).toLocaleString('es-ES')} g</option>)}
-                  </select>
-                  <small style={{ display: 'block', marginTop: '0.3rem', color: insufficient ? '#dc2626' : '#64748b' }}>{requiredSeed.toLocaleString('es-ES')} g necesarios{insufficient ? ' · Stock insuficiente' : ''}</small>
-                </label>
-              </div>
-            </article>
-          );
+      <div style={{ overflowX: 'auto' }}>
+        <table style={{ width: '100%', minWidth: '920px', borderCollapse: 'collapse', textAlign: 'left' }}>
+          <thead style={{ background: '#f8fafc', color: '#475569', fontSize: '0.72rem', textTransform: 'uppercase' }}>
+            <tr>
+              <th style={{ padding: '0.65rem', width: '42px' }}><input type="checkbox" checked={allSelected} onChange={toggleAll} title={allSelected ? 'Desmarcar todas' : 'Seleccionar todas'} style={{ transform: 'scale(1.15)', accentColor: '#16a34a' }} /></th>
+              <th style={{ padding: '0.65rem' }}>Variedad</th>
+              <th style={{ padding: '0.65rem', width: '105px' }}>Bandejas</th>
+              <th style={{ padding: '0.65rem', width: '220px' }}>Fecha real</th>
+              <th style={{ padding: '0.65rem', minWidth: '250px' }}>Lote de semilla</th>
+              <th style={{ padding: '0.65rem', width: '90px' }}></th>
+            </tr>
+          </thead>
+          <tbody>
+            {groupedTasks.map(([plannedDate, dayTasks]) => {
+              const isOverdueDay = plannedDate < todayKey;
+              return [
+                <tr key={`date-${plannedDate}`}>
+                  <td colSpan="6" style={{ padding: '0.55rem 0.75rem', background: isOverdueDay ? '#fff7ed' : '#ecfdf5', color: isOverdueDay ? '#c2410c' : '#166534', fontWeight: 800, fontSize: '0.82rem', textTransform: 'capitalize', borderTop: '1px solid #e2e8f0' }}>
+                    {isOverdueDay ? '⚠️ Pendientes atrasadas' : plannedDate === todayKey ? 'Hoy' : 'Previstas'} · {new Date(`${plannedDate}T12:00:00`).toLocaleDateString('es-ES', { weekday: 'long', day: 'numeric', month: 'long' })}
+                  </td>
+                </tr>,
+                ...dayTasks.map(task => {
+                  const lots = compatibleLots(task);
+                  const trays = Number(valueFor(task, 'trays') || 0);
+                  const cropType = cropTypeFor(task);
+                  const requiredSeed = trays * Number(cropType?.seedGrams || 0);
+                  const selectedLot = lots.find(lot => String(lot.id) === String(valueFor(task, 'stockLotId')));
+                  const insufficient = selectedLot && Number(selectedLot.remainingQuantity || 0) < requiredSeed;
+                  const disabled = deselectedIds.has(task.id);
+                  const cellStyle = { padding: '0.55rem 0.65rem', borderTop: '1px solid #eef2f7', opacity: disabled ? 0.55 : 1 };
+                  const inputStyle = { width: '100%', boxSizing: 'border-box', padding: '0.5rem 0.55rem', border: '1px solid #cbd5e1', borderRadius: '7px', background: 'white', color: '#1e293b' };
+                  return (
+                    <tr key={task.id} style={{ background: disabled ? '#f8fafc' : 'white' }}>
+                      <td style={cellStyle}><input type="checkbox" checked={!disabled} onChange={() => toggleSelected(task.id)} title={disabled ? 'Seleccionar para sembrar' : 'Dejar pendiente'} style={{ transform: 'scale(1.15)', accentColor: '#16a34a' }} /></td>
+                      <td style={cellStyle}><strong style={{ color: '#1e293b' }}>{varietyNameFor(task)}</strong>{disabled && <span style={{ marginLeft: '0.45rem', padding: '0.15rem 0.35rem', borderRadius: '999px', background: '#fef3c7', color: '#92400e', fontSize: '0.68rem', fontWeight: 800 }}>QUEDARÁ PENDIENTE</span>}<small style={{ display: 'block', marginTop: '0.15rem', color: '#64748b' }}>{Number(cropType?.seedGrams || 0)} g/bandeja · {requiredSeed.toLocaleString('es-ES')} g</small></td>
+                      <td style={cellStyle}><input type="number" min="1" step="1" value={valueFor(task, 'trays')} onChange={event => setEdit(task.id, 'trays', event.target.value)} onBlur={event => persistField(task, 'trays', Number(event.target.value))} style={inputStyle} /></td>
+                      <td style={cellStyle}><input type="datetime-local" value={localDateTimeValue(valueFor(task, 'actualPlantedAt'))} onChange={event => setEdit(task.id, 'actualPlantedAt', event.target.value)} onBlur={event => persistField(task, 'actualPlantedAt', event.target.value)} style={inputStyle} /><button type="button" onClick={() => { const now = todayAtCurrentTime(); setEdit(task.id, 'actualPlantedAt', now); persistField(task, 'actualPlantedAt', now); }} style={{ border: 0, padding: '0.2rem 0 0', background: 'transparent', color: '#2563eb', cursor: 'pointer', fontSize: '0.72rem', fontWeight: 700 }}>Usar ahora</button></td>
+                      <td style={cellStyle}><select value={valueFor(task, 'stockLotId') || ''} onChange={event => { setEdit(task.id, 'stockLotId', event.target.value); persistField(task, 'stockLotId', event.target.value); }} style={inputStyle}><option value="">Seleccionar lote…</option>{lots.map(lot => <option key={lot.id} value={lot.id}>{lot.supplierBatch} · {Number(lot.remainingQuantity).toLocaleString('es-ES')} g disponibles</option>)}</select>{insufficient && <small style={{ display: 'block', color: '#dc2626', marginTop: '0.2rem' }}>Stock insuficiente</small>}</td>
+                      <td style={cellStyle}><button type="button" onClick={() => cancelTask(task)} title="Eliminar propuesta" style={{ border: 0, background: '#fee2e2', color: '#b91c1c', borderRadius: '7px', padding: '0.45rem 0.55rem', cursor: 'pointer', fontWeight: 700 }}>Eliminar</button></td>
+                    </tr>
+                  );
+                })
+              ];
             })}
-          </div>;
-        })}
+          </tbody>
+        </table>
       </div>
     </section>
   );
