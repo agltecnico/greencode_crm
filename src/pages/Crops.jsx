@@ -4,6 +4,7 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useData } from '../context/DataContext';
 import { generateLabelPDF } from '../utils/labelPdf.js';
 import EmployeeTasks from '../components/EmployeeTasks';
+import SowingTaskQueue from '../components/SowingTaskQueue';
 import TraceabilityExplorer from '../components/TraceabilityExplorer';
 import Supplies from './Supplies';
 import '../crops.css';
@@ -1035,75 +1036,6 @@ export default function Crops() {
             <span style={{ fontSize: '1.2rem' }}>⊕</span> Registrar Siembra
           </button>
         </div>
-
-        
-          {/* SOWING SMART TASKS OUTSIDE MODAL */}
-          {(() => {
-            const today = new Date();
-            const targetDayOfWeek = today.getDay();
-            const tasks = [];
-            
-            (harvestTargets || []).forEach(routine => {
-              const cType = (cropTypes || []).find(ct => ct.id == routine.productId);
-              if(!cType) return;
-              
-              const harvestWd = Number(routine.targetDayOfWeek);
-              const plantWd = weekDay(harvestWd - getCropCycleOffsets(cType).harvest);
-              
-              const isPlanted = (crops || []).some(c => {
-                if(c.cropTypeId !== cType.id) return false;
-                if(!c.datePlanted || c.status === 'DISCARDED' || c.status === 'HARVESTED') return false;
-                const cDate = new Date(c.datePlanted);
-                const tDate = new Date();
-                return cDate.getFullYear() === tDate.getFullYear() && 
-                       cDate.getMonth() === tDate.getMonth() && 
-                       cDate.getDate() === tDate.getDate();
-              });
-              
-              if(plantWd === targetDayOfWeek && !isPlanted) {
-                tasks.push({
-                  cropTypeId: cType.id,
-                  name: cType.name,
-                  trays: routine.tuppersCount,
-                  gramsPerTray: Number(cType.seedGrams || 0),
-                  totalSeedGrams: Number(cType.seedGrams || 0) * Number(routine.tuppersCount || 0)
-                });
-              }
-            });
-
-            if (tasks.length > 0) {
-              return (
-                <div style={{ marginBottom: '2rem', backgroundColor: '#f0fdf4', padding: '1.25rem', borderRadius: '1rem', border: '1px solid #bbf7d0', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.05)' }}>
-                  <h4 style={{ fontWeight: 'bold', color: '#166534', margin: '0 0 1rem 0', display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '1.1rem' }}>
-                    <span>📋</span> Tareas de Siembra Pendientes para Hoy
-                  </h4>
-                  <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap' }}>
-                    {tasks.map((t, idx) => (
-                      <div key={idx} 
-                          onClick={() => {
-                            openSowModal({ cropTypeId: t.cropTypeId, traysCount: t.trays });
-                          }}
-                          style={{ flex: '1 1 min-content', minWidth: '250px', display: 'flex', justifyContent: 'space-between', padding: '1rem', backgroundColor: 'white', borderRadius: '0.75rem', border: '1px solid #cbd5e1', cursor: 'pointer', transition: 'all 0.2s', boxShadow: '0 1px 3px rgba(0,0,0,0.1)' }}
-                          onMouseEnter={(e) => { e.currentTarget.style.borderColor = '#22c55e'; e.currentTarget.style.transform = 'translateY(-2px)'; e.currentTarget.style.boxShadow = '0 10px 15px -3px rgba(34,197,94,0.2)'; }}
-                          onMouseLeave={(e) => { e.currentTarget.style.borderColor = '#cbd5e1'; e.currentTarget.style.transform = 'none'; e.currentTarget.style.boxShadow = '0 1px 3px rgba(0,0,0,0.1)'; }}
-                      >
-                        <div>
-                          <span style={{ fontWeight: 'bold', color: '#1e293b', fontSize: '1.1rem' }}>Sembrar {t.name}</span>
-                          <div style={{ fontSize: '0.9rem', color: '#64748b', marginTop: '0.25rem' }}>
-                            {t.trays} bandejas · {t.gramsPerTray} g/bandeja · {t.totalSeedGrams} g total
-                          </div>
-                        </div>
-                        <div style={{ display: 'flex', alignItems: 'center', color: '#22c55e', fontWeight: 'bold' }}>
-                           <span style={{ backgroundColor: '#dcfce7', padding: '0.5rem 1rem', borderRadius: '999px', fontSize: '0.85rem' }}>Empezar ➔</span>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              );
-            }
-            return null;
-          })()}
 
           {/* Tab Navigation */}
         <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '2rem', backgroundColor: '#f1f5f9', padding: '0.25rem', borderRadius: '0.75rem', width: 'fit-content' }}>
@@ -2526,6 +2458,7 @@ export default function Crops() {
         
         {activeTab === 'tareas' && (
           <div>
+            <SowingTaskQueue />
             <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '1rem' }}>
               <button 
                 onClick={() => window.open('/tv', 'TVMode', 'width=1920,height=1080,menubar=no,toolbar=no,location=no,status=no,resizable=yes')} 

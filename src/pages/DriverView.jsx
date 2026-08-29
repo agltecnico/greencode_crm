@@ -5,7 +5,7 @@ import { useNavigate } from 'react-router-dom';
 import { generateDeliveryNoteBlob } from '../utils/pdf';
 
 function DriverView() {
-  const { clients, orders, deliveryNotes, markOrderAsDelivered, saveSignedDeliveryNote, updateDeliveryNote, updateOrderList, companyLogo, companyProfile } = useContext(DataContext);
+  const { clients, orders, deliveryNotes, markOrderAsDelivered, saveSignedDeliveryNote, updateDeliveryNote, companyLogo, companyProfile, initialDataLoading, driverActionsReady } = useContext(DataContext);
   const [view, setView] = useState('orders');
   const [pdfBlob, setPdfBlob] = useState(null);
     const [pdfError, setPdfError] = useState(null); // 'orders', 'deliver', 'ticket', 'sign'
@@ -90,6 +90,10 @@ function DriverView() {
     .sort((a,b) => new Date(b.date) - new Date(a.date));
 
   const handleStartDelivery = (order) => {
+    if (!driverActionsReady) {
+      alert('Terminando de preparar los datos de entrega. Inténtalo de nuevo en un momento.');
+      return;
+    }
     setSelectedOrder(order);
     setEditItems(getItemsArray(order.items).map(item => ({ 
       ...item, 
@@ -139,6 +143,10 @@ function DriverView() {
   };
 
   const handleViewTicket = (order) => {
+    if (!driverActionsReady) {
+      alert('El albarán todavía se está cargando. Inténtalo de nuevo en un momento.');
+      return;
+    }
     const ticket = deliveryNotes.find(dn => dn.orderId === order.id);
     if (ticket) {
       setSelectedOrder(order);
@@ -147,18 +155,6 @@ function DriverView() {
     } else {
       alert('No se encontró el albarán correspondiente.');
     }
-  };
-
-  const sendWhatsApp = () => {
-    const client = clients.find(c => c.id === selectedTicket.clientId);
-    const clientName = client ? client.name : (selectedTicket.clientName || '');
-    const url = `https://${window.location.host}/ticket/${selectedTicket.id}`;
-    const greeting = clientName ? `Hola ${clientName}!` : 'Hola!';
-    const text = `Y" *NUEVO ALBARÁN*\n${greeting} Puedes ver y descargar tu albarán firmado aquíí:\nY'% ${url}`;
-    const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
-    if (isMobile) { window.location.href = `whatsapp://send?text=${encodeURIComponent(text)}`; } else { window.open(`https://web.whatsapp.com/send?text=${encodeURIComponent(text)}`, '_blank'); }
-    updateDeliveryNote(selectedTicket.id, { sent: true });
-    setSelectedTicket(prev => ({ ...prev, sent: true }));
   };
 
   const sharePDF = async () => {
@@ -172,7 +168,6 @@ function DriverView() {
       const file = new File([blob], fileName, { type: 'application/pdf' });
 
       let sharedSuccessfully = false;
-      let lastShareError = null;
 
       // Try native share first
       if (navigator.share) {
@@ -192,11 +187,8 @@ function DriverView() {
           return; // Stop here if successful
         } catch (shareErr) {
           console.warn("Native file sharing failed:", shareErr);
-          lastShareError = shareErr;
           if (shareErr.name === 'AbortError') return; // User cancelled
         }
-      } else {
-        lastShareError = new Error("navigator.share no estǭ disponible en este navegador");
       }
 
       if (!sharedSuccessfully) {
@@ -697,7 +689,7 @@ function DriverView() {
                 {activeTab === 'pending' ? 'Pedidos Pendientes' : 'Pedidos Entregados'} ({filteredOrders.length})
               </h2>
               
-              {filteredOrders.map(order => (
+              {!initialDataLoading && filteredOrders.map(order => (
                 <div 
                   key={order.id} 
                   className={`driver-card ${activeTab === 'delivered' ? 'delivered' : ''} ${expandedOrderId === order.id ? 'expanded' : ''}`}
@@ -793,7 +785,11 @@ function DriverView() {
                 </div>
               ))}
               
-              {filteredOrders.length === 0 && (
+              {initialDataLoading ? (
+                <div className="empty-state">
+                  <p>⏳ Cargando pedidos...</p>
+                </div>
+              ) : filteredOrders.length === 0 && (
                 <div className="empty-state">
                   <p>
                     {activeTab === 'pending' 

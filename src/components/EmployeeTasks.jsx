@@ -211,7 +211,9 @@ export default function EmployeeTasks({ onTaskAction, onHarvestBatchAction }) {
         });
       };
 
-      if(!isPast && plantWd == targetDayOfWeek && !isAlreadyPlanted()) {
+      // Las siembras de hoy y atrasadas viven en la cola persistente.
+      // Aquí solo se mantienen las futuras como vista previa del calendario.
+      if(calendarDayNumber(targetDate) > calendarDayNumber(today) && plantWd == targetDayOfWeek && !isAlreadyPlanted()) {
         const gramsPerTray = Number(cType.seedGrams || 0);
         const totalSeedGrams = gramsPerTray * Number(routine.tuppersCount || 0);
         tasksForDate.push({ 

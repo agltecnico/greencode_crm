@@ -73,6 +73,9 @@ export const DataProvider = ({ children }) => {
   const [productMovements, setProductMovements] = useState([]);
   const [packagingFormats, setPackagingFormats] = useState([]);
   const [dailyLogs, setDailyLogs] = useState([]);
+  const [sowingTasks, setSowingTasks] = useState([]);
+  const [initialDataLoading, setInitialDataLoading] = useState(true);
+  const [driverActionsReady, setDriverActionsReady] = useState(false);
 
   const refreshInFlightRef = useRef(null);
   const pendingMutationsRef = useRef(0);
@@ -86,10 +89,14 @@ export const DataProvider = ({ children }) => {
 
       const loadData = async () => {
       try {
-        const results = await Promise.all([
+        // Pedidos y clientes son lo único necesario para pintar la vista de reparto.
+        // El resto (especialmente firmas de albaranes) puede ser mucho más pesado.
+        const coreDataPromise = Promise.all([
           supabase.from('clients').select('*').order('createdAt', { ascending: true }),
-          supabase.from('products').select('*').order('createdAt', { ascending: true }),
           supabase.from('orders').select('*').order('createdAt', { ascending: true }),
+        ]);
+        const secondaryDataPromise = Promise.all([
+          supabase.from('products').select('*').order('createdAt', { ascending: true }),
           supabase.from('delivery_notes').select('*').order('createdAt', { ascending: true }),
           supabase.from('invoices').select('*').order('createdAt', { ascending: true }),
           supabase.from('expenses').select('*').order('createdAt', { ascending: true }),
@@ -109,15 +116,24 @@ export const DataProvider = ({ children }) => {
           supabase.from('daily_logs').select('*').order('date', { ascending: true }),
           supabase.from('product_movements').select('*').order('createdAt', { ascending: true }),
           supabase.from('packaging_formats').select('*').order('capacityMl', { ascending: true }),
+          supabase.from('sowing_tasks').select('*').eq('status', 'PENDING').order('plannedDate', { ascending: true }),
         ]);
 
+        const coreResults = await coreDataPromise;
+        const failedCoreQuery = coreResults.find(result => result.error);
+        if (failedCoreQuery) throw failedCoreQuery.error;
+
+        const [{ data: clientsData }, { data: ordersData }] = coreResults;
+        if (clientsData) setClients(clientsData);
+        if (ordersData) setOrders(ordersData);
+        setInitialDataLoading(false);
+
+        const results = await secondaryDataPromise;
         const failedQuery = results.find(result => result.error);
         if (failedQuery) throw failedQuery.error;
 
         const [
-          { data: clientsData },
           { data: productsData },
-          { data: ordersData },
           { data: notesData },
           { data: invoicesData },
           { data: expensesData },
@@ -136,12 +152,11 @@ export const DataProvider = ({ children }) => {
           { data: harvestsData },
           { data: dailyLogsData },
           { data: productMovementsData },
-          { data: packagingFormatsData }
+          { data: packagingFormatsData },
+          { data: sowingTasksData }
         ] = results;
 
-        if (clientsData) setClients(clientsData);
         if (productsData) setProducts(productsData);
-        if (ordersData) setOrders(ordersData);
         if (notesData) setDeliveryNotes(notesData);
         if (invoicesData) setInvoices(invoicesData);
         if (expensesData) {
@@ -187,6 +202,7 @@ export const DataProvider = ({ children }) => {
         if (dailyLogsData) setDailyLogs(dailyLogsData);
         if (productMovementsData) setProductMovements(productMovementsData);
         if (packagingFormatsData) setPackagingFormats(packagingFormatsData);
+        if (sowingTasksData) setSowingTasks(sowingTasksData);
 
         if (profileData && profileData.length > 0) {
           setCompanyProfile(profileData[0]);
@@ -223,10 +239,12 @@ export const DataProvider = ({ children }) => {
             console.error('No se pudo migrar el perfil local de empresa a Supabase:', profileError);
           }
         }
+        setDriverActionsReady(true);
         lastRefreshAtRef.current = Date.now();
         return true;
       } catch (err) {
         console.error("Error loading data from Supabase:", err);
+        setInitialDataLoading(false);
         return false;
       } finally {
         refreshInFlightRef.current = null;
@@ -287,16 +305,12 @@ export const DataProvider = ({ children }) => {
         }
       });
 
-    window.addEventListener('focus', refreshWhenActive);
     window.addEventListener('online', refreshWhenActive);
-    document.addEventListener('visibilitychange', refreshWhenActive);
 
     return () => {
       window.clearInterval(intervalId);
       window.clearTimeout(realtimeRefreshTimerRef.current);
-      window.removeEventListener('focus', refreshWhenActive);
       window.removeEventListener('online', refreshWhenActive);
-      document.removeEventListener('visibilitychange', refreshWhenActive);
       void supabase.removeChannel(channel);
     };
   }, [refreshData]);
@@ -540,6 +554,45 @@ export const DataProvider = ({ children }) => {
     const deleteSubstrateInventory = deleteStockEntry;
   
   // Crop
+    const syncSowingTasks = async () => {
+      const { error } = await supabase.rpc('sync_sowing_tasks');
+      if (error) throw error;
+      const { data, error: loadError } = await supabase
+        .from('sowing_tasks')
+        .select('*')
+        .eq('status', 'PENDING')
+        .order('plannedDate', { ascending: true });
+      if (loadError) throw loadError;
+      setSowingTasks(data || []);
+      return data || [];
+    };
+
+    const updateSowingTask = async (id, fields) => {
+      const payload = { ...fields, updatedAt: new Date().toISOString() };
+      const { data, error } = await supabase
+        .from('sowing_tasks')
+        .update(payload)
+        .eq('id', id)
+        .eq('status', 'PENDING')
+        .select()
+        .single();
+      if (error) throw error;
+      setSowingTasks(previous => previous.map(task => task.id === id ? data : task));
+      return data;
+    };
+
+    const cancelSowingTask = async id => updateSowingTask(id, {
+      status: 'CANCELLED',
+      cancelledAt: new Date().toISOString()
+    });
+
+    const completeSowingTasks = async tasks => {
+      const { data, error } = await supabase.rpc('complete_sowing_tasks', { p_tasks: tasks });
+      if (error) throw error;
+      await refreshData({ force: true });
+      return data;
+    };
+
     const addCrop = async (item) => {
       const tempId = createId();
       const newItem = { ...item, id: tempId };
@@ -1489,6 +1542,7 @@ export const DataProvider = ({ children }) => {
     await refreshData({ force: true });
     return data;
   };
+
   const editHarvestPackaging = async (id, packagingBreakdown) => {
     const { data, error } = await supabase.rpc('edit_harvest_packaging', {
       p_harvest_id: id,
@@ -1541,6 +1595,7 @@ export const DataProvider = ({ children }) => {
         substrates, addSubstrate, deleteSubstrate,
         substrateInventory, addSubstrateInventory, deleteSubstrateInventory,
         crops, addCrop, sowCrop, updateCrop, increaseCropTrays, deleteCrop, advanceCropStatus, reverseCropStatus, setCropPhase, discardCrop,
+        sowingTasks, syncSowingTasks, updateSowingTask, cancelSowingTask, completeSowingTasks,
         harvestTargets, addHarvestTarget, updateHarvestTarget, deleteHarvestTarget,
       harvests, addHarvest, registerHarvest, updateHarvest, editHarvestPackaging, deleteHarvest,
       dailyLogs, addDailyLog, updateDailyLog, deleteDailyLog,
@@ -1554,7 +1609,7 @@ export const DataProvider = ({ children }) => {
       invoices, addInvoice, deleteInvoice, importData, markInvoiceAsPaid,
       expenses, addExpense, updateExpense, deleteExpense, markExpenseAsPaid,
       salesForecasts, saveSalesForecasts,
-      refreshData
+      refreshData, initialDataLoading, driverActionsReady
     }}>
       {children}
     </DataContext.Provider>
