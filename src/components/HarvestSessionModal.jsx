@@ -23,6 +23,21 @@ const isoWeek = value => {
   return Math.ceil((((date - start) / 86400000) + 1) / 7);
 };
 
+const pendingDeliveryGroups = movements => {
+  const groups = new Map();
+  [...movements].sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt)).forEach(movement => {
+    const date = new Date(movement.createdAt);
+    const weekKey = `${date.getFullYear()}-${String(isoWeek(date)).padStart(2, '0')}`;
+    if (!groups.has(weekKey)) groups.set(weekKey, { year: date.getFullYear(), week: isoWeek(date), dates: new Map(), units: 0 });
+    const group = groups.get(weekKey);
+    const dateLabel = date.toLocaleDateString('es-ES', { day: '2-digit', month: '2-digit', year: 'numeric' });
+    const units = Math.abs(Number(movement.quantity || 0));
+    group.units += units;
+    group.dates.set(dateLabel, (group.dates.get(dateLabel) || 0) + units);
+  });
+  return [...groups.values()];
+};
+
 const makeLine = () => ({ id: crypto.randomUUID(), productId: '', packagingQuantities: {} });
 
 export default function HarvestSessionModal({ open, onClose }) {
@@ -200,6 +215,7 @@ export default function HarvestSessionModal({ open, onClose }) {
                 const recipe = recipeIds(product);
                 const producedUnits = lineUnits(line);
                 const pendingMovements = pendingOrdersForProduct(line.productId);
+                const deliveryGroups = pendingDeliveryGroups(pendingMovements);
                 const pendingUnits = pendingMovements.reduce((sum, movement) => sum + Math.abs(Number(movement.quantity || 0)), 0);
                 const week = selectedWeekBounds();
                 const weekPendingUnits = pendingMovements
@@ -232,6 +248,20 @@ export default function HarvestSessionModal({ open, onClose }) {
                       <div className="is-linked"><span>SE VINCULARÁN</span><strong>{linkedUnits}</strong><small>{linkedWeekUnits} de esta semana{linkedOlderUnits > 0 ? ` · ${linkedOlderUnits} anteriores` : ''}</small></div>
                       <div className="is-surplus"><span>QUEDAN EN STOCK</span><strong>{surplusUnits}</strong><small>táperes disponibles</small></div>
                     </div>
+                    {deliveryGroups.length > 0 ? (
+                      <div className="harvest-line__deliveries">
+                        <strong>Pedidos entregados pendientes de {product.name}</strong>
+                        <span>Solo se vincularán pedidos de este mismo producto.</span>
+                        {deliveryGroups.map(group => (
+                          <div key={`${group.year}-${group.week}`}>
+                            <b>Semana {group.week} · {group.units} uds.</b>
+                            <small>{[...group.dates.entries()].map(([dateLabel, units]) => `${dateLabel}: ${units}`).join(' · ')}</small>
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <div className="harvest-line__no-deliveries">No hay pedidos entregados pendientes de vincular para {product.name}.</div>
+                    )}
                   </>}
                 </article>;
               })}
