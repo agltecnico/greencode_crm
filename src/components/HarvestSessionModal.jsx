@@ -27,7 +27,7 @@ const makeLine = () => ({ id: crypto.randomUUID(), productId: '', packagingQuant
 
 export default function HarvestSessionModal({ open, onClose }) {
   const {
-    crops, cropTypes, seedVarieties, articles, products, harvests, stockEntries,
+    crops, cropTypes, seedVarieties, articles, products, harvests, stockEntries, productMovements,
     registerHarvestSession
   } = useData();
   const [harvestDate, setHarvestDate] = useState(localInputValue());
@@ -66,6 +66,21 @@ export default function HarvestSessionModal({ open, onClose }) {
     .map(id => articles?.find(article => article.id === id && article.active !== false))
     .filter(Boolean);
   const lineUnits = line => Object.values(line.packagingQuantities || {}).reduce((sum, value) => sum + Number(value || 0), 0);
+  const pendingOrdersForProduct = productId => (productMovements || []).filter(movement =>
+    movement.type === 'ORDER'
+    && String(movement.productId) === String(productId)
+    && Number(movement.quantity || 0) < 0
+    && String(movement.referenceId || '').endsWith('|PENDING-TRACEABILITY')
+  );
+  const selectedWeekBounds = () => {
+    const selected = new Date(harvestDate);
+    const start = new Date(selected);
+    start.setHours(0, 0, 0, 0);
+    start.setDate(start.getDate() - (start.getDay() === 0 ? 6 : start.getDay() - 1));
+    const end = new Date(start);
+    end.setDate(end.getDate() + 7);
+    return { start, end };
+  };
   const activeLines = lines.filter(line => line.productId && lineUnits(line) > 0);
   const usedVarietyIds = new Set(activeLines.flatMap(line => recipeIds(products?.find(product => product.id === line.productId))));
   const selectedReadyCrops = readyCrops.filter(crop => Number(selectedCropTrays[crop.id] || 0) > 0);
@@ -183,6 +198,21 @@ export default function HarvestSessionModal({ open, onClose }) {
               {lines.map((line, lineIndex) => {
                 const product = products?.find(item => item.id === line.productId);
                 const recipe = recipeIds(product);
+                const producedUnits = lineUnits(line);
+                const pendingMovements = pendingOrdersForProduct(line.productId);
+                const pendingUnits = pendingMovements.reduce((sum, movement) => sum + Math.abs(Number(movement.quantity || 0)), 0);
+                const week = selectedWeekBounds();
+                const weekPendingUnits = pendingMovements
+                  .filter(movement => {
+                    const deliveryDate = new Date(movement.createdAt);
+                    return deliveryDate >= week.start && deliveryDate < week.end;
+                  })
+                  .reduce((sum, movement) => sum + Math.abs(Number(movement.quantity || 0)), 0);
+                const olderPendingUnits = Math.max(0, pendingUnits - weekPendingUnits);
+                const linkedUnits = Math.min(producedUnits, pendingUnits);
+                const linkedOlderUnits = Math.min(producedUnits, olderPendingUnits);
+                const linkedWeekUnits = Math.min(weekPendingUnits, Math.max(0, producedUnits - linkedOlderUnits));
+                const surplusUnits = Math.max(0, producedUnits - pendingUnits);
                 return <article className="harvest-line" key={line.id}>
                   <div className="harvest-line__top"><b>Cosecha {lineIndex + 1}</b><button type="button" onClick={() => removeLine(line.id)}>Eliminar</button></div>
                   <select value={line.productId} onChange={event => updateLine(line.id, { productId: event.target.value, packagingQuantities: {} })}>
@@ -196,6 +226,11 @@ export default function HarvestSessionModal({ open, onClose }) {
                         const stock = (stockEntries || []).filter(entry => entry.articleId === format.id).reduce((sum, entry) => sum + Number(entry.quantity || 0), 0);
                         return <label key={format.id}><span>{format.name}<small>{stock} disponibles</small></span><input type="number" min="0" placeholder="0" value={line.packagingQuantities[format.id] || ''} onChange={event => updateLine(line.id, { packagingQuantities: { ...line.packagingQuantities, [format.id]: Math.max(0, Number(event.target.value || 0)) } })} /></label>;
                       })}
+                    </div>
+                    <div className="harvest-line__allocation">
+                      <div><span>PEDIDOS PENDIENTES</span><strong>{pendingUnits}</strong><small>{weekPendingUnits} de esta semana{olderPendingUnits > 0 ? ` · ${olderPendingUnits} anteriores` : ''}</small></div>
+                      <div className="is-linked"><span>SE VINCULARÁN</span><strong>{linkedUnits}</strong><small>{linkedWeekUnits} de esta semana{linkedOlderUnits > 0 ? ` · ${linkedOlderUnits} anteriores` : ''}</small></div>
+                      <div className="is-surplus"><span>QUEDAN EN STOCK</span><strong>{surplusUnits}</strong><small>táperes disponibles</small></div>
                     </div>
                   </>}
                 </article>;
