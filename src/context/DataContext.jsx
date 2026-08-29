@@ -1543,6 +1543,19 @@ export const DataProvider = ({ children }) => {
     return data;
   };
 
+  const registerHarvestSession = async ({ harvestDate, harvestLines }) => {
+    const { data, error } = await persistOrReload(
+      () => supabase.rpc('register_harvest_session', {
+        p_harvest_date: harvestDate,
+        p_harvests: harvestLines
+      }),
+      'registrar la sesión completa de cosecha'
+    );
+    if (error) return null;
+    await refreshData({ force: true });
+    return data;
+  };
+
   const editHarvestPackaging = async (id, packagingBreakdown) => {
     const { data, error } = await supabase.rpc('edit_harvest_packaging', {
       p_harvest_id: id,
@@ -1597,7 +1610,7 @@ export const DataProvider = ({ children }) => {
         crops, addCrop, sowCrop, updateCrop, increaseCropTrays, deleteCrop, advanceCropStatus, reverseCropStatus, setCropPhase, discardCrop,
         sowingTasks, syncSowingTasks, updateSowingTask, cancelSowingTask, completeSowingTasks,
         harvestTargets, addHarvestTarget, updateHarvestTarget, deleteHarvestTarget,
-      harvests, addHarvest, registerHarvest, updateHarvest, editHarvestPackaging, deleteHarvest,
+      harvests, addHarvest, registerHarvest, registerHarvestSession, updateHarvest, editHarvestPackaging, deleteHarvest,
       dailyLogs, addDailyLog, updateDailyLog, deleteDailyLog,
 
       clients: sortedClients, addClient, updateClient, deleteClient,

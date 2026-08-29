@@ -5,6 +5,7 @@ import { useData } from '../context/DataContext';
 import { generateLabelPDF } from '../utils/labelPdf.js';
 import EmployeeTasks from '../components/EmployeeTasks';
 import SowingTaskQueue from '../components/SowingTaskQueue';
+import HarvestSessionModal from '../components/HarvestSessionModal';
 import TraceabilityExplorer from '../components/TraceabilityExplorer';
 import Supplies from './Supplies';
 import '../crops.css';
@@ -194,6 +195,8 @@ class ErrorBoundary extends React.Component {
 
 
 export default function Crops() {
+  const legacyHarvestModalEnabled = false;
+  const legacyFinishedStockEnabled = false;
   const navigate = useNavigate();
   const { requireAdmin } = useAdminMode();
   const { profile } = useAuth();
@@ -1467,7 +1470,7 @@ export default function Crops() {
         </button>
       </div>
 
-      {false && harvestTab === 'inventario' && (
+      {legacyFinishedStockEnabled && harvestTab === 'inventario' && (
       <div className="premium-card mb-6" style={{ background: '#ffffff', color: '#1e293b', border: '1px solid #e2e8f0', borderRadius: '16px', overflow: 'hidden', boxShadow: '0 4px 10px rgba(15,23,42,0.06)' }}>
         <h3 className="premium-card-title" style={{ margin: 0, color: '#1e293b', background: '#f8fafc', borderBottom: '1px solid #e2e8f0', padding: '1.1rem 1.35rem', display: 'flex', alignItems: 'center', gap: '0.75rem', fontSize: '1.2rem' }}>
           <span style={{ fontSize: '1.5rem' }}>📦</span> Inventario de Producto Terminado y Reservas
@@ -2704,7 +2707,9 @@ export default function Crops() {
   );
 })()}
 
-{isHarvestModalOpen && (
+<HarvestSessionModal open={isHarvestModalOpen} onClose={closeHarvestModal} />
+
+{isHarvestModalOpen && legacyHarvestModalEnabled && (
   <div style={modalOverlayStyle}>
     <div style={{ ...modalCardStyle, width: '760px', maxWidth: '94vw', maxHeight: '92vh', padding: 0, overflowY: 'auto' }}>
       
