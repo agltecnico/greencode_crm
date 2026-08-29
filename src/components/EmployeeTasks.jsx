@@ -1,5 +1,5 @@
 import { useNavigate } from 'react-router-dom';
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useData } from '../context/DataContext';
 import '../crops.css';
 import Swal from 'sweetalert2';
@@ -25,12 +25,13 @@ const calendarDayNumber = (dateValue) => {
 
 const calendarDaysBetween = (from, to) => calendarDayNumber(to) - calendarDayNumber(from);
 
-export default function EmployeeTasks({ onTaskAction, onHarvestBatchAction }) {
+export default function EmployeeTasks({ onTaskAction, onHarvestBatchAction, onSowingGroupAction }) {
   const navigate = useNavigate();
   const { 
     harvestTargets, crops, cropTypes, seedVarieties, articles, stockLots, providers,
-    sowCrop, updateCrop
+    sowCrop, updateCrop, sowingTasks, syncSowingTasks
   } = useData();
+  const sowingSyncStarted = useRef(false);
   
   const [timeFilter, setTimeFilter] = useState(1);
   const [monthOffset, setMonthOffset] = useState(0);
@@ -40,6 +41,12 @@ export default function EmployeeTasks({ onTaskAction, onHarvestBatchAction }) {
   const [selectedTasks, setSelectedTasks] = useState([]);
   const [isSowModalOpen, setIsSowModalOpen] = useState(false);
   const [batchSelections, setBatchSelections] = useState({});
+
+  useEffect(() => {
+    if (sowingSyncStarted.current) return;
+    sowingSyncStarted.current = true;
+    syncSowingTasks().catch(error => console.error('No se pudieron sincronizar las siembras del día:', error));
+  }, [syncSowingTasks]);
 
   const activeCrops = crops?.filter(c => c.status !== 'HARVESTED' && c.status !== 'DISCARDED') || [];
 
@@ -170,6 +177,7 @@ export default function EmployeeTasks({ onTaskAction, onHarvestBatchAction }) {
           icon: CULTIVATION_TASK_ICONS[phaseStr] || '🌿',
           className: 'move',
           cropId: crop.id,
+          trays: Number(crop.traysCount || 0),
           nextStatus: phaseStr === 'GERMINACIÓN' ? 'GERMINATING' : phaseStr === 'OSCURIDAD' ? 'DARKNESS' : 'LIGHT'
         });
       } else if (action === 'harvest') {
@@ -181,6 +189,7 @@ export default function EmployeeTasks({ onTaskAction, onHarvestBatchAction }) {
           icon: '✂️',
           className: 'harvest',
           cropId: crop.id,
+          trays: Number(crop.traysCount || 0),
           cropTypeId: cType.id
         });
       }
@@ -355,7 +364,7 @@ export default function EmployeeTasks({ onTaskAction, onHarvestBatchAction }) {
     <div className={`task-day-group ${dayGroup.isToday ? 'is-today' : ''}`}>
       <div className="task-day-header">
         <span className="task-day-title">
-          {dayGroup.isToday ? '🎯 TAREAS DE HOY' : dayGroup.date.toLocaleDateString('es-ES', { weekday: 'long', day: 'numeric', month: 'short' })}
+          {dayGroup.title || (dayGroup.isToday ? '🎯 TAREAS DE HOY' : dayGroup.date.toLocaleDateString('es-ES', { weekday: 'long', day: 'numeric', month: 'short' }))}
         </span>
       </div>
       {dayGroup.items.length === 0 ? (
@@ -408,6 +417,68 @@ export default function EmployeeTasks({ onTaskAction, onHarvestBatchAction }) {
     </div>
   );
 
+  const renderDailyGroups = dayGroup => {
+    const todayKey = localDateKey(today);
+    const groups = [
+      {
+        key: 'sowing',
+        title: 'Siembras del día',
+        icon: '🌱',
+        color: '#16a34a',
+        background: '#f0fdf4',
+        items: (sowingTasks || []).filter(task => task.status === 'PENDING' && task.plannedDate === todayKey),
+        action: onSowingGroupAction
+      },
+      {
+        key: 'darkness',
+        title: 'Pasar a oscuridad',
+        icon: '🌑',
+        color: '#4f46e5',
+        background: '#eef2ff',
+        items: dayGroup.items.filter(task => task.type === 'move' && task.nextStatus === 'DARKNESS')
+      },
+      {
+        key: 'light',
+        title: 'Pasar a luz',
+        icon: '☀️',
+        color: '#d97706',
+        background: '#fffbeb',
+        items: dayGroup.items.filter(task => task.type === 'move' && task.nextStatus === 'LIGHT')
+      },
+      {
+        key: 'harvest',
+        title: 'Listos para cosechar',
+        icon: '✂️',
+        color: '#dc2626',
+        background: '#fef2f2',
+        items: dayGroup.items.filter(task => task.type === 'harvest')
+      }
+    ];
+    const otherTasks = dayGroup.items.filter(task => task.type === 'move' && !['DARKNESS', 'LIGHT'].includes(task.nextStatus));
+    if (otherTasks.length) groups.splice(1, 0, { key: 'other', title: 'Otros cambios de fase', icon: '🌿', color: '#0284c7', background: '#f0f9ff', items: otherTasks });
+
+    return (
+      <div className="task-day-group is-today">
+        <div className="task-day-header"><span className="task-day-title">🎯 TAREAS DE HOY</span></div>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '0.85rem', padding: '1rem' }}>
+          {groups.map(group => {
+            const trays = group.items.reduce((sum, item) => sum + Number(item.trays || 0), 0);
+            const disabled = group.items.length === 0;
+            return (
+              <button key={group.key} type="button" disabled={disabled} onClick={() => {
+                if (group.action) group.action();
+                else setSelectedDayTasks({ ...dayGroup, title: `${group.icon} ${group.title}`, items: group.items });
+              }} style={{ padding: '1rem', border: `1px solid ${disabled ? '#e2e8f0' : group.color + '45'}`, borderLeft: `5px solid ${disabled ? '#cbd5e1' : group.color}`, borderRadius: '12px', background: disabled ? '#f8fafc' : group.background, textAlign: 'left', cursor: disabled ? 'default' : 'pointer', opacity: disabled ? 0.6 : 1 }}>
+                <span style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.5rem' }}><strong style={{ color: disabled ? '#64748b' : group.color, fontSize: '1rem' }}>{group.icon} {group.title}</strong><span style={{ minWidth: '28px', height: '28px', padding: '0 0.45rem', display: 'grid', placeItems: 'center', borderRadius: '999px', background: disabled ? '#e2e8f0' : 'white', color: disabled ? '#64748b' : group.color, fontWeight: 900 }}>{group.items.length}</span></span>
+                <small style={{ display: 'block', marginTop: '0.45rem', color: '#64748b' }}>{group.items.length ? `${trays} bandejas · Ver listado →` : 'Sin tareas pendientes'}</small>
+              </button>
+            );
+          })}
+        </div>
+      </div>
+    );
+  };
+
   return (
     <div className="crops-module">
       <div className="tasks-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '1rem' }}>
@@ -458,11 +529,7 @@ export default function EmployeeTasks({ onTaskAction, onHarvestBatchAction }) {
 
       <div className="tasks-list-area">
         {timeFilter === 1 ? (
-          allTasks.map((dayGroup, idx) => (
-            <div key={idx}>
-              {renderDetailedDay(dayGroup)}
-            </div>
-          ))
+          allTasks[0] ? renderDailyGroups(allTasks[0]) : null
         ) : timeFilter === 30 ? (
           <div style={{ overflowX: 'auto', paddingBottom: '0.5rem' }}>
             <div style={{ minWidth: '760px' }}>

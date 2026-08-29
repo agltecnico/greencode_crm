@@ -2460,7 +2460,6 @@ export default function Crops() {
         
         {activeTab === 'tareas' && (
           <div>
-            <SowingTaskQueue summaryOnly onOpen={() => setActiveTab('lotes')} />
             <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '1rem' }}>
               <button 
                 onClick={() => window.open('/tv', 'TVMode', 'width=1920,height=1080,menubar=no,toolbar=no,location=no,status=no,resizable=yes')} 
@@ -2479,6 +2478,7 @@ export default function Crops() {
                 }
               }}
               onHarvestBatchAction={openHarvestBatch}
+              onSowingGroupAction={() => setActiveTab('lotes')}
             />
           </div>
         )}
