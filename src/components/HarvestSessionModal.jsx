@@ -240,10 +240,8 @@ export default function HarvestSessionModal({ open, onClose }) {
                   })
                   .reduce((sum, movement) => sum + Math.abs(Number(movement.quantity || 0)), 0);
                 const olderPendingUnits = Math.max(0, pendingUnits - weekPendingUnits);
-                const linkedUnits = Math.min(producedUnits, pendingUnits);
-                const linkedOlderUnits = Math.min(producedUnits, olderPendingUnits);
-                const linkedWeekUnits = Math.min(weekPendingUnits, Math.max(0, producedUnits - linkedOlderUnits));
-                const surplusUnits = Math.max(0, producedUnits - pendingUnits);
+                const linkedUnits = Math.min(producedUnits, weekPendingUnits);
+                const surplusUnits = Math.max(0, producedUnits - weekPendingUnits);
                 return <article className="harvest-line" key={line.id}>
                   <div className="harvest-line__top"><b>Cosecha {lineIndex + 1}</b><button type="button" onClick={() => removeLine(line.id)}>Eliminar</button></div>
                   <select value={line.productId} onChange={event => updateLine(line.id, { productId: event.target.value, packagingQuantities: {} })}>
@@ -259,16 +257,16 @@ export default function HarvestSessionModal({ open, onClose }) {
                       })}
                     </div>
                     <div className="harvest-line__allocation">
-                      <div><span>PEDIDOS PENDIENTES</span><strong>{pendingUnits}</strong><small>{weekPendingUnits} de esta semana{olderPendingUnits > 0 ? ` · ${olderPendingUnits} anteriores` : ''}</small></div>
-                      <div className="is-linked"><span>SE VINCULARÁN</span><strong>{linkedUnits}</strong><small>{linkedWeekUnits} de esta semana{linkedOlderUnits > 0 ? ` · ${linkedOlderUnits} anteriores` : ''}</small></div>
+                      <div><span>PEDIDOS SEMANA {isoWeek(harvestDate)}</span><strong>{weekPendingUnits}</strong><small>mismo producto</small></div>
+                      <div className="is-linked"><span>SE VINCULARÁN</span><strong>{linkedUnits}</strong><small>solo de esta semana</small></div>
                       <div className="is-surplus"><span>QUEDAN EN STOCK</span><strong>{surplusUnits}</strong><small>táperes disponibles</small></div>
                     </div>
                     {deliveryGroups.length > 0 ? (
                       <div className="harvest-line__deliveries">
                         <strong>Pedidos entregados pendientes de {product.name}</strong>
-                        <span>Solo se vincularán pedidos de este mismo producto.</span>
+                        <span>Se vincularán únicamente los de la semana {isoWeek(harvestDate)}. {olderPendingUnits > 0 ? `${olderPendingUnits} uds. anteriores quedan pendientes.` : ''}</span>
                         {deliveryGroups.map(group => (
-                          <div key={`${group.year}-${group.week}`}>
+                          <div key={`${group.year}-${group.week}`} className={group.week === isoWeek(harvestDate) ? 'is-current-week' : 'is-other-week'}>
                             <b>Semana {group.week} · {group.units} uds.</b>
                             <small>{[...group.dates.entries()].map(([dateLabel, units]) => `${dateLabel}: ${units}`).join(' · ')}</small>
                           </div>
