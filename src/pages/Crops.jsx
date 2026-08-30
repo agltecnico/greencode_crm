@@ -6,6 +6,7 @@ import { generateLabelPDF } from '../utils/labelPdf.js';
 import EmployeeTasks from '../components/EmployeeTasks';
 import SowingTaskQueue from '../components/SowingTaskQueue';
 import HarvestSessionModal from '../components/HarvestSessionModal';
+import ActiveCropsBoard from '../components/ActiveCropsBoard';
 import TraceabilityExplorer from '../components/TraceabilityExplorer';
 import Supplies from './Supplies';
 import '../crops.css';
@@ -1066,6 +1067,19 @@ export default function Crops() {
 
         {sowTab === 'activos' && (
             <div style={{ animation: 'fadeIn 0.3s ease' }}>
+              <ActiveCropsBoard
+                crops={activeCropsList}
+                cropTypes={cropTypes}
+                statusFilter={statusFilter}
+                onFilterChange={setStatusFilter}
+                onAddTrays={openCropTrayEditor}
+                onAdjust={openCropCycleEditor}
+                onDelete={handleDeleteCrop}
+                cycleDay={cropCycleDay}
+                expectedHarvest={expectedHarvestDate}
+                formatSowingDate={formatSowingDateTime}
+              />
+              <div className="active-crops-legacy" aria-hidden="true">
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem', flexWrap: 'wrap', gap: '1rem' }}>
                 <h3 style={{ margin: 0, fontSize: '1.25rem', fontWeight: 'bold', color: '#1e293b' }}>Lotes en Producción</h3>
                 
@@ -1182,6 +1196,7 @@ export default function Crops() {
                   </tbody>
                 </table>
               </div>
+            </div>
             </div>
           )}
 
