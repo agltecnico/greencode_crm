@@ -13,6 +13,7 @@ export default function ActiveCropsBoard({
   crops, cropTypes, statusFilter, onFilterChange, onAddTrays, onAdjust, onDelete,
   cycleDay, expectedHarvest, formatSowingDate
 }) {
+  const [expandedCropId, setExpandedCropId] = useState(null);
   const counts = Object.fromEntries(PHASES.map(phase => [phase.id,
     phase.id === 'ALL' ? crops.length : crops.filter(crop => cropStatus(crop) === phase.id).length
   ]));
@@ -44,27 +45,32 @@ export default function ActiveCropsBoard({
           const expectedDays = type ? (Number(type.germinationDays || 0) + Number(type.darknessDays || 0) + Number(type.lightDays || 0) || 14) : 14;
           const progress = Math.min(100, Math.max(0, days / expectedDays * 100));
           const harvestDate = expectedHarvest(type, crop.datePlanted || crop.plantedAt, crop.cycleDayAdjustment);
+          const expanded = String(expandedCropId) === String(crop.id);
           return (
-            <article className="active-crop-card" key={crop.id} style={{ '--phase-color': phase.color, '--phase-soft': phase.soft }}>
-              <div className="active-crop-card__top">
-                <span className="active-crop-card__initial">{type?.name?.charAt(0).toUpperCase() || '🌱'}</span>
-                <div><h4>{type?.name || 'Cultivo sin nombre'}</h4><small>{crop.batchNumber || 'Sin lote'}</small></div>
-                <b>{Number(crop.traysCount || crop.trays || 0)}<small>bandejas</small></b>
-              </div>
-              <div className="active-crop-card__meta">
-                <span className="active-crop-card__phase">{phase.icon} {phase.label}</span>
-                <span>Día {days} de {expectedDays}</span>
-              </div>
-              <div className="active-crop-card__progress"><i style={{ width: `${progress}%` }} /></div>
-              <div className="active-crop-card__dates">
-                <span><small>Sembrado</small>{formatSowingDate(crop.datePlanted || crop.plantedAt)}</span>
-                <span><small>Cosecha prevista</small>{harvestDate ? harvestDate.toLocaleDateString('es-ES', { day: '2-digit', month: 'short' }) : 'Sin fecha'}</span>
-              </div>
-              <footer>
-                <button type="button" onClick={() => onAddTrays(crop)}>＋ Bandejas</button>
-                <button type="button" onClick={() => onAdjust(crop)}>Ajustar ciclo</button>
-                <button type="button" className="is-danger" onClick={() => onDelete(crop)} aria-label={`Eliminar ${type?.name || 'cultivo'}`}>×</button>
-              </footer>
+            <article className={`active-crop-row ${expanded ? 'is-expanded' : ''}`} key={crop.id} style={{ '--phase-color': phase.color, '--phase-soft': phase.soft }}>
+              <button type="button" className="active-crop-row__summary" onClick={() => setExpandedCropId(expanded ? null : crop.id)} aria-expanded={expanded}>
+                <i aria-label={phase.label} title={phase.label} />
+                <strong>{type?.name || 'Cultivo sin nombre'}</strong>
+                <span><small>Cosecha</small>{harvestDate ? harvestDate.toLocaleDateString('es-ES', { day: '2-digit', month: 'short' }) : 'Sin fecha'}</span>
+                <span><small>Fase</small>{phase.label}</span>
+                <b>{Number(crop.traysCount || crop.trays || 0)} <small>bdj.</small></b>
+                <em>{expanded ? '−' : '+'}</em>
+              </button>
+              {expanded && (
+                <div className="active-crop-row__detail">
+                  <div className="active-crop-row__facts">
+                    <span><small>Lote</small>{crop.batchNumber || 'Sin lote'}</span>
+                    <span><small>Fecha de siembra</small>{formatSowingDate(crop.datePlanted || crop.plantedAt)}</span>
+                    <span><small>Desarrollo</small>Día {days} de {expectedDays}</span>
+                  </div>
+                  <div className="active-crop-card__progress"><i style={{ width: `${progress}%` }} /></div>
+                  <footer>
+                    <button type="button" onClick={() => onAddTrays(crop)}>＋ Añadir bandejas</button>
+                    <button type="button" onClick={() => onAdjust(crop)}>Ajustar ciclo y fechas</button>
+                    <button type="button" className="is-danger" onClick={() => onDelete(crop)}>Eliminar cultivo</button>
+                  </footer>
+                </div>
+              )}
             </article>
           );
         })}
@@ -73,3 +79,4 @@ export default function ActiveCropsBoard({
     </section>
   );
 }
+import { useState } from 'react';
