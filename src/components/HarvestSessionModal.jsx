@@ -156,7 +156,9 @@ export default function HarvestSessionModal({ open, onClose }) {
   const selectedVarietyIds = new Set(selectedReadyCrops.map(cropVarietyId));
   const selectableProducts = (products || []).filter(product => {
     const recipe = recipeIds(product);
-    return recipe.length > 0 && packagingFor(product).length > 0 && recipe.every(varietyId => selectedVarietyIds.has(varietyId));
+    const selectedRecipeVarieties = new Set(recipe.filter(varietyId => selectedVarietyIds.has(varietyId)));
+    const minimumVarieties = Math.min(4, new Set(recipe).size);
+    return recipe.length > 0 && packagingFor(product).length > 0 && selectedRecipeVarieties.size >= minimumVarieties;
   });
   const totalSelectedTrays = selectedReadyCrops.reduce((sum, crop) => sum + Number(selectedCropTrays[crop.id] || 0), 0);
   const totalReadyTrays = readyCrops.reduce((sum, crop) => sum + Number(crop.traysCount || crop.trays || 0), 0);
@@ -307,9 +309,10 @@ export default function HarvestSessionModal({ open, onClose }) {
     }
     const incomplete = activeLines.find(line => {
       const recipe = recipeIds(products.find(product => product.id === line.productId));
-      return !recipe.every(id => selectedVarietyIds.has(id));
+      const selectedRecipeVarieties = new Set(recipe.filter(id => selectedVarietyIds.has(id)));
+      return selectedRecipeVarieties.size < Math.min(4, new Set(recipe).size);
     });
-    if (incomplete) return Swal.fire('Producto no disponible', 'Falta seleccionar algún cultivo necesario para una variedad o mix.', 'warning');
+    if (incomplete) return Swal.fire('Producto no disponible', 'Una variedad individual necesita su cultivo y un mix necesita al menos cuatro variedades compatibles de su receta.', 'warning');
 
     const allocations = buildAllocations();
     const dateKey = date.toISOString().slice(0, 10);
