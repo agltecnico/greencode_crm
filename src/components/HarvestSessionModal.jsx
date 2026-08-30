@@ -50,6 +50,7 @@ export default function HarvestSessionModal({ open, onClose }) {
   const [lines, setLines] = useState([makeLine()]);
   const [notes, setNotes] = useState('');
   const [saving, setSaving] = useState(false);
+  const [step, setStep] = useState(1);
 
   const harvestWeek = useMemo(() => {
     const selected = new Date(harvestDate);
@@ -96,6 +97,7 @@ export default function HarvestSessionModal({ open, onClose }) {
     setHarvestDate(localInputValue());
     setLines([makeLine()]);
     setNotes('');
+    setStep(1);
   }, [open]);
 
   useEffect(() => {
@@ -194,6 +196,17 @@ export default function HarvestSessionModal({ open, onClose }) {
     if (!lines.some(line => line.id === target.id)) setLines(current => [...current, target]);
     selectProductForLine(target.id, row.product.id, row.missing);
   };
+  const nextStep = () => {
+    if (step === 1 && selectedReadyCrops.length === 0) {
+      Swal.fire('Selecciona cultivos', 'Marca al menos un cultivo listo para continuar.', 'warning');
+      return;
+    }
+    if (step === 2 && activeLines.length === 0) {
+      Swal.fire('Indica la producción', 'Selecciona al menos una variedad o mix e indica sus táperes.', 'warning');
+      return;
+    }
+    setStep(current => Math.min(3, current + 1));
+  };
 
   const buildAllocations = () => {
     const allocations = Object.fromEntries(activeLines.map(line => [line.id, {}]));
@@ -214,6 +227,10 @@ export default function HarvestSessionModal({ open, onClose }) {
 
   const submit = async event => {
     event.preventDefault();
+    if (step < 3) {
+      nextStep();
+      return;
+    }
     if (activeLines.length === 0) return Swal.fire('Faltan cosechas', 'Añade al menos un producto y sus táperes.', 'warning');
     if (selectedReadyCrops.length === 0) return Swal.fire('Faltan cultivos', 'Selecciona al menos un cultivo listo.', 'warning');
     const date = new Date(harvestDate);
@@ -268,7 +285,15 @@ export default function HarvestSessionModal({ open, onClose }) {
           <button type="button" className="harvest-session__close" onClick={onClose}>×</button>
         </header>
 
-        <section className="harvest-demand">
+        <nav className="harvest-wizard" aria-label="Pasos para registrar la cosecha">
+          {[['1', 'Cultivos listos'], ['2', 'Variedades y táperes'], ['3', 'Revisar y registrar']].map(([number, label]) => (
+            <button type="button" key={number} className={step === Number(number) ? 'is-active' : step > Number(number) ? 'is-complete' : ''} onClick={() => Number(number) < step && setStep(Number(number))}>
+              <span>{step > Number(number) ? '✓' : number}</span><b>{label}</b>
+            </button>
+          ))}
+        </nav>
+
+        {step === 2 && <section className="harvest-demand">
           <header>
             <div><span>{isPastWeek ? 'SEMANA PASADA' : 'SEMANA ACTUAL'}</span><h3>{harvestWeek.start.toLocaleDateString('es-ES', { day: '2-digit', month: 'short' })} — {new Date(harvestWeek.end.getTime() - 86400000).toLocaleDateString('es-ES', { day: '2-digit', month: 'short' })}</h3><p>{isPastWeek ? 'Cantidades realmente vendidas en pedidos entregados.' : 'Necesidades calculadas con todos los pedidos registrados de la semana.'}</p></div>
             <div className="harvest-demand__totals"><span><small>{isPastWeek ? 'VENDIDO' : 'PEDIDO'}</small><b>{weekRequestedUnits}</b></span><span><small>YA COSECHADO</small><b>{weekHarvestedUnits}</b></span><span className={weekMissingUnits > 0 ? 'has-missing' : ''}><small>FALTA COSECHAR</small><b>{weekMissingUnits}</b></span></div>
@@ -281,9 +306,9 @@ export default function HarvestSessionModal({ open, onClose }) {
             {!weekDemand.length && <p className="harvest-demand__empty">No hay pedidos registrados para esta semana. Puedes seleccionar igualmente un producto debajo.</p>}
           </div>
           <small className="harvest-demand__hint">Pulsa un producto para preparar su cosecha y completar automáticamente la cantidad cuando solo tenga un formato de envase.</small>
-        </section>
+        </section>}
 
-        <div className="harvest-session__columns">
+        <div className={`harvest-session__columns is-step-${step}`}>
           <section className="harvest-session__crops">
             <div className="harvest-session__title"><div><span>1</span><h3>Cultivos listos</h3></div><strong>{totalSelectedTrays} bandejas</strong></div>
             <p>Están marcados los cultivos previstos para la semana elegida. Ajusta las bandejas reales.</p>
@@ -377,20 +402,29 @@ export default function HarvestSessionModal({ open, onClose }) {
               })}
             </div>
             <button className="harvest-session__add" type="button" onClick={() => setLines(current => [...current, makeLine()])}>＋ Añadir otra cosecha</button>
-            <label className="harvest-session__notes">Comentario opcional<textarea rows="2" value={notes} onChange={event => setNotes(event.target.value)} placeholder="Observaciones de la cosecha…" /></label>
           </section>
         </div>
 
+        {step === 3 && <section className="harvest-review">
+          <header><span>✓</span><div><h3>Revisa la cosecha</h3><p>Comprueba cultivos, productos y vinculación antes de guardar.</p></div></header>
+          <div className="harvest-review__totals"><article><small>CULTIVOS</small><strong>{selectedReadyCrops.length}</strong><span>{totalSelectedTrays} bandejas</span></article><article><small>PRODUCCIÓN</small><strong>{totalUnits}</strong><span>táperes en {activeLines.length} producto{activeLines.length === 1 ? '' : 's'}</span></article><article><small>TRAZABILIDAD</small><strong>{totalLinkableUnits}</strong><span>se vincularán</span></article></div>
+          <div className="harvest-review__content">
+            <div><h4>Cultivos utilizados</h4>{selectedReadyCrops.map(crop => <p key={crop.id}><b>{varietyName(crop)}</b><span>{selectedCropTrays[crop.id]} bandejas · {crop.batchNumber || 'sin lote'}</span></p>)}</div>
+            <div><h4>Productos obtenidos</h4>{activeLines.map(line => { const product = products.find(item => item.id === line.productId); return <p key={line.id}><b>{product?.name || 'Producto'}</b><span>{lineUnits(line)} táperes</span></p>; })}</div>
+          </div>
+          <label className="harvest-session__notes">Comentario opcional<textarea rows="2" value={notes} onChange={event => setNotes(event.target.value)} placeholder="Observaciones de la cosecha…" /></label>
+        </section>}
+
         <footer className="harvest-session__footer">
           <div><strong>{activeLines.length} productos · {totalUnits} táperes</strong><span>{totalSelectedTrays} bandejas · {totalUnits > 0 ? `${totalLinkableUnits} uds. se vincularán` : `${remainingTrays} bandejas quedarán pendientes`}</span></div>
-          <button type="button" onClick={onClose}>Cancelar</button>
-          <button type="submit" disabled={saving || !readyCrops.length}>
+          <button type="button" onClick={step === 1 ? onClose : () => setStep(current => current - 1)}>{step === 1 ? 'Cancelar' : '← Volver'}</button>
+          {step < 3 ? <button type="button" className="harvest-session__next" onClick={nextStep}>Continuar →</button> : <button type="submit" disabled={saving || !readyCrops.length}>
             {saving
               ? 'Registrando todo…'
               : isPastWeek
                 ? `Registrar cosecha pasada · vincular ${totalLinkableUnits} uds.`
                 : `Registrar cosecha · vincular ${totalLinkableUnits} uds.`}
-          </button>
+          </button>}
         </footer>
       </form>
     </div>
