@@ -145,6 +145,11 @@ export default function HarvestSessionModal({ open, onClose }) {
   const usedVarietyIds = new Set(activeLines.flatMap(line => recipeIds(products?.find(product => product.id === line.productId))));
   const selectedProductVarietyIds = new Set(lines.filter(line => line.productId).flatMap(line => recipeIds(products?.find(product => product.id === line.productId))));
   const selectedReadyCrops = readyCrops.filter(crop => Number(selectedCropTrays[crop.id] || 0) > 0);
+  const selectedVarietyIds = new Set(selectedReadyCrops.map(cropVarietyId));
+  const selectableProducts = (products || []).filter(product => {
+    const recipe = recipeIds(product);
+    return recipe.length > 0 && packagingFor(product).length > 0 && recipe.every(varietyId => selectedVarietyIds.has(varietyId));
+  });
   const totalSelectedTrays = selectedReadyCrops.reduce((sum, crop) => sum + Number(selectedCropTrays[crop.id] || 0), 0);
   const totalReadyTrays = readyCrops.reduce((sum, crop) => sum + Number(crop.traysCount || crop.trays || 0), 0);
   const remainingTrays = totalReadyTrays - totalSelectedTrays;
@@ -213,11 +218,6 @@ export default function HarvestSessionModal({ open, onClose }) {
       productId,
       packagingQuantities: suggestedUnits > 0 && formats.length === 1 ? { [formats[0].id]: suggestedUnits } : {}
     });
-    const varieties = new Set(recipeIds(product));
-    setSelectedCropTrays(current => Object.fromEntries(readyCrops.map(crop => [
-      crop.id,
-      varieties.has(cropVarietyId(crop)) ? Number(crop.traysCount || crop.trays || 0) : Number(current[crop.id] || 0)
-    ])));
   };
   const prepareDemandProduct = row => {
     const existing = lines.find(line => String(line.productId) === String(row.product.id));
@@ -269,12 +269,11 @@ export default function HarvestSessionModal({ open, onClose }) {
     if (uncovered.length) {
       return Swal.fire('Cultivos sin asignar', `${uncovered.map(varietyName).join(', ')} están seleccionados pero no aparecen en ningún producto. Desmárcalos o añade su cosecha.`, 'warning');
     }
-    const availableVarieties = new Set(selectedReadyCrops.map(cropVarietyId));
     const incomplete = activeLines.find(line => {
       const recipe = recipeIds(products.find(product => product.id === line.productId));
-      return recipe.filter(id => availableVarieties.has(id)).length < Math.min(4, recipe.length);
+      return !recipe.every(id => selectedVarietyIds.has(id));
     });
-    if (incomplete) return Swal.fire('Mix incompleto', 'No están seleccionadas suficientes variedades para uno de los productos.', 'warning');
+    if (incomplete) return Swal.fire('Producto no disponible', 'Falta seleccionar algún cultivo necesario para una variedad o mix.', 'warning');
 
     const allocations = buildAllocations();
     const dateKey = date.toISOString().slice(0, 10);
@@ -334,18 +333,18 @@ export default function HarvestSessionModal({ open, onClose }) {
             <div className="harvest-demand__totals"><span><small>{isPastWeek ? 'VENDIDO' : 'PEDIDO'}</small><b>{weekRequestedUnits}</b></span><span><small>YA COSECHADO</small><b>{weekHarvestedUnits}</b></span><span className={weekMissingUnits > 0 ? 'has-missing' : ''}><small>FALTA COSECHAR</small><b>{weekMissingUnits}</b></span></div>
           </header>
           <div className="harvest-demand__products">
-            {weekDemand.map(row => <button type="button" key={row.product.id} className={row.missing > 0 ? 'needs-harvest' : 'is-complete'} onClick={() => prepareDemandProduct(row)}>
+            {weekDemand.filter(row => selectableProducts.some(product => String(product.id) === String(row.product.id))).map(row => <button type="button" key={row.product.id} className={row.missing > 0 ? 'needs-harvest' : 'is-complete'} onClick={() => prepareDemandProduct(row)}>
               <span><b>{row.product.name}</b><small>{row.orderCount} pedido{row.orderCount === 1 ? '' : 's'} · {row.harvested} ya cosechados</small></span>
               <strong>{row.missing > 0 ? `${row.missing} faltan` : '✓ Completo'}</strong>
             </button>)}
-            {!weekDemand.length && <p className="harvest-demand__empty">No hay pedidos registrados para esta semana. Puedes seleccionar igualmente un producto debajo.</p>}
+            {!weekDemand.some(row => selectableProducts.some(product => String(product.id) === String(row.product.id))) && <p className="harvest-demand__empty">No hay pedidos compatibles con los cultivos seleccionados. Puedes elegir igualmente una variedad o mix debajo.</p>}
           </div>
           <small className="harvest-demand__hint">Pulsa un producto para preparar su cosecha y completar automáticamente la cantidad cuando solo tenga un formato de envase.</small>
         </section>}
 
         <div className={`harvest-session__columns is-step-${step}`}>
           <section className="harvest-session__crops">
-            <div className="harvest-session__title"><div><span>1</span><h3>Cultivos listos</h3></div><strong>{totalSelectedTrays} bandejas</strong></div>
+            <div className="harvest-session__title"><div><span>2</span><h3>¿Qué bandejas se han cosechado?</h3></div><div className="harvest-session__crop-actions"><button type="button" onClick={() => setSelectedCropTrays(Object.fromEntries(readyCrops.map(crop => [crop.id, Number(crop.traysCount || crop.trays || 0)])))}>Seleccionar todas</button><button type="button" onClick={() => setSelectedCropTrays(Object.fromEntries(readyCrops.map(crop => [crop.id, 0])))}>Limpiar</button><strong>{totalSelectedTrays} bandejas</strong></div></div>
             <p>Están marcados los cultivos previstos para la semana elegida. Ajusta las bandejas reales.</p>
             <div className="harvest-session__crop-list">
               {readyCrops.map(crop => {
@@ -378,6 +377,7 @@ export default function HarvestSessionModal({ open, onClose }) {
                 const recipe = recipeIds(product);
                 const producedUnits = lineUnits(line);
                 const demand = weekDemand.find(row => String(row.product.id) === String(line.productId));
+                const selectedElsewhere = new Set(lines.filter(other => other.id !== line.id && other.productId).map(other => String(other.productId)));
                 const pendingMovements = pendingOrdersForProduct(line.productId);
                 const deliveryGroups = pendingDeliveryGroups(pendingMovements);
                 const pendingUnits = pendingMovements.reduce((sum, movement) => sum + Math.abs(Number(movement.quantity || 0)), 0);
@@ -398,8 +398,9 @@ export default function HarvestSessionModal({ open, onClose }) {
                     selectProductForLine(line.id, productId, recommendation);
                   }}>
                     <option value="">Seleccionar variedad o mix…</option>
-                    {(products || []).filter(item => recipeIds(item).length && packagingFor(item).length).map(item => <option key={item.id} value={item.id}>{item.name}</option>)}
+                    {selectableProducts.filter(item => !selectedElsewhere.has(String(item.id)) || String(item.id) === String(line.productId)).map(item => <option key={item.id} value={item.id}>{item.name}{recipeIds(item).length > 1 ? ' · Mix' : ' · Variedad individual'}</option>)}
                   </select>
+                  {!product && selectableProducts.length === 0 && <div className="harvest-line__no-deliveries">Los cultivos seleccionados no permiten elaborar ningún producto configurado. Vuelve al paso anterior y revisa las bandejas.</div>}
                   {product && <>
                     <div className="harvest-line__recipe">{recipe.map(id => <span key={id}>{seedVarieties?.find(item => item.id === id)?.name || 'Variedad'}</span>)}</div>
                     <div className={`harvest-line__need ${demand?.missing > 0 ? 'has-missing' : 'is-covered'}`}>
@@ -444,8 +445,8 @@ export default function HarvestSessionModal({ open, onClose }) {
           <header><span>✓</span><div><h3>Revisa la cosecha</h3><p>Comprueba cultivos, productos y vinculación antes de guardar.</p></div></header>
           <div className="harvest-review__totals"><article><small>CULTIVOS</small><strong>{selectedReadyCrops.length}</strong><span>{totalSelectedTrays} bandejas</span></article><article><small>PRODUCCIÓN</small><strong>{totalUnits}</strong><span>táperes en {activeLines.length} producto{activeLines.length === 1 ? '' : 's'}</span></article><article><small>TRAZABILIDAD</small><strong>{totalLinkableUnits}</strong><span>se vincularán</span></article></div>
           <div className="harvest-review__content">
-            <div><h4>Cultivos utilizados</h4>{selectedReadyCrops.map(crop => <p key={crop.id}><b>{varietyName(crop)}</b><span>{selectedCropTrays[crop.id]} bandejas · {crop.batchNumber || 'sin lote'}</span></p>)}</div>
-            <div><h4>Productos obtenidos</h4>{activeLines.map(line => { const product = products.find(item => item.id === line.productId); return <p key={line.id}><b>{product?.name || 'Producto'}</b><span>{lineUnits(line)} táperes</span></p>; })}</div>
+            <div><h4>Cultivos utilizados <button type="button" onClick={() => setStep(2)}>Modificar</button></h4>{selectedReadyCrops.map(crop => <p key={crop.id}><b>{varietyName(crop)}</b><span>{selectedCropTrays[crop.id]} bandejas · {crop.batchNumber || 'sin lote'}</span></p>)}</div>
+            <div><h4>Productos obtenidos <button type="button" onClick={() => setStep(3)}>Modificar</button></h4>{activeLines.map(line => { const product = products.find(item => item.id === line.productId); return <p key={line.id}><b>{product?.name || 'Producto'}</b><span>{Object.entries(line.packagingQuantities).filter(([, quantity]) => Number(quantity) > 0).map(([articleId, quantity]) => `${quantity} × ${articles.find(article => article.id === articleId)?.name || 'envase'}`).join(' · ')}</span></p>; })}</div>
           </div>
           <label className="harvest-session__notes">Comentario opcional<textarea rows="2" value={notes} onChange={event => setNotes(event.target.value)} placeholder="Observaciones de la cosecha…" /></label>
         </section>}
