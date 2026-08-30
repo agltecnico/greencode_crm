@@ -8,6 +8,13 @@ const localInputValue = (date = new Date()) => {
   return local.toISOString().slice(0, 16);
 };
 
+const harvestDateWithCurrentTime = dateValue => {
+  const now = new Date();
+  const [year, month, day] = String(dateValue).split('-').map(Number);
+  const selected = new Date(year, month - 1, day, now.getHours(), now.getMinutes(), now.getSeconds(), now.getMilliseconds());
+  return localInputValue(selected);
+};
+
 const cleanInitials = name => {
   const words = String(name || 'LOTE').normalize('NFD').replace(/[\u0300-\u036f]/g, '')
     .replace(/\([^)]*\)/g, ' ').replace(/[^A-Za-z0-9 ]/g, ' ').trim().toUpperCase().split(/\s+/).filter(Boolean);
@@ -316,7 +323,7 @@ export default function HarvestSessionModal({ open, onClose }) {
 
         {step === 1 && <section className={`harvest-date-step ${isRetroactive ? 'is-retroactive' : ''}`}>
           <header><span>{isRetroactive ? '↶' : '✓'}</span><div><h3>{isRetroactive ? 'Cosecha retroactiva detectada' : 'Cosecha de hoy'}</h3><p>{isRetroactive ? 'Mostramos las ventas entregadas de esa semana que todavía no tienen cultivo ni lote vinculados.' : 'La fecha actual está seleccionada. Puedes continuar con los cultivos listos.'}</p></div></header>
-          <label>Fecha y hora reales de cosecha<input autoFocus type="datetime-local" value={harvestDate} max={localInputValue()} onChange={event => setHarvestDate(event.target.value)} /></label>
+          <label>Fecha real de cosecha<input autoFocus type="date" value={harvestDate.slice(0, 10)} max={localInputValue().slice(0, 10)} onChange={event => setHarvestDate(harvestDateWithCurrentTime(event.target.value))} /><small>La hora se guardará automáticamente al registrar la cosecha.</small></label>
           <div className="harvest-date-step__week"><small>SEMANA SELECCIONADA</small><strong>{harvestWeek.start.toLocaleDateString('es-ES', { day: '2-digit', month: 'long' })} — {new Date(harvestWeek.end.getTime() - 86400000).toLocaleDateString('es-ES', { day: '2-digit', month: 'long' })}</strong><span>{readyCrops.length} cultivos listos disponibles</span></div>
           {isRetroactive && <div className="harvest-date-step__pending"><div><h4>Táperes vendidos sin cultivo vinculado</h4><strong>{retroactivePendingUnits} uds.</strong></div>{retroactivePending.map(row => <button type="button" key={row.product.id} onClick={() => prepareDemandProduct({ ...row, missing: row.units })}><span><b>{row.product.name}</b><small>{row.deliveries} movimiento{row.deliveries === 1 ? '' : 's'} de venta pendiente{row.deliveries === 1 ? '' : 's'}</small></span><strong>{row.units} uds.</strong><em>Preparar →</em></button>)}{!retroactivePending.length && <p>✓ No hay ventas entregadas sin cultivo para esta semana.</p>}</div>}
         </section>}
