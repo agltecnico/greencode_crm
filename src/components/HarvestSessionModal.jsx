@@ -306,12 +306,7 @@ export default function HarvestSessionModal({ open, onClose }) {
     return allocations;
   };
 
-  const submit = async event => {
-    event.preventDefault();
-    if (step < 4) {
-      nextStep();
-      return;
-    }
+  const submitHarvest = async () => {
     if (activeLines.length === 0) return Swal.fire('Faltan cosechas', 'Añade al menos un producto y sus táperes.', 'warning');
     if (selectedReadyCrops.length === 0) return Swal.fire('Faltan cultivos', 'Selecciona al menos un cultivo listo.', 'warning');
     const date = new Date(harvestDate);
@@ -327,6 +322,17 @@ export default function HarvestSessionModal({ open, onClose }) {
       return selectedRecipeVarieties.size < Math.min(4, new Set(recipe).size);
     });
     if (incomplete) return Swal.fire('Producto no disponible', 'Una variedad individual necesita su cultivo y un mix necesita al menos cuatro variedades compatibles de su receta.', 'warning');
+
+    const confirmation = await Swal.fire({
+      title: '¿Registrar esta cosecha?',
+      html: `<b>${totalSelectedTrays} bandejas</b> producirán <b>${totalUnits} táperes</b> en ${activeLines.length} cosecha${activeLines.length === 1 ? '' : 's'}.<br><small>Después podrás consultar los lotes en el histórico.</small>`,
+      icon: 'question',
+      showCancelButton: true,
+      confirmButtonText: 'Sí, registrar cosecha',
+      cancelButtonText: 'Volver a revisar',
+      confirmButtonColor: '#059669'
+    });
+    if (!confirmation.isConfirmed) return;
 
     const allocations = buildAllocations();
     const dateKey = date.toISOString().slice(0, 10);
@@ -359,7 +365,7 @@ export default function HarvestSessionModal({ open, onClose }) {
 
   return (
     <div className="harvest-session-overlay">
-      <form className="harvest-session" onSubmit={submit}>
+      <form className="harvest-session" onSubmit={event => { event.preventDefault(); if (step < 4) nextStep(); }}>
         <header className="harvest-session__header">
           <div><span>COSECHA DEL DÍA</span><h2>Registrar toda la producción</h2><p>Selecciona los cultivos utilizados y añade todos los productos obtenidos.</p></div>
           <button type="button" className="harvest-session__close" onClick={onClose}>×</button>
@@ -529,7 +535,7 @@ export default function HarvestSessionModal({ open, onClose }) {
         <footer className="harvest-session__footer">
           <div><strong>{activeLines.length} productos · {totalUnits} táperes</strong><span>{totalSelectedTrays} bandejas · {totalUnits > 0 ? `${totalLinkableUnits} uds. se vincularán` : `${remainingTrays} bandejas quedarán pendientes`}</span></div>
           <button type="button" onClick={step === 1 ? onClose : () => setStep(current => current - 1)}>{step === 1 ? 'Cancelar' : '← Volver'}</button>
-          {step < 4 ? <button type="button" className="harvest-session__next" onClick={nextStep}>Continuar →</button> : <button type="submit" disabled={saving || !readyCrops.length}>
+          {step < 4 ? <button type="button" className="harvest-session__next" onClick={nextStep}>Continuar →</button> : <button type="button" className="harvest-session__submit" onClick={submitHarvest} disabled={saving || !readyCrops.length}>
             {saving
               ? 'Registrando todo…'
               : isPastWeek
