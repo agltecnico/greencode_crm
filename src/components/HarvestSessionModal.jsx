@@ -144,6 +144,11 @@ export default function HarvestSessionModal({ open, onClose }) {
   const totalUnits = activeLines.reduce((sum, line) => sum + lineUnits(line), 0);
 
   const isPastWeek = harvestWeek.end <= new Date();
+  const todayStart = new Date();
+  todayStart.setHours(0, 0, 0, 0);
+  const selectedDateStart = new Date(harvestDate);
+  selectedDateStart.setHours(0, 0, 0, 0);
+  const isRetroactive = selectedDateStart < todayStart;
   const weekDemand = useMemo(() => (products || []).map(product => {
     const weekOrders = (orders || []).filter(order => {
       const date = new Date(order.date || order.deliveryDate || order.createdAt);
@@ -163,6 +168,23 @@ export default function HarvestSessionModal({ open, onClose }) {
   const weekRequestedUnits = weekDemand.reduce((sum, row) => sum + row.requested, 0);
   const weekHarvestedUnits = weekDemand.reduce((sum, row) => sum + row.harvested, 0);
   const weekMissingUnits = weekDemand.reduce((sum, row) => sum + row.missing, 0);
+  const retroactivePending = useMemo(() => (products || []).map(product => {
+    const movements = (productMovements || []).filter(movement =>
+      movement.type === 'ORDER'
+      && String(movement.productId) === String(product.id)
+      && Number(movement.quantity || 0) < 0
+      && String(movement.referenceId || '').endsWith('|PENDING-TRACEABILITY')
+    ).filter(movement => {
+      const date = new Date(movement.createdAt);
+      return date >= harvestWeek.start && date < harvestWeek.end;
+    });
+    return {
+      product,
+      units: movements.reduce((sum, movement) => sum + Math.abs(Number(movement.quantity || 0)), 0),
+      deliveries: movements.length
+    };
+  }).filter(row => row.units > 0).sort((a, b) => b.units - a.units), [harvestWeek, productMovements, products]);
+  const retroactivePendingUnits = retroactivePending.reduce((sum, row) => sum + row.units, 0);
   const totalLinkableUnits = activeLines.reduce((sum, line) => {
     const pendingThisWeek = pendingOrdersForProduct(line.productId)
       .filter(movement => {
@@ -197,15 +219,15 @@ export default function HarvestSessionModal({ open, onClose }) {
     selectProductForLine(target.id, row.product.id, row.missing);
   };
   const nextStep = () => {
-    if (step === 1 && selectedReadyCrops.length === 0) {
+    if (step === 2 && selectedReadyCrops.length === 0) {
       Swal.fire('Selecciona cultivos', 'Marca al menos un cultivo listo para continuar.', 'warning');
       return;
     }
-    if (step === 2 && activeLines.length === 0) {
+    if (step === 3 && activeLines.length === 0) {
       Swal.fire('Indica la producción', 'Selecciona al menos una variedad o mix e indica sus táperes.', 'warning');
       return;
     }
-    setStep(current => Math.min(3, current + 1));
+    setStep(current => Math.min(4, current + 1));
   };
 
   const buildAllocations = () => {
@@ -227,7 +249,7 @@ export default function HarvestSessionModal({ open, onClose }) {
 
   const submit = async event => {
     event.preventDefault();
-    if (step < 3) {
+    if (step < 4) {
       nextStep();
       return;
     }
@@ -281,19 +303,25 @@ export default function HarvestSessionModal({ open, onClose }) {
       <form className="harvest-session" onSubmit={submit}>
         <header className="harvest-session__header">
           <div><span>COSECHA DEL DÍA</span><h2>Registrar toda la producción</h2><p>Selecciona los cultivos utilizados y añade todos los productos obtenidos.</p></div>
-          <label>Fecha real de cosecha<input type="datetime-local" value={harvestDate} max={localInputValue()} onChange={event => setHarvestDate(event.target.value)} /></label>
           <button type="button" className="harvest-session__close" onClick={onClose}>×</button>
         </header>
 
         <nav className="harvest-wizard" aria-label="Pasos para registrar la cosecha">
-          {[['1', 'Cultivos listos'], ['2', 'Variedades y táperes'], ['3', 'Revisar y registrar']].map(([number, label]) => (
+          {[['1', 'Fecha'], ['2', 'Cultivos listos'], ['3', 'Variedades y táperes'], ['4', 'Revisar']].map(([number, label]) => (
             <button type="button" key={number} className={step === Number(number) ? 'is-active' : step > Number(number) ? 'is-complete' : ''} onClick={() => Number(number) < step && setStep(Number(number))}>
               <span>{step > Number(number) ? '✓' : number}</span><b>{label}</b>
             </button>
           ))}
         </nav>
 
-        {step === 2 && <section className="harvest-demand">
+        {step === 1 && <section className={`harvest-date-step ${isRetroactive ? 'is-retroactive' : ''}`}>
+          <header><span>{isRetroactive ? '↶' : '✓'}</span><div><h3>{isRetroactive ? 'Cosecha retroactiva detectada' : 'Cosecha de hoy'}</h3><p>{isRetroactive ? 'Mostramos las ventas entregadas de esa semana que todavía no tienen cultivo ni lote vinculados.' : 'La fecha actual está seleccionada. Puedes continuar con los cultivos listos.'}</p></div></header>
+          <label>Fecha y hora reales de cosecha<input autoFocus type="datetime-local" value={harvestDate} max={localInputValue()} onChange={event => setHarvestDate(event.target.value)} /></label>
+          <div className="harvest-date-step__week"><small>SEMANA SELECCIONADA</small><strong>{harvestWeek.start.toLocaleDateString('es-ES', { day: '2-digit', month: 'long' })} — {new Date(harvestWeek.end.getTime() - 86400000).toLocaleDateString('es-ES', { day: '2-digit', month: 'long' })}</strong><span>{readyCrops.length} cultivos listos disponibles</span></div>
+          {isRetroactive && <div className="harvest-date-step__pending"><div><h4>Táperes vendidos sin cultivo vinculado</h4><strong>{retroactivePendingUnits} uds.</strong></div>{retroactivePending.map(row => <button type="button" key={row.product.id} onClick={() => prepareDemandProduct({ ...row, missing: row.units })}><span><b>{row.product.name}</b><small>{row.deliveries} movimiento{row.deliveries === 1 ? '' : 's'} de venta pendiente{row.deliveries === 1 ? '' : 's'}</small></span><strong>{row.units} uds.</strong><em>Preparar →</em></button>)}{!retroactivePending.length && <p>✓ No hay ventas entregadas sin cultivo para esta semana.</p>}</div>}
+        </section>}
+
+        {step === 3 && <section className="harvest-demand">
           <header>
             <div><span>{isPastWeek ? 'SEMANA PASADA' : 'SEMANA ACTUAL'}</span><h3>{harvestWeek.start.toLocaleDateString('es-ES', { day: '2-digit', month: 'short' })} — {new Date(harvestWeek.end.getTime() - 86400000).toLocaleDateString('es-ES', { day: '2-digit', month: 'short' })}</h3><p>{isPastWeek ? 'Cantidades realmente vendidas en pedidos entregados.' : 'Necesidades calculadas con todos los pedidos registrados de la semana.'}</p></div>
             <div className="harvest-demand__totals"><span><small>{isPastWeek ? 'VENDIDO' : 'PEDIDO'}</small><b>{weekRequestedUnits}</b></span><span><small>YA COSECHADO</small><b>{weekHarvestedUnits}</b></span><span className={weekMissingUnits > 0 ? 'has-missing' : ''}><small>FALTA COSECHAR</small><b>{weekMissingUnits}</b></span></div>
@@ -405,7 +433,7 @@ export default function HarvestSessionModal({ open, onClose }) {
           </section>
         </div>
 
-        {step === 3 && <section className="harvest-review">
+        {step === 4 && <section className="harvest-review">
           <header><span>✓</span><div><h3>Revisa la cosecha</h3><p>Comprueba cultivos, productos y vinculación antes de guardar.</p></div></header>
           <div className="harvest-review__totals"><article><small>CULTIVOS</small><strong>{selectedReadyCrops.length}</strong><span>{totalSelectedTrays} bandejas</span></article><article><small>PRODUCCIÓN</small><strong>{totalUnits}</strong><span>táperes en {activeLines.length} producto{activeLines.length === 1 ? '' : 's'}</span></article><article><small>TRAZABILIDAD</small><strong>{totalLinkableUnits}</strong><span>se vincularán</span></article></div>
           <div className="harvest-review__content">
@@ -418,7 +446,7 @@ export default function HarvestSessionModal({ open, onClose }) {
         <footer className="harvest-session__footer">
           <div><strong>{activeLines.length} productos · {totalUnits} táperes</strong><span>{totalSelectedTrays} bandejas · {totalUnits > 0 ? `${totalLinkableUnits} uds. se vincularán` : `${remainingTrays} bandejas quedarán pendientes`}</span></div>
           <button type="button" onClick={step === 1 ? onClose : () => setStep(current => current - 1)}>{step === 1 ? 'Cancelar' : '← Volver'}</button>
-          {step < 3 ? <button type="button" className="harvest-session__next" onClick={nextStep}>Continuar →</button> : <button type="submit" disabled={saving || !readyCrops.length}>
+          {step < 4 ? <button type="button" className="harvest-session__next" onClick={nextStep}>Continuar →</button> : <button type="submit" disabled={saving || !readyCrops.length}>
             {saving
               ? 'Registrando todo…'
               : isPastWeek
