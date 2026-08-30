@@ -5,7 +5,11 @@ import { useNavigate } from 'react-router-dom';
 import { generateDeliveryNoteBlob } from '../utils/pdf';
 
 function DriverView() {
-  const { clients, orders, deliveryNotes, markOrderAsDelivered, saveSignedDeliveryNote, updateDeliveryNote, companyLogo, companyProfile, initialDataLoading, driverActionsReady } = useContext(DataContext);
+  const {
+    clients, orders, deliveryNotes, markOrderAsDelivered, saveSignedDeliveryNote,
+    updateDeliveryNote, companyLogo, companyProfile, initialDataLoading, driverActionsReady,
+    loadDriverDeliveredOrders, driverDeliveredLoading, driverDeliveredLoaded
+  } = useContext(DataContext);
   const [view, setView] = useState('orders');
   const [pdfBlob, setPdfBlob] = useState(null);
     const [pdfError, setPdfError] = useState(null); // 'orders', 'deliver', 'ticket', 'sign'
@@ -668,9 +672,13 @@ function DriverView() {
                 <button 
                   type="button" 
                   className={`tab-btn ${activeTab === 'delivered' ? 'active' : ''}`}
-                  onClick={() => { setActiveTab('delivered'); setExpandedOrderId(null); }}
+                  onClick={() => {
+                    setActiveTab('delivered');
+                    setExpandedOrderId(null);
+                    void loadDriverDeliveredOrders();
+                  }}
                 >
-                  Entregados ({deliveredCount})
+                  Entregados{driverDeliveredLoaded ? ` (${deliveredCount})` : ''}
                 </button>
               </div>
 
@@ -689,7 +697,7 @@ function DriverView() {
                 {activeTab === 'pending' ? 'Pedidos Pendientes' : 'Pedidos Entregados'} ({filteredOrders.length})
               </h2>
               
-              {!initialDataLoading && filteredOrders.map(order => (
+              {!initialDataLoading && !driverDeliveredLoading && filteredOrders.map(order => (
                 <div 
                   key={order.id} 
                   className={`driver-card ${activeTab === 'delivered' ? 'delivered' : ''} ${expandedOrderId === order.id ? 'expanded' : ''}`}
@@ -785,9 +793,9 @@ function DriverView() {
                 </div>
               ))}
               
-              {initialDataLoading ? (
+              {initialDataLoading || (activeTab === 'delivered' && driverDeliveredLoading) ? (
                 <div className="empty-state">
-                  <p>⏳ Cargando pedidos...</p>
+                  <p>⏳ Cargando {activeTab === 'delivered' ? 'entregados' : 'pedidos'}...</p>
                 </div>
               ) : filteredOrders.length === 0 && (
                 <div className="empty-state">

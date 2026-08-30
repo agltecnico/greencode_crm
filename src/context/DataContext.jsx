@@ -15,7 +15,7 @@ const alphabetically = (items, label = item => item?.name) =>
     String(label(a) || '').localeCompare(String(label(b) || ''), 'es', { sensitivity: 'base', numeric: true })
   );
 
-export const DataProvider = ({ children }) => {
+export const DataProvider = ({ children, mode = 'full' }) => {
 
     const sanitizeForeignKeys = (obj) => {
       const copy = { ...obj };
@@ -76,11 +76,14 @@ export const DataProvider = ({ children }) => {
   const [sowingTasks, setSowingTasks] = useState([]);
   const [initialDataLoading, setInitialDataLoading] = useState(true);
   const [driverActionsReady, setDriverActionsReady] = useState(false);
+  const [driverDeliveredLoading, setDriverDeliveredLoading] = useState(false);
+  const [driverDeliveredLoaded, setDriverDeliveredLoaded] = useState(false);
 
   const refreshInFlightRef = useRef(null);
   const pendingMutationsRef = useRef(0);
   const lastRefreshAtRef = useRef(0);
   const realtimeRefreshTimerRef = useRef(null);
+  const driverDeliveredLoadedRef = useRef(false);
 
   // Load Initial Data from Supabase
   const refreshData = useCallback(async ({ force = false } = {}) => {
@@ -89,13 +92,27 @@ export const DataProvider = ({ children }) => {
 
       const loadData = async () => {
       try {
+        const isDriverMode = mode === 'driver';
         // Pedidos y clientes son lo único necesario para pintar la vista de reparto.
         // El resto (especialmente firmas de albaranes) puede ser mucho más pesado.
-        const coreDataPromise = Promise.all([
-          supabase.from('clients').select('*').order('createdAt', { ascending: true }),
-          supabase.from('orders').select('*').order('createdAt', { ascending: true }),
-        ]);
-        const secondaryDataPromise = Promise.all([
+        const coreDataPromise = isDriverMode
+          ? Promise.all([
+              supabase.from('clients').select('*').order('createdAt', { ascending: true }),
+              supabase.from('orders').select('*').neq('status', 'DELIVERED').order('date', { ascending: false }),
+              ...(driverDeliveredLoadedRef.current
+                ? [supabase.from('orders').select('*').eq('status', 'DELIVERED').order('date', { ascending: false })]
+                : []),
+            ])
+          : Promise.all([
+              supabase.from('clients').select('*').order('createdAt', { ascending: true }),
+              supabase.from('orders').select('*').order('createdAt', { ascending: true }),
+            ]);
+        const secondaryDataPromise = isDriverMode
+          ? Promise.all([
+              supabase.from('delivery_notes').select('*').gte('date', `${new Date().getFullYear()}-01-01`).order('date', { ascending: false }),
+              supabase.from('company_profile').select('*').limit(1),
+            ])
+          : Promise.all([
           supabase.from('products').select('*').order('createdAt', { ascending: true }),
           supabase.from('delivery_notes').select('*').order('createdAt', { ascending: true }),
           supabase.from('invoices').select('*').order('createdAt', { ascending: true }),
@@ -123,14 +140,26 @@ export const DataProvider = ({ children }) => {
         const failedCoreQuery = coreResults.find(result => result.error);
         if (failedCoreQuery) throw failedCoreQuery.error;
 
-        const [{ data: clientsData }, { data: ordersData }] = coreResults;
+        const [{ data: clientsData }, { data: ordersData }, { data: deliveredData } = {}] = coreResults;
         if (clientsData) setClients(clientsData);
-        if (ordersData) setOrders(ordersData);
+        if (ordersData) setOrders(isDriverMode ? [...ordersData, ...(deliveredData || [])] : ordersData);
         setInitialDataLoading(false);
 
         const results = await secondaryDataPromise;
         const failedQuery = results.find(result => result.error);
         if (failedQuery) throw failedQuery.error;
+
+        if (isDriverMode) {
+          const [{ data: notesData }, { data: profileData }] = results;
+          if (notesData) setDeliveryNotes(notesData);
+          if (profileData?.[0]) {
+            setCompanyProfile(profileData[0]);
+            localStorage.setItem('crm_company_profile', JSON.stringify(profileData[0]));
+          }
+          setDriverActionsReady(true);
+          lastRefreshAtRef.current = Date.now();
+          return true;
+        }
 
         const [
           { data: productsData },
@@ -253,7 +282,34 @@ export const DataProvider = ({ children }) => {
 
       refreshInFlightRef.current = loadData();
       return refreshInFlightRef.current;
-    }, []);
+    }, [mode]);
+
+  const loadDriverDeliveredOrders = useCallback(async () => {
+    if (mode !== 'driver' || driverDeliveredLoadedRef.current || driverDeliveredLoading) return;
+
+    setDriverDeliveredLoading(true);
+    try {
+      const [ordersResult, notesResult] = await Promise.all([
+        supabase.from('orders').select('*').eq('status', 'DELIVERED').order('date', { ascending: false }),
+        supabase.from('delivery_notes').select('*').order('date', { ascending: false }),
+      ]);
+      if (ordersResult.error) throw ordersResult.error;
+      if (notesResult.error) throw notesResult.error;
+
+      setOrders(prev => [
+        ...prev.filter(order => order.status !== 'DELIVERED'),
+        ...(ordersResult.data || []),
+      ]);
+      setDeliveryNotes(notesResult.data || []);
+      driverDeliveredLoadedRef.current = true;
+      setDriverDeliveredLoaded(true);
+    } catch (error) {
+      console.error('No se pudieron cargar los pedidos entregados:', error);
+      await Swal.fire('No se pudieron cargar', 'Inténtalo de nuevo en unos segundos.', 'error');
+    } finally {
+      setDriverDeliveredLoading(false);
+    }
+  }, [driverDeliveredLoading, mode]);
 
   const persistOrReload = async (operation, actionLabel) => {
     pendingMutationsRef.current += 1;
@@ -1622,7 +1678,8 @@ export const DataProvider = ({ children }) => {
       invoices, addInvoice, deleteInvoice, importData, markInvoiceAsPaid,
       expenses, addExpense, updateExpense, deleteExpense, markExpenseAsPaid,
       salesForecasts, saveSalesForecasts,
-      refreshData, initialDataLoading, driverActionsReady
+      refreshData, initialDataLoading, driverActionsReady,
+      loadDriverDeliveredOrders, driverDeliveredLoading, driverDeliveredLoaded
     }}>
       {children}
     </DataContext.Provider>

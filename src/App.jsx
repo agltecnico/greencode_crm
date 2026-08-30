@@ -1,4 +1,4 @@
-import { Routes, Route, Outlet } from 'react-router-dom';
+import { Routes, Route, Outlet, useLocation } from 'react-router-dom';
 import Layout from './components/Layout';
 import Hub from './pages/Hub';
 import Dashboard from './pages/Dashboard';
@@ -20,13 +20,18 @@ import { DataProvider } from './context/DataContext';
 import { AdminModeProvider } from './context/AdminModeContext';
 import './App.css';
 
-const ProtectedProviders = () => (
-  <ProtectedRoute>
-    <AdminModeProvider>
-      <DataProvider><Outlet /></DataProvider>
-    </AdminModeProvider>
-  </ProtectedRoute>
-);
+const ProtectedProviders = () => {
+  const location = useLocation();
+  const dataMode = location.pathname === '/repartidor' ? 'driver' : 'full';
+
+  return (
+    <ProtectedRoute>
+      <AdminModeProvider>
+        <DataProvider key={dataMode} mode={dataMode}><Outlet /></DataProvider>
+      </AdminModeProvider>
+    </ProtectedRoute>
+  );
+};
 
 const PermissionGate = ({ permission, children }) => (
   <ProtectedRoute permission={permission}>{children}</ProtectedRoute>
