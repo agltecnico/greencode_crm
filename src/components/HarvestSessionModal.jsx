@@ -58,6 +58,10 @@ export default function HarvestSessionModal({ open, onClose }) {
   const [notes, setNotes] = useState('');
   const [saving, setSaving] = useState(false);
   const [step, setStep] = useState(1);
+  const [pickerOpen, setPickerOpen] = useState(false);
+  const [editingLineId, setEditingLineId] = useState(null);
+  const [pickerProductId, setPickerProductId] = useState('');
+  const [pickerQuantities, setPickerQuantities] = useState({});
 
   const harvestWeek = useMemo(() => {
     const selected = new Date(harvestDate);
@@ -105,6 +109,10 @@ export default function HarvestSessionModal({ open, onClose }) {
     setLines([makeLine()]);
     setNotes('');
     setStep(1);
+    setPickerOpen(false);
+    setEditingLineId(null);
+    setPickerProductId('');
+    setPickerQuantities({});
   }, [open]);
 
   useEffect(() => {
@@ -224,6 +232,34 @@ export default function HarvestSessionModal({ open, onClose }) {
     const target = existing || lines.find(line => !line.productId) || makeLine();
     if (!lines.some(line => line.id === target.id)) setLines(current => [...current, target]);
     selectProductForLine(target.id, row.product.id, row.missing);
+  };
+  const openProductPicker = line => {
+    setEditingLineId(line?.id || null);
+    setPickerProductId(line?.productId || '');
+    setPickerQuantities(line?.packagingQuantities || {});
+    setPickerOpen(true);
+  };
+  const choosePickerProduct = productId => {
+    const product = products.find(item => String(item.id) === String(productId));
+    const formats = packagingFor(product);
+    const recommendation = weekDemand.find(row => String(row.product.id) === String(productId))?.missing || 0;
+    setPickerProductId(productId);
+    setPickerQuantities(recommendation > 0 && formats.length === 1 ? { [formats[0].id]: recommendation } : {});
+  };
+  const savePickerProduct = () => {
+    const units = Object.values(pickerQuantities).reduce((sum, quantity) => sum + Number(quantity || 0), 0);
+    if (!pickerProductId || units <= 0) {
+      Swal.fire('Faltan datos', 'Selecciona una variedad o mix e indica al menos un táper.', 'warning');
+      return;
+    }
+    if (editingLineId) {
+      updateLine(editingLineId, { productId: pickerProductId, packagingQuantities: pickerQuantities });
+    } else {
+      const blank = lines.find(line => !line.productId && lineUnits(line) === 0);
+      if (blank) updateLine(blank.id, { productId: pickerProductId, packagingQuantities: pickerQuantities });
+      else setLines(current => [...current, { ...makeLine(), productId: pickerProductId, packagingQuantities: pickerQuantities }]);
+    }
+    setPickerOpen(false);
   };
   const nextStep = () => {
     if (step === 2 && selectedReadyCrops.length === 0) {
@@ -369,8 +405,16 @@ export default function HarvestSessionModal({ open, onClose }) {
           </section>
 
           <section className="harvest-session__production">
-            <div className="harvest-session__title"><div><span>2</span><h3>Táperes obtenidos</h3></div><strong>{totalUnits} unidades</strong></div>
-            <p>Elige una variedad o mix y registra los envases obtenidos.</p>
+            <div className="harvest-session__title"><div><span>3</span><h3>Variedades y táperes obtenidos</h3></div><strong>{totalUnits} unidades</strong></div>
+            <p>Añade cada variedad o mix una sola vez e indica sus formatos.</p>
+            <div className="harvest-products-simple">
+              {activeLines.map(line => {
+                const product = products.find(item => String(item.id) === String(line.productId));
+                return <article key={line.id}><div><b>{product?.name || 'Producto'}</b><span>{Object.entries(line.packagingQuantities).filter(([, quantity]) => Number(quantity) > 0).map(([articleId, quantity]) => `${quantity} × ${articles.find(article => article.id === articleId)?.name || 'envase'}`).join(' · ')}</span></div><strong>{lineUnits(line)}<small> táperes</small></strong><button type="button" onClick={() => openProductPicker(line)}>Editar</button><button type="button" className="is-delete" onClick={() => removeLine(line.id)}>×</button></article>;
+              })}
+              {!activeLines.length && <div className="harvest-products-simple__empty"><span>🥗</span><b>Todavía no has añadido ninguna cosecha</b><small>Pulsa el botón para elegir una variedad individual o un mix.</small></div>}
+              <button type="button" className="harvest-products-simple__add" onClick={() => openProductPicker()}>＋ Añadir cosecha</button>
+            </div>
             <div className="harvest-session__line-list">
               {lines.map((line, lineIndex) => {
                 const product = products?.find(item => item.id === line.productId);
@@ -450,6 +494,20 @@ export default function HarvestSessionModal({ open, onClose }) {
           </div>
           <label className="harvest-session__notes">Comentario opcional<textarea rows="2" value={notes} onChange={event => setNotes(event.target.value)} placeholder="Observaciones de la cosecha…" /></label>
         </section>}
+
+        {pickerOpen && <div className="harvest-picker-overlay">
+          <section className="harvest-picker">
+            <header><div><span>AÑADIR COSECHA</span><h3>{pickerProductId ? 'Indica los táperes obtenidos' : 'Elige variedad o mix'}</h3></div><button type="button" onClick={() => setPickerOpen(false)}>×</button></header>
+            <div className="harvest-picker__products">
+              {selectableProducts.filter(product => {
+                const selectedLine = lines.find(line => line.id === editingLineId);
+                return !lines.some(line => line.id !== selectedLine?.id && String(line.productId) === String(product.id));
+              }).map(product => <button type="button" key={product.id} className={String(pickerProductId) === String(product.id) ? 'is-selected' : ''} onClick={() => choosePickerProduct(product.id)}><b>{product.name}</b><small>{recipeIds(product).length > 1 ? `Mix · ${recipeIds(product).map(id => seedVarieties.find(item => item.id === id)?.name).filter(Boolean).join(', ')}` : 'Variedad individual'}</small></button>)}
+            </div>
+            {pickerProductId && <div className="harvest-picker__formats"><h4>¿Cuántos táperes has obtenido?</h4>{packagingFor(products.find(item => String(item.id) === String(pickerProductId))).map(format => <label key={format.id}><span><b>{format.name}</b><small>{(stockEntries || []).filter(entry => entry.articleId === format.id).reduce((sum, entry) => sum + Number(entry.quantity || 0), 0)} envases disponibles</small></span><input type="number" min="0" placeholder="0" value={pickerQuantities[format.id] || ''} onChange={event => setPickerQuantities(current => ({ ...current, [format.id]: Math.max(0, Number(event.target.value || 0)) }))} /></label>)}</div>}
+            <footer><button type="button" onClick={() => setPickerOpen(false)}>Cancelar</button><button type="button" className="is-primary" onClick={savePickerProduct}>{editingLineId ? 'Guardar cambios' : 'Añadir cosecha'}</button></footer>
+          </section>
+        </div>}
 
         <footer className="harvest-session__footer">
           <div><strong>{activeLines.length} productos · {totalUnits} táperes</strong><span>{totalSelectedTrays} bandejas · {totalUnits > 0 ? `${totalLinkableUnits} uds. se vincularán` : `${remainingTrays} bandejas quedarán pendientes`}</span></div>
