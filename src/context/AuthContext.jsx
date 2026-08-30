@@ -18,6 +18,7 @@ export function AuthProvider({ children }) {
   const [loading, setLoading] = useState(true);
   const [recoveryMode, setRecoveryMode] = useState(isPasswordSetupCallback);
   const inactiveSignOutStarted = useRef(false);
+  const currentUserIdRef = useRef(null);
 
   const loadProfile = async user => {
     if (!user) {
@@ -31,6 +32,7 @@ export function AuthProvider({ children }) {
 
   useEffect(() => {
     supabase.auth.getSession().then(async ({ data }) => {
+      currentUserIdRef.current = data.session?.user?.id || null;
       setSession(data.session);
       try {
         await loadProfile(data.session?.user);
@@ -42,9 +44,21 @@ export function AuthProvider({ children }) {
       if (event === 'PASSWORD_RECOVERY' || (event === 'SIGNED_IN' && isPasswordSetupCallback())) {
         setRecoveryMode(true);
       }
+
+      const nextUserId = nextSession?.user?.id || null;
+      const userChanged = currentUserIdRef.current !== nextUserId;
+      currentUserIdRef.current = nextUserId;
       setSession(nextSession);
-      setLoading(true);
-      setTimeout(() => loadProfile(nextSession?.user).finally(() => setLoading(false)), 0);
+
+      // Supabase refreshes the token when a background tab becomes active again.
+      // Keep that refresh invisible instead of replacing the whole application
+      // with ProtectedRoute's loading screen.
+      if (event === 'TOKEN_REFRESHED' && !userChanged) return;
+
+      if (userChanged) setLoading(true);
+      setTimeout(() => loadProfile(nextSession?.user).finally(() => {
+        if (userChanged) setLoading(false);
+      }), 0);
     });
     return () => listener.subscription.unsubscribe();
   }, []);
