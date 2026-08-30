@@ -21,6 +21,14 @@ const cleanInitials = name => {
   return words.length === 1 ? words[0].slice(0, 3) : words.slice(0, 3).map(word => word[0]).join('');
 };
 
+const harvestProductName = name => String(name || 'Producto')
+  .replace(/\s*\(\s*\d+\s*ML\s*\)\s*$/i, '')
+  .replace(/\s+\d+\s*ML\s*$/i, '')
+  .trim();
+
+const harvestProductKey = name => harvestProductName(name)
+  .normalize('NFD').replace(/[\u0300-\u036f]/g, '').toUpperCase();
+
 const isoWeek = value => {
   const source = new Date(value);
   const date = new Date(Date.UTC(source.getFullYear(), source.getMonth(), source.getDate()));
@@ -119,9 +127,7 @@ export default function HarvestSessionModal({ open, onClose }) {
     if (!open) return;
     setSelectedCropTrays(Object.fromEntries(readyCrops.map(crop => [
       crop.id,
-      weeklyReadyCropIds.has(crop.id)
-        ? Number(crop.traysCount || crop.trays || 0)
-        : 0
+      Number(crop.traysCount || crop.trays || 0)
     ])));
   }, [harvestDate, open, readyCrops, weeklyReadyCropIds]);
 
@@ -154,12 +160,20 @@ export default function HarvestSessionModal({ open, onClose }) {
   const selectedProductVarietyIds = new Set(lines.filter(line => line.productId).flatMap(line => recipeIds(products?.find(product => product.id === line.productId))));
   const selectedReadyCrops = readyCrops.filter(crop => Number(selectedCropTrays[crop.id] || 0) > 0);
   const selectedVarietyIds = new Set(selectedReadyCrops.map(cropVarietyId));
-  const selectableProducts = (products || []).filter(product => {
+  const compatibleProducts = (products || []).filter(product => {
     const recipe = recipeIds(product);
     const selectedRecipeVarieties = new Set(recipe.filter(varietyId => selectedVarietyIds.has(varietyId)));
     const minimumVarieties = Math.min(4, new Set(recipe).size);
     return recipe.length > 0 && packagingFor(product).length > 0 && selectedRecipeVarieties.size >= minimumVarieties;
   });
+  const selectableProducts = Object.values(compatibleProducts.reduce((groups, product) => {
+    const key = harvestProductKey(product.name);
+    const current = groups[key];
+    const productHasCapacity = /\d+\s*ML/i.test(product.name || '');
+    const currentHasCapacity = /\d+\s*ML/i.test(current?.name || '');
+    if (!current || (currentHasCapacity && !productHasCapacity)) groups[key] = product;
+    return groups;
+  }, {}));
   const totalSelectedTrays = selectedReadyCrops.reduce((sum, crop) => sum + Number(selectedCropTrays[crop.id] || 0), 0);
   const totalReadyTrays = readyCrops.reduce((sum, crop) => sum + Number(crop.traysCount || crop.trays || 0), 0);
   const remainingTrays = totalReadyTrays - totalSelectedTrays;
@@ -413,7 +427,7 @@ export default function HarvestSessionModal({ open, onClose }) {
             <div className="harvest-products-simple">
               {activeLines.map(line => {
                 const product = products.find(item => String(item.id) === String(line.productId));
-                return <article key={line.id}><div><b>{product?.name || 'Producto'}</b><span>{Object.entries(line.packagingQuantities).filter(([, quantity]) => Number(quantity) > 0).map(([articleId, quantity]) => `${quantity} × ${articles.find(article => article.id === articleId)?.name || 'envase'}`).join(' · ')}</span></div><strong>{lineUnits(line)}<small> táperes</small></strong><button type="button" onClick={() => openProductPicker(line)}>Editar</button><button type="button" className="is-delete" onClick={() => removeLine(line.id)}>×</button></article>;
+                return <article key={line.id}><div><b>{harvestProductName(product?.name)}</b><span>{Object.entries(line.packagingQuantities).filter(([, quantity]) => Number(quantity) > 0).map(([articleId, quantity]) => `${quantity} × ${articles.find(article => article.id === articleId)?.name || 'envase'}`).join(' · ')}</span></div><strong>{lineUnits(line)}<small> táperes</small></strong><button type="button" onClick={() => openProductPicker(line)}>Editar</button><button type="button" className="is-delete" onClick={() => removeLine(line.id)}>×</button></article>;
               })}
               {!activeLines.length && <div className="harvest-products-simple__empty"><span>🥗</span><b>Todavía no has añadido ninguna cosecha</b><small>Pulsa el botón para elegir una variedad individual o un mix.</small></div>}
               <button type="button" className="harvest-products-simple__add" onClick={() => openProductPicker()}>＋ Añadir cosecha</button>
@@ -493,7 +507,7 @@ export default function HarvestSessionModal({ open, onClose }) {
           <div className="harvest-review__totals"><article><small>CULTIVOS</small><strong>{selectedReadyCrops.length}</strong><span>{totalSelectedTrays} bandejas</span></article><article><small>PRODUCCIÓN</small><strong>{totalUnits}</strong><span>táperes en {activeLines.length} producto{activeLines.length === 1 ? '' : 's'}</span></article><article><small>TRAZABILIDAD</small><strong>{totalLinkableUnits}</strong><span>se vincularán</span></article></div>
           <div className="harvest-review__content">
             <div><h4>Cultivos utilizados <button type="button" onClick={() => setStep(2)}>Modificar</button></h4>{selectedReadyCrops.map(crop => <p key={crop.id}><b>{varietyName(crop)}</b><span>{selectedCropTrays[crop.id]} bandejas · {crop.batchNumber || 'sin lote'}</span></p>)}</div>
-            <div><h4>Productos obtenidos <button type="button" onClick={() => setStep(3)}>Modificar</button></h4>{activeLines.map(line => { const product = products.find(item => item.id === line.productId); return <p key={line.id}><b>{product?.name || 'Producto'}</b><span>{Object.entries(line.packagingQuantities).filter(([, quantity]) => Number(quantity) > 0).map(([articleId, quantity]) => `${quantity} × ${articles.find(article => article.id === articleId)?.name || 'envase'}`).join(' · ')}</span></p>; })}</div>
+            <div><h4>Productos obtenidos <button type="button" onClick={() => setStep(3)}>Modificar</button></h4>{activeLines.map(line => { const product = products.find(item => item.id === line.productId); return <p key={line.id}><b>{harvestProductName(product?.name)}</b><span>{Object.entries(line.packagingQuantities).filter(([, quantity]) => Number(quantity) > 0).map(([articleId, quantity]) => `${quantity} × ${articles.find(article => article.id === articleId)?.name || 'envase'}`).join(' · ')}</span></p>; })}</div>
           </div>
           <label className="harvest-session__notes">Comentario opcional<textarea rows="2" value={notes} onChange={event => setNotes(event.target.value)} placeholder="Observaciones de la cosecha…" /></label>
         </section>}
@@ -505,7 +519,7 @@ export default function HarvestSessionModal({ open, onClose }) {
               {selectableProducts.filter(product => {
                 const selectedLine = lines.find(line => line.id === editingLineId);
                 return !lines.some(line => line.id !== selectedLine?.id && String(line.productId) === String(product.id));
-              }).map(product => <button type="button" key={product.id} className={String(pickerProductId) === String(product.id) ? 'is-selected' : ''} onClick={() => choosePickerProduct(product.id)}><b>{product.name}</b><small>{recipeIds(product).length > 1 ? `Mix · ${recipeIds(product).map(id => seedVarieties.find(item => item.id === id)?.name).filter(Boolean).join(', ')}` : 'Variedad individual'}</small></button>)}
+              }).map(product => <button type="button" key={product.id} className={String(pickerProductId) === String(product.id) ? 'is-selected' : ''} onClick={() => choosePickerProduct(product.id)}><b>{harvestProductName(product.name)}</b><small>{recipeIds(product).length > 1 ? `Mix · ${recipeIds(product).map(id => seedVarieties.find(item => item.id === id)?.name).filter(Boolean).join(', ')}` : 'Variedad individual'}</small></button>)}
             </div>
             {pickerProductId && <div className="harvest-picker__formats"><h4>¿Cuántos táperes has obtenido?</h4>{packagingFor(products.find(item => String(item.id) === String(pickerProductId))).map(format => <label key={format.id}><span><b>{format.name}</b><small>{(stockEntries || []).filter(entry => entry.articleId === format.id).reduce((sum, entry) => sum + Number(entry.quantity || 0), 0)} envases disponibles</small></span><input type="number" min="0" placeholder="0" value={pickerQuantities[format.id] || ''} onChange={event => setPickerQuantities(current => ({ ...current, [format.id]: Math.max(0, Number(event.target.value || 0)) }))} /></label>)}</div>}
             <footer><button type="button" onClick={() => setPickerOpen(false)}>Cancelar</button><button type="button" className="is-primary" onClick={savePickerProduct}>{editingLineId ? 'Guardar cambios' : 'Añadir cosecha'}</button></footer>
