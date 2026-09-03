@@ -63,6 +63,7 @@ const pendingDeliveryGroups = movements => {
 };
 
 const makeLine = () => ({ id: crypto.randomUUID(), productId: '', packagingQuantities: {} });
+const HARVEST_CATCH_UP_CUTOFF = new Date('2026-09-02T00:00:00+02:00');
 
 export default function HarvestSessionModal({ open, onClose }) {
   const {
@@ -195,7 +196,9 @@ export default function HarvestSessionModal({ open, onClose }) {
   const totalUnits = activeLines.reduce((sum, line) => sum + lineUnits(line), 0);
 
   const isPastWeek = harvestWeek.end <= new Date();
-  const harvestWeekStartKey = localDateKey(harvestWeek.start);
+  const appliesCatchUpCutoff = HARVEST_CATCH_UP_CUTOFF >= harvestWeek.start && HARVEST_CATCH_UP_CUTOFF < harvestWeek.end;
+  const harvestPeriodStart = appliesCatchUpCutoff ? HARVEST_CATCH_UP_CUTOFF : harvestWeek.start;
+  const harvestWeekStartKey = localDateKey(harvestPeriodStart);
   const harvestWeekEnd = new Date(harvestWeek.end);
   harvestWeekEnd.setDate(harvestWeekEnd.getDate() - 1);
   const harvestWeekEndKey = localDateKey(harvestWeekEnd);
@@ -240,20 +243,20 @@ export default function HarvestSessionModal({ open, onClose }) {
       && String(movement.referenceId || '').endsWith('|PENDING-TRACEABILITY')
     ).filter(movement => {
       const date = new Date(movement.createdAt);
-      return date >= harvestWeek.start && date < harvestWeek.end;
+      return date >= harvestPeriodStart && date < harvestWeek.end;
     });
     return {
       product,
       units: movements.reduce((sum, movement) => sum + Math.abs(Number(movement.quantity || 0)), 0),
       deliveries: movements.length
     };
-  }).filter(row => row.units > 0).sort((a, b) => b.units - a.units), [harvestWeek, productMovements, products]);
+  }).filter(row => row.units > 0).sort((a, b) => b.units - a.units), [harvestPeriodStart, harvestWeek.end, productMovements, products]);
   const retroactivePendingUnits = retroactivePending.reduce((sum, row) => sum + row.units, 0);
   const totalLinkableUnits = activeLines.reduce((sum, line) => {
     const pendingThisWeek = pendingOrdersForProduct(line.productId)
       .filter(movement => {
         const deliveryDate = new Date(movement.createdAt);
-        return deliveryDate >= harvestWeek.start && deliveryDate < harvestWeek.end;
+        return deliveryDate >= harvestPeriodStart && deliveryDate < harvestWeek.end;
       })
       .reduce((units, movement) => units + Math.abs(Number(movement.quantity || 0)), 0);
     return sum + Math.min(lineUnits(line), pendingThisWeek);
@@ -452,13 +455,13 @@ export default function HarvestSessionModal({ open, onClose }) {
         {step === 1 && <section className={`harvest-date-step ${isRetroactive ? 'is-retroactive' : ''}`}>
           <header><span>{isRetroactive ? '↶' : '✓'}</span><div><h3>{isRetroactive ? 'Cosecha retroactiva detectada' : 'Cosecha de hoy'}</h3><p>{isRetroactive ? 'Mostramos las ventas entregadas de esa semana que todavía no tienen cultivo ni lote vinculados.' : 'La fecha actual está seleccionada. Puedes continuar con los cultivos listos.'}</p></div></header>
           <label>Fecha real de cosecha<input autoFocus type="date" value={harvestDate.slice(0, 10)} max={localInputValue().slice(0, 10)} onChange={event => setHarvestDate(harvestDateWithCurrentTime(event.target.value))} /><small>La hora se guardará automáticamente al registrar la cosecha.</small></label>
-          <div className="harvest-date-step__week"><small>SEMANA SELECCIONADA</small><strong>{harvestWeek.start.toLocaleDateString('es-ES', { day: '2-digit', month: 'long' })} — {new Date(harvestWeek.end.getTime() - 86400000).toLocaleDateString('es-ES', { day: '2-digit', month: 'long' })}</strong><span>{readyCrops.length} cultivos listos disponibles</span></div>
+          <div className="harvest-date-step__week"><small>PERIODO DE COSECHA</small><strong>{harvestPeriodStart.toLocaleDateString('es-ES', { day: '2-digit', month: 'long' })} — {new Date(harvestWeek.end.getTime() - 86400000).toLocaleDateString('es-ES', { day: '2-digit', month: 'long' })}</strong><span>{readyCrops.length} cultivos listos disponibles</span></div>
           {isRetroactive && <div className="harvest-date-step__pending"><div><h4>Táperes vendidos sin cultivo vinculado</h4><strong>{retroactivePendingUnits} uds.</strong></div>{retroactivePending.map(row => <button type="button" key={row.product.id} onClick={() => prepareDemandProduct({ ...row, missing: row.units })}><span><b>{row.product.name}</b><small>{row.deliveries} movimiento{row.deliveries === 1 ? '' : 's'} de venta pendiente{row.deliveries === 1 ? '' : 's'}</small></span><strong>{row.units} uds.</strong><em>Preparar →</em></button>)}{!retroactivePending.length && <p>✓ No hay ventas entregadas sin cultivo para esta semana.</p>}</div>}
         </section>}
 
         {step === 3 && <section className="harvest-demand">
           <header>
-            <div><span>{isPastWeek ? 'SEMANA PASADA' : 'SEMANA ACTUAL'}</span><h3>{harvestWeek.start.toLocaleDateString('es-ES', { day: '2-digit', month: 'short' })} — {new Date(harvestWeek.end.getTime() - 86400000).toLocaleDateString('es-ES', { day: '2-digit', month: 'short' })}</h3><p>{isPastWeek ? 'Cantidades realmente vendidas en pedidos entregados.' : 'Necesidades calculadas con todos los pedidos registrados de la semana.'}</p></div>
+            <div><span>{isPastWeek ? 'PERIODO PASADO' : 'PERIODO ACTUAL'}</span><h3>{harvestPeriodStart.toLocaleDateString('es-ES', { day: '2-digit', month: 'short' })} — {new Date(harvestWeek.end.getTime() - 86400000).toLocaleDateString('es-ES', { day: '2-digit', month: 'short' })}</h3><p>{isPastWeek ? 'Cantidades realmente vendidas en el periodo de cosecha.' : 'Pedidos del periodo actual; los días ya incluidos en la cosecha anterior quedan fuera.'}</p></div>
             <div className="harvest-demand__totals"><span><small>{isPastWeek ? 'VENDIDO' : 'PEDIDO ESTA SEMANA'}</small><b>{weekRequestedUnits}</b></span><span><small>YA COSECHADO</small><b>{weekHarvestedUnits}</b></span><span className={weekPendingHarvestUnits > 0 ? 'has-missing' : ''}><small>QUEDA POR COSECHAR</small><b>{weekPendingHarvestUnits}</b></span></div>
           </header>
           {demandPlanRows.length > 0 && <button type="button" className="harvest-demand__prepare" onClick={() => openDemandPlan()}><span>⚡ Preparar cosecha según pedidos de la semana</span><strong>{demandPlanRows.length} productos compatibles · {compatibleDemandUnits} uds.</strong></button>}
@@ -526,7 +529,7 @@ export default function HarvestSessionModal({ open, onClose }) {
                 const weekPendingUnits = pendingMovements
                   .filter(movement => {
                     const deliveryDate = new Date(movement.createdAt);
-                    return deliveryDate >= harvestWeek.start && deliveryDate < harvestWeek.end;
+                    return deliveryDate >= harvestPeriodStart && deliveryDate < harvestWeek.end;
                   })
                   .reduce((sum, movement) => sum + Math.abs(Number(movement.quantity || 0)), 0);
                 const olderPendingUnits = Math.max(0, pendingUnits - weekPendingUnits);
