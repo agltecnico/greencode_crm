@@ -5,28 +5,50 @@ const PHASES = [
   { id: 'SOAKING', label: 'Remojo', icon: '◌', color: '#2563eb', soft: '#dbeafe' },
   { id: 'GERMINATING', label: 'Germinación', icon: '●', color: '#d97706', soft: '#fef3c7' },
   { id: 'DARKNESS', label: 'Oscuridad', icon: '◐', color: '#4f46e5', soft: '#e0e7ff' },
-  { id: 'LIGHT', label: 'Luz', icon: '☀', color: '#0f766e', soft: '#ccfbf1' },
-  { id: 'READY', label: 'Para cosechar', icon: '✓', color: '#15803d', soft: '#dcfce7' }
+  { id: 'LIGHT', label: 'Luz / crecimiento', icon: '☀', color: '#0f766e', soft: '#ccfbf1' },
+  { id: 'READY', label: 'Lista para cosechar', icon: '✓', color: '#15803d', soft: '#dcfce7' }
 ];
 
-const cropStatus = crop => String(crop.status || 'GERMINATING').toUpperCase();
+const storedCropStatus = crop => {
+  const status = String(crop.status || 'GERMINATING').toUpperCase();
+  if (status === 'SOWED') return 'GERMINATING';
+  if (status === 'GROWING') return 'LIGHT';
+  return status;
+};
 
 export default function ActiveCropsBoard({
   crops, cropTypes, statusFilter, onFilterChange, onAddTrays, onAdjust, onDelete,
   cycleDay, expectedHarvest, formatSowingDate
 }) {
   const [selectedGroupId, setSelectedGroupId] = useState(null);
+  const typeForCrop = crop => cropTypes?.find(item => item.id === crop.seedId || item.id === crop.cropTypeId);
+  const displayCropStatus = crop => {
+    const stored = storedCropStatus(crop);
+    if (!['GERMINATING', 'SOAKING'].includes(stored)) return stored;
+    const type = typeForCrop(crop);
+    if (!type) return stored;
+    const day = cycleDay(crop.datePlanted || crop.plantedAt, crop.cycleDayAdjustment);
+    const soaking = Number(type.soakingHours || 0) > 0 ? Math.max(1, Math.ceil(Number(type.soakingHours) / 24)) : 0;
+    const germinationEnd = soaking + Number(type.germinationDays || 0);
+    const darknessEnd = germinationEnd + Number(type.darknessDays || 0);
+    const harvestDay = darknessEnd + Number(type.lightDays || 0);
+    if (soaking > 0 && day < soaking) return 'SOAKING';
+    if (day < germinationEnd) return 'GERMINATING';
+    if (Number(type.darknessDays || 0) > 0 && day < darknessEnd) return 'DARKNESS';
+    if (day < harvestDay) return 'LIGHT';
+    return 'READY';
+  };
   const counts = Object.fromEntries(PHASES.map(phase => [phase.id,
-    phase.id === 'ALL' ? crops.length : crops.filter(crop => cropStatus(crop) === phase.id).length
+    phase.id === 'ALL' ? crops.length : crops.filter(crop => displayCropStatus(crop) === phase.id).length
   ]));
   const visible = crops
-    .filter(crop => statusFilter === 'ALL' || cropStatus(crop) === statusFilter)
+    .filter(crop => statusFilter === 'ALL' || displayCropStatus(crop) === statusFilter)
     .sort((a, b) => new Date(a.datePlanted || a.plantedAt) - new Date(b.datePlanted || b.plantedAt));
   const grouped = [...visible.reduce((map, crop) => {
-    const type = cropTypes?.find(item => item.id === crop.seedId || item.id === crop.cropTypeId);
+    const type = typeForCrop(crop);
     const key = String(type?.id || crop.cropTypeId || crop.seedId || 'unknown');
     const current = map.get(key) || { id: key, type, name: type?.name || 'Cultivo sin nombre', crops: [], trays: 0, phases: {} };
-    const phaseId = cropStatus(crop);
+    const phaseId = displayCropStatus(crop);
     const trays = Number(crop.traysCount || crop.trays || 0);
     current.crops.push(crop);
     current.trays += trays;
@@ -71,7 +93,7 @@ export default function ActiveCropsBoard({
           <article className="active-crop-detail active-crop-group-detail" style={{ '--phase-color': '#10b981', '--phase-soft': '#ecfdf5' }}>
             <header><div><span>{selectedGroup.trays} bandejas activas</span><h3>{selectedGroup.name}</h3><small>{selectedGroup.crops.length} lote{selectedGroup.crops.length === 1 ? '' : 's'} en producción</small></div><button type="button" onClick={() => setSelectedGroupId(null)}>×</button></header>
             <div className="active-crop-group-detail__lots">{selectedGroup.crops.map(crop => {
-              const phase = PHASES.find(item => item.id === cropStatus(crop)) || PHASES[0];
+              const phase = PHASES.find(item => item.id === displayCropStatus(crop)) || PHASES[0];
               const days = cycleDay(crop.datePlanted || crop.plantedAt, crop.cycleDayAdjustment);
               const expectedDays = Number(selectedGroup.type?.germinationDays || 0) + Number(selectedGroup.type?.darknessDays || 0) + Number(selectedGroup.type?.lightDays || 0) || 14;
               const harvestDate = expectedHarvest(selectedGroup.type, crop.datePlanted || crop.plantedAt, crop.cycleDayAdjustment);
