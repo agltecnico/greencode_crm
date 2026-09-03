@@ -326,6 +326,18 @@ export default function Dashboard() {
     };
     const productSales = [...productTotals.values()].map(finishEconomicRow).sort((a, b) => b.total - a.total);
     const allClients = [...clientTotals.values()].map(finishEconomicRow).sort((a, b) => b.total - a.total);
+    const bestSaleOrder = periodOrders.reduce((best, order) => Number(order.total || 0) > Number(best?.total || 0) ? order : best, null);
+    const bestSaleNote = bestSaleOrder ? noteByOrder.get(bestSaleOrder.id) : null;
+    const bestSaleClient = bestSaleOrder
+      ? clients.find(client => String(client.id) === String(bestSaleOrder.clientId || bestSaleNote?.clientId))
+      : null;
+    const bestSale = bestSaleOrder ? {
+      value: Number(bestSaleOrder.total || 0),
+      units: (bestSaleOrder.items || []).reduce((sum, item) => sum + Number(item.quantity || 0), 0),
+      clientName: bestSaleClient?.commercialName || bestSaleClient?.name
+        || bestSaleNote?.clientCommercialName || bestSaleNote?.clientName
+        || bestSaleOrder.clientCommercialName || bestSaleOrder.clientName || 'Cliente sin identificar'
+    } : null;
     const tracedProducts = productSales.filter(item => item.costedUnits > 0);
     const mostProfitable = tracedProducts.slice().sort((a, b) => b.margin - a.margin)[0] || null;
     const totalCost = productSales.reduce((sum, item) => sum + item.cost, 0);
@@ -372,6 +384,7 @@ export default function Dashboard() {
       operatingResult,
       costedUnits,
       mostProfitable,
+      bestSale,
       orderCount: periodOrders.length,
       requestedOrderCount: requestedOrders.length,
       requestedOrderValue,
