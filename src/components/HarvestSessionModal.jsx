@@ -63,7 +63,7 @@ const pendingDeliveryGroups = movements => {
 };
 
 const makeLine = () => ({ id: crypto.randomUUID(), productId: '', packagingQuantities: {} });
-const HARVEST_CATCH_UP_CUTOFF = new Date('2026-09-02T00:00:00+02:00');
+const HARVEST_CATCH_UP_EXCLUDED_ORDER_IDS = new Set(['07e10c7f-9fd9-4ccf-82e3-2382b7c5fbb1']);
 
 export default function HarvestSessionModal({ open, onClose }) {
   const {
@@ -170,6 +170,7 @@ export default function HarvestSessionModal({ open, onClose }) {
     && String(movement.productId) === String(productId)
     && Number(movement.quantity || 0) < 0
     && String(movement.referenceId || '').endsWith('|PENDING-TRACEABILITY')
+    && !HARVEST_CATCH_UP_EXCLUDED_ORDER_IDS.has(String(movement.referenceId || '').split('|')[0])
   );
   const activeLines = lines.filter(line => line.productId && lineUnits(line) > 0);
   const usedVarietyIds = new Set(activeLines.flatMap(line => recipeIds(products?.find(product => product.id === line.productId))));
@@ -196,8 +197,7 @@ export default function HarvestSessionModal({ open, onClose }) {
   const totalUnits = activeLines.reduce((sum, line) => sum + lineUnits(line), 0);
 
   const isPastWeek = harvestWeek.end <= new Date();
-  const appliesCatchUpCutoff = HARVEST_CATCH_UP_CUTOFF >= harvestWeek.start && HARVEST_CATCH_UP_CUTOFF < harvestWeek.end;
-  const harvestPeriodStart = appliesCatchUpCutoff ? HARVEST_CATCH_UP_CUTOFF : harvestWeek.start;
+  const harvestPeriodStart = harvestWeek.start;
   const harvestWeekStartKey = localDateKey(harvestPeriodStart);
   const harvestWeekEnd = new Date(harvestWeek.end);
   harvestWeekEnd.setDate(harvestWeekEnd.getDate() - 1);
@@ -214,6 +214,7 @@ export default function HarvestSessionModal({ open, onClose }) {
   const weekDemand = useMemo(() => (products || []).map(product => {
     const weekOrders = (orders || []).filter(order => {
       if (!isInHarvestWeek(order.date || order.deliveryDate || order.createdAt)) return false;
+      if (HARVEST_CATCH_UP_EXCLUDED_ORDER_IDS.has(String(order.id))) return false;
       if (String(order.status).toUpperCase() === 'CANCELLED') return false;
       return !isPastWeek || String(order.status).toUpperCase() === 'DELIVERED';
     });
@@ -241,6 +242,7 @@ export default function HarvestSessionModal({ open, onClose }) {
       && String(movement.productId) === String(product.id)
       && Number(movement.quantity || 0) < 0
       && String(movement.referenceId || '').endsWith('|PENDING-TRACEABILITY')
+      && !HARVEST_CATCH_UP_EXCLUDED_ORDER_IDS.has(String(movement.referenceId || '').split('|')[0])
     ).filter(movement => {
       const date = new Date(movement.createdAt);
       return date >= harvestPeriodStart && date < harvestWeek.end;
@@ -461,7 +463,7 @@ export default function HarvestSessionModal({ open, onClose }) {
 
         {step === 3 && <section className="harvest-demand">
           <header>
-            <div><span>{isPastWeek ? 'PERIODO PASADO' : 'PERIODO ACTUAL'}</span><h3>{harvestPeriodStart.toLocaleDateString('es-ES', { day: '2-digit', month: 'short' })} — {new Date(harvestWeek.end.getTime() - 86400000).toLocaleDateString('es-ES', { day: '2-digit', month: 'short' })}</h3><p>{isPastWeek ? 'Cantidades realmente vendidas en el periodo de cosecha.' : 'Pedidos del periodo actual; los días ya incluidos en la cosecha anterior quedan fuera.'}</p></div>
+            <div><span>{isPastWeek ? 'SEMANA PASADA' : 'SEMANA ACTUAL'}</span><h3>{harvestPeriodStart.toLocaleDateString('es-ES', { day: '2-digit', month: 'short' })} — {new Date(harvestWeek.end.getTime() - 86400000).toLocaleDateString('es-ES', { day: '2-digit', month: 'short' })}</h3><p>{isPastWeek ? 'Cantidades realmente vendidas durante la semana.' : 'Pedidos de toda la semana; se descuenta únicamente el pedido de La Plaza ya cosechado.'}</p></div>
             <div className="harvest-demand__totals"><span><small>{isPastWeek ? 'VENDIDO' : 'PEDIDO ESTA SEMANA'}</small><b>{weekRequestedUnits}</b></span><span><small>YA COSECHADO</small><b>{weekHarvestedUnits}</b></span><span className={weekPendingHarvestUnits > 0 ? 'has-missing' : ''}><small>QUEDA POR COSECHAR</small><b>{weekPendingHarvestUnits}</b></span></div>
           </header>
           {demandPlanRows.length > 0 && <button type="button" className="harvest-demand__prepare" onClick={() => openDemandPlan()}><span>⚡ Preparar cosecha según pedidos de la semana</span><strong>{demandPlanRows.length} productos compatibles · {compatibleDemandUnits} uds.</strong></button>}
