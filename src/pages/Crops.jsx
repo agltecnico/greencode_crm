@@ -1435,6 +1435,16 @@ export default function Crops() {
     );
   };
 
+  const readyCropGroups = [...(crops || []).filter(crop => crop.status === 'READY' && (crop.traysCount > 0 || crop.trays > 0)).reduce((map, crop) => {
+    const type = cropTypes?.find(item => item.id === crop.seedId || item.id === crop.cropTypeId);
+    const key = String(type?.id || crop.cropTypeId || crop.seedId || 'unknown');
+    const current = map.get(key) || { id: key, type, name: type?.name || 'Cultivo sin nombre', crops: [], trays: 0 };
+    current.crops.push(crop);
+    current.trays += Number(crop.traysCount || crop.trays || 0);
+    map.set(key, current);
+    return map;
+  }, new Map()).values()].sort((a, b) => a.name.localeCompare(b.name, 'es'));
+
   const renderCosechas = () => (
     <div style={{ animation: 'fadeIn 0.3s ease' }}>
       <div className="flex justify-between items-center mb-6">
@@ -1633,45 +1643,18 @@ export default function Crops() {
           <span style={{ fontSize: '1.5rem' }}>🌱</span> Cultivos Listos para Cosechar
         </h3>
         <div style={{ padding: '1.5rem' }}>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: '1.5rem' }}>
-            {(crops?.filter(c => c.status === 'READY' && (c.traysCount > 0 || c.trays > 0)) || []).map(crop => {
-              const cType = cropTypes?.find(c => c.id === crop.seedId || c.id === crop.cropTypeId);
-              const daysAlive = cropCycleDay(crop.datePlanted || crop.plantedAt, crop.cycleDayAdjustment);
-              
+          <div className="harvest-ready-groups">
+            {readyCropGroups.map(group => {
               return (
-                <div key={crop.id} style={{ padding: '1.25rem', borderRadius: '12px', border: '1px solid #bbf7d0', backgroundColor: '#f0fdf4', position: 'relative', display: 'flex', flexDirection: 'column', gap: '1rem', transition: 'transform 0.2s, box-shadow 0.2s' }} onMouseEnter={e => { e.currentTarget.style.transform = 'translateY(-2px)'; e.currentTarget.style.boxShadow = '0 10px 15px -3px rgba(34, 197, 94, 0.2)'; }} onMouseLeave={e => { e.currentTarget.style.transform = 'none'; e.currentTarget.style.boxShadow = 'none'; }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                    <h4 style={{ margin: 0, fontWeight: '800', color: '#166534', fontSize: '1.1rem' }}>{cType?.name || 'Desconocido'}</h4>
-                    <span style={{ backgroundColor: '#16a34a', color: 'white', fontSize: '0.75rem', padding: '0.25rem 0.5rem', borderRadius: '6px', fontFamily: 'monospace', fontWeight: 'bold', letterSpacing: '0.05em' }}>{crop.batchNumber || 'N/A'}</span>
-                  </div>
-                  
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', fontSize: '0.9rem', color: '#15803d' }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '1px dashed #bbf7d0', paddingBottom: '0.25rem' }}>
-                      <strong>Bandejas cultivadas:</strong> <span>{crop.traysCount} unds</span>
-                    </div>
-                    <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                      <strong>Días de crecimiento:</strong> <span>{daysAlive} días</span>
-                    </div>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', borderTop: '1px dashed #bbf7d0', paddingTop: '0.25rem' }}>
-                      <strong>Inicio:</strong> <span>{formatSowingDateTime(crop.datePlanted || crop.plantedAt)}</span>
-                    </div>
-                  </div>
-                  
-                  <button 
-                    onClick={() => openHarvestModalForCrop(crop)}
-                    style={{ marginTop: 'auto', width: '100%', backgroundColor: '#16a34a', color: 'white', fontWeight: 'bold', padding: '0.75rem', borderRadius: '8px', border: 'none', cursor: 'pointer', transition: 'background-color 0.2s, transform 0.1s', display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '0.5rem' }}
-                    onMouseOver={e => e.currentTarget.style.backgroundColor = '#15803d'}
-                    onMouseOut={e => e.currentTarget.style.backgroundColor = '#16a34a'}
-                    onMouseDown={e => e.currentTarget.style.transform = 'scale(0.98)'}
-                    onMouseUp={e => e.currentTarget.style.transform = 'none'}
-                  >
-                    <span>✂️</span> Cortar y Envasar
-                  </button>
-                </div>
+                <article key={group.id} className="harvest-ready-group">
+                  <header><span>{group.name.charAt(0).toUpperCase()}</span><div><h4>{group.name}</h4><small>{group.crops.length} lote{group.crops.length === 1 ? '' : 's'} listo{group.crops.length === 1 ? '' : 's'}</small></div><b>{group.trays}<small> bandejas</small></b></header>
+                  <div className="harvest-ready-group__lots">{group.crops.map(crop => <span key={crop.id}><b>{Number(crop.traysCount || crop.trays || 0)} bdj.</b><small>{crop.batchNumber || 'Sin lote'} · desde {new Date(crop.datePlanted || crop.plantedAt).toLocaleDateString('es-ES', { day: '2-digit', month: '2-digit' })}</small></span>)}</div>
+                  <button type="button" onClick={() => setIsHarvestModalOpen(true)}><span>✂️</span> Preparar cosecha</button>
+                </article>
               );
             })}
           </div>
-          {(crops?.filter(c => c.status === 'READY' && (c.traysCount > 0 || c.trays > 0)) || []).length === 0 && (
+          {readyCropGroups.length === 0 && (
             <div style={{ textAlign: 'center', padding: '3rem', backgroundColor: '#f8fafc', borderRadius: '12px', border: '2px dashed #cbd5e1' }}>
               <div style={{ fontSize: '2.5rem', marginBottom: '1rem', opacity: 0.5 }}>🌱</div>
               <p style={{ color: '#64748b', fontSize: '1.1rem', margin: 0, fontWeight: '500' }}>No hay cultivos listos para cosechar actualmente.</p>
