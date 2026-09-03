@@ -79,6 +79,9 @@ export default function HarvestSessionModal({ open, onClose }) {
   const [editingLineId, setEditingLineId] = useState(null);
   const [pickerProductId, setPickerProductId] = useState('');
   const [pickerQuantities, setPickerQuantities] = useState({});
+  const [demandPlanOpen, setDemandPlanOpen] = useState(false);
+  const [demandPlanFocusId, setDemandPlanFocusId] = useState(null);
+  const [demandPlanDraft, setDemandPlanDraft] = useState({});
 
   const harvestWeek = useMemo(() => {
     const selected = new Date(harvestDate);
@@ -130,6 +133,9 @@ export default function HarvestSessionModal({ open, onClose }) {
     setEditingLineId(null);
     setPickerProductId('');
     setPickerQuantities({});
+    setDemandPlanOpen(false);
+    setDemandPlanFocusId(null);
+    setDemandPlanDraft({});
   }, [open]);
 
   useEffect(() => {
@@ -253,6 +259,10 @@ export default function HarvestSessionModal({ open, onClose }) {
       .reduce((units, movement) => units + Math.abs(Number(movement.quantity || 0)), 0);
     return sum + Math.min(lineUnits(line), pendingThisWeek);
   }, 0);
+  const totalCoveredOrderUnits = activeLines.reduce((sum, line) => {
+    const demand = weekDemand.find(row => String(row.product.id) === String(line.productId));
+    return sum + Math.min(lineUnits(line), Number(demand?.missing || 0));
+  }, 0);
 
   if (!open) return null;
 
@@ -268,9 +278,11 @@ export default function HarvestSessionModal({ open, onClose }) {
   };
   const prepareDemandProduct = row => {
     const existing = lines.find(line => String(line.productId) === String(row.product.id));
-    const target = existing || lines.find(line => !line.productId) || makeLine();
-    if (!lines.some(line => line.id === target.id)) setLines(current => [...current, target]);
-    selectProductForLine(target.id, row.product.id, row.missing);
+    const formats = packagingFor(row.product);
+    setEditingLineId(existing?.id || null);
+    setPickerProductId(row.product.id);
+    setPickerQuantities(existing?.packagingQuantities || (formats[0] ? { [formats[0].id]: row.missing } : {}));
+    setPickerOpen(true);
   };
   const openProductPicker = line => {
     setEditingLineId(line?.id || null);
@@ -299,6 +311,40 @@ export default function HarvestSessionModal({ open, onClose }) {
       else setLines(current => [...current, { ...makeLine(), productId: pickerProductId, packagingQuantities: pickerQuantities }]);
     }
     setPickerOpen(false);
+  };
+  const demandPlanRows = weekDemand.filter(row => row.missing > 0
+    && selectableProducts.some(product => String(product.id) === String(row.product.id)));
+  const openDemandPlan = focusId => {
+    const draft = {};
+    demandPlanRows.forEach(row => {
+      const existing = lines.find(line => String(line.productId) === String(row.product.id));
+      const formats = packagingFor(row.product);
+      const existingFormatId = Object.entries(existing?.packagingQuantities || {}).find(([, quantity]) => Number(quantity) > 0)?.[0];
+      draft[row.product.id] = {
+        units: existing ? lineUnits(existing) : row.missing,
+        formatId: existingFormatId || formats[0]?.id || ''
+      };
+    });
+    setDemandPlanDraft(draft);
+    setDemandPlanFocusId(focusId || null);
+    setDemandPlanOpen(true);
+  };
+  const applyDemandPlan = () => {
+    const demandIds = new Set(demandPlanRows.map(row => String(row.product.id)));
+    const manualLines = activeLines.filter(line => !demandIds.has(String(line.productId)));
+    const plannedLines = demandPlanRows.flatMap(row => {
+      const draft = demandPlanDraft[row.product.id];
+      const units = Number(draft?.units || 0);
+      if (units <= 0 || !draft?.formatId) return [];
+      const existing = lines.find(line => String(line.productId) === String(row.product.id));
+      return [{
+        id: existing?.id || crypto.randomUUID(),
+        productId: row.product.id,
+        packagingQuantities: { [draft.formatId]: units }
+      }];
+    });
+    setLines([...manualLines, ...plannedLines].length ? [...manualLines, ...plannedLines] : [makeLine()]);
+    setDemandPlanOpen(false);
   };
   const nextStep = () => {
     if (step === 2 && selectedReadyCrops.length === 0) {
@@ -414,6 +460,7 @@ export default function HarvestSessionModal({ open, onClose }) {
             <div><span>{isPastWeek ? 'SEMANA PASADA' : 'SEMANA ACTUAL'}</span><h3>{harvestWeek.start.toLocaleDateString('es-ES', { day: '2-digit', month: 'short' })} — {new Date(harvestWeek.end.getTime() - 86400000).toLocaleDateString('es-ES', { day: '2-digit', month: 'short' })}</h3><p>{isPastWeek ? 'Cantidades realmente vendidas en pedidos entregados.' : 'Necesidades calculadas con todos los pedidos registrados de la semana.'}</p></div>
             <div className="harvest-demand__totals"><span><small>{isPastWeek ? 'VENDIDO' : 'PEDIDO'}</small><b>{weekRequestedUnits}</b></span><span><small>YA COSECHADO</small><b>{weekHarvestedUnits}</b></span><span className={weekPendingRegistrationUnits > 0 ? 'has-missing' : ''}><small>POR REGISTRAR</small><b>{weekPendingRegistrationUnits}</b></span><span className={weekPendingProductionUnits > 0 ? 'has-missing' : ''}><small>POR PRODUCIR</small><b>{weekPendingProductionUnits}</b></span></div>
           </header>
+          {demandPlanRows.length > 0 && <button type="button" className="harvest-demand__prepare" onClick={() => openDemandPlan()}><span>⚡ Preparar todas desde pedidos</span><strong>{demandPlanRows.length} productos · {demandPlanRows.reduce((sum, row) => sum + row.missing, 0)} uds.</strong></button>}
           <div className="harvest-demand__products">
             {weekDemand.filter(row => selectableProducts.some(product => String(product.id) === String(row.product.id))).map(row => <button type="button" key={row.product.id} className={row.missing > 0 ? 'needs-harvest' : 'is-complete'} onClick={() => prepareDemandProduct(row)}>
               <span><b>{row.product.name}</b><small>{row.orderCount} pedido{row.orderCount === 1 ? '' : 's'} · {row.harvested} ya cosechados</small></span>
@@ -421,7 +468,7 @@ export default function HarvestSessionModal({ open, onClose }) {
             </button>)}
             {!weekDemand.some(row => selectableProducts.some(product => String(product.id) === String(row.product.id))) && <p className="harvest-demand__empty">No hay pedidos compatibles con los cultivos seleccionados. Puedes elegir igualmente una variedad o mix debajo.</p>}
           </div>
-          <small className="harvest-demand__hint">Pulsa un producto para preparar su cosecha y completar automáticamente la cantidad cuando solo tenga un formato de envase.</small>
+          <small className="harvest-demand__hint">Pulsa un producto para editarlo por separado o prepara todos los compatibles con los cultivos seleccionados.</small>
         </section>}
 
         <div className={`harvest-session__columns is-step-${step}`}>
@@ -479,7 +526,8 @@ export default function HarvestSessionModal({ open, onClose }) {
                   .reduce((sum, movement) => sum + Math.abs(Number(movement.quantity || 0)), 0);
                 const olderPendingUnits = Math.max(0, pendingUnits - weekPendingUnits);
                 const linkedUnits = Math.min(producedUnits, weekPendingUnits);
-                const surplusUnits = Math.max(0, producedUnits - weekPendingUnits);
+                const reservedUnits = Math.min(Math.max(0, producedUnits - linkedUnits), Number(demand?.pendingProduction || 0));
+                const surplusUnits = Math.max(0, producedUnits - linkedUnits - reservedUnits);
                 return <article className="harvest-line" key={line.id}>
                   <div className="harvest-line__top"><b>Cosecha {lineIndex + 1}</b><button type="button" onClick={() => removeLine(line.id)}>Eliminar</button></div>
                   <select value={line.productId} onChange={event => {
@@ -505,8 +553,9 @@ export default function HarvestSessionModal({ open, onClose }) {
                       })}
                     </div>
                     <div className="harvest-line__allocation">
-                      <div className="is-linked"><span>SE ASIGNAN A PEDIDOS ENTREGADOS</span><strong>{linkedUnits} uds.</strong><small>de {weekPendingUnits} pendientes esta semana</small></div>
-                      <div className="is-surplus"><span>QUEDAN DISPONIBLES</span><strong>{surplusUnits} uds.</strong><small>en stock</small></div>
+                      <div className="is-linked"><span>SE VINCULAN AHORA</span><strong>{linkedUnits} uds.</strong><small>pedidos ya entregados</small></div>
+                      <div className="is-reserved"><span>RESERVADAS PARA PEDIDOS</span><strong>{reservedUnits} uds.</strong><small>pedidos abiertos de la semana</small></div>
+                      <div className="is-surplus"><span>STOCK LIBRE</span><strong>{surplusUnits} uds.</strong><small>sin reservar</small></div>
                     </div>
                     {deliveryGroups.length > 0 ? (
                       <details className="harvest-line__deliveries">
@@ -533,7 +582,7 @@ export default function HarvestSessionModal({ open, onClose }) {
 
         {step === 4 && <section className="harvest-review">
           <header><span>✓</span><div><h3>Revisa la cosecha</h3><p>Comprueba cultivos, productos y vinculación antes de guardar.</p></div></header>
-          <div className="harvest-review__totals"><article><small>CULTIVOS</small><strong>{selectedReadyCrops.length}</strong><span>{totalSelectedTrays} bandejas</span></article><article><small>PRODUCCIÓN</small><strong>{totalUnits}</strong><span>táperes en {activeLines.length} producto{activeLines.length === 1 ? '' : 's'}</span></article><article><small>TRAZABILIDAD</small><strong>{totalLinkableUnits}</strong><span>se vincularán</span></article></div>
+          <div className="harvest-review__totals"><article><small>CULTIVOS</small><strong>{selectedReadyCrops.length}</strong><span>{totalSelectedTrays} bandejas</span></article><article><small>PRODUCCIÓN</small><strong>{totalUnits}</strong><span>táperes en {activeLines.length} producto{activeLines.length === 1 ? '' : 's'}</span></article><article><small>PEDIDOS CUBIERTOS</small><strong>{totalCoveredOrderUnits}</strong><span>{totalLinkableUnits} se vinculan ahora</span></article></div>
           <div className="harvest-review__content">
             <div><h4>Cultivos utilizados <button type="button" onClick={() => setStep(2)}>Modificar</button></h4>{selectedReadyCrops.map(crop => <p key={crop.id}><b>{varietyName(crop)}</b><span>{selectedCropTrays[crop.id]} bandejas · {crop.batchNumber || 'sin lote'}</span></p>)}</div>
             <div><h4>Productos obtenidos <button type="button" onClick={() => setStep(3)}>Modificar</button></h4>{activeLines.map(line => { const product = products.find(item => item.id === line.productId); return <p key={line.id}><b>{harvestProductName(product?.name)}</b><span>{Object.entries(line.packagingQuantities).filter(([, quantity]) => Number(quantity) > 0).map(([articleId, quantity]) => `${quantity} × ${articles.find(article => article.id === articleId)?.name || 'envase'}`).join(' · ')}</span></p>; })}</div>
@@ -555,15 +604,37 @@ export default function HarvestSessionModal({ open, onClose }) {
           </section>
         </div>}
 
+        {demandPlanOpen && <div className="harvest-demand-plan-overlay">
+          <section className="harvest-demand-plan">
+            <header><div><span>COSECHA DESDE PEDIDOS</span><h3>Todas las cosechas a registrar</h3><p>Las cantidades pedidas están rellenadas como mínimo recomendado. Puedes aumentar o reducir cualquier fila.</p></div><button type="button" onClick={() => setDemandPlanOpen(false)}>×</button></header>
+            <div className="harvest-demand-plan__grid">
+              {demandPlanRows.map(row => {
+                const draft = demandPlanDraft[row.product.id] || {};
+                const formats = packagingFor(row.product);
+                const units = Number(draft.units || 0);
+                const covered = Math.min(units, row.missing);
+                const free = Math.max(0, units - row.missing);
+                return <article key={row.product.id} className={String(demandPlanFocusId) === String(row.product.id) ? 'is-focused' : ''}>
+                  <div className="harvest-demand-plan__product"><div><b>{harvestProductName(row.product.name)}</b><small>{row.orderCount} pedido{row.orderCount === 1 ? '' : 's'} · {row.harvested} ya cosechados</small></div><strong>{row.missing} solicitados</strong></div>
+                  <label><span>Cantidad a cosechar</span><input type="number" min="0" step="1" value={draft.units ?? ''} onChange={event => setDemandPlanDraft(current => ({ ...current, [row.product.id]: { ...current[row.product.id], units: Math.max(0, Number(event.target.value || 0)) } }))} /></label>
+                  <label><span>Formato de envase</span><select value={draft.formatId || ''} onChange={event => setDemandPlanDraft(current => ({ ...current, [row.product.id]: { ...current[row.product.id], formatId: event.target.value } }))}>{formats.map(format => <option key={format.id} value={format.id}>{format.name}</option>)}</select></label>
+                  <div className="harvest-demand-plan__allocation"><span><b>{covered}</b> para pedidos</span><span><b>{free}</b> stock libre</span></div>
+                </article>;
+              })}
+            </div>
+            <footer><div><b>{demandPlanRows.length} productos</b><span>{Object.values(demandPlanDraft).reduce((sum, draft) => sum + Number(draft.units || 0), 0)} unidades preparadas</span></div><button type="button" onClick={() => setDemandPlanOpen(false)}>Cancelar</button><button type="button" className="is-primary" onClick={applyDemandPlan}>Pasar al registro de cosechas</button></footer>
+          </section>
+        </div>}
+
         <footer className="harvest-session__footer">
-          <div><strong>{activeLines.length} productos · {totalUnits} táperes</strong><span>{totalSelectedTrays} bandejas · {totalUnits > 0 ? `${totalLinkableUnits} uds. se vincularán` : `${remainingTrays} bandejas quedarán pendientes`}</span></div>
+          <div><strong>{activeLines.length} productos · {totalUnits} táperes</strong><span>{totalSelectedTrays} bandejas · {totalUnits > 0 ? `${totalCoveredOrderUnits} uds. cubren pedidos · ${Math.max(0, totalUnits - totalCoveredOrderUnits)} libres` : `${remainingTrays} bandejas quedarán pendientes`}</span></div>
           <button type="button" onClick={step === 1 ? onClose : () => setStep(current => current - 1)}>{step === 1 ? 'Cancelar' : '← Volver'}</button>
           {step < 4 ? <button type="button" className="harvest-session__next" onClick={nextStep}>Continuar →</button> : <button type="button" className="harvest-session__submit" onClick={submitHarvest} disabled={saving || !readyCrops.length}>
             {saving
               ? 'Registrando todo…'
               : isPastWeek
-                ? `Registrar cosecha pasada · vincular ${totalLinkableUnits} uds.`
-                : `Registrar cosecha · vincular ${totalLinkableUnits} uds.`}
+                ? `Registrar cosecha pasada · cubrir ${totalCoveredOrderUnits} uds.`
+                : `Registrar cosecha · cubrir ${totalCoveredOrderUnits} uds.`}
           </button>}
         </footer>
       </form>
