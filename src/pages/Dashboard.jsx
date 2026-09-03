@@ -196,6 +196,8 @@ export default function Dashboard() {
       return { id: crop.id, name: cropType.name || 'Cultivo', trays, seedCost, substrateCost, trayCost, total: seedCost + substrateCost + trayCost, harvestDate: planted };
     }).filter(Boolean);
     const activeHarvestCostInPeriod = activeProductionRows.reduce((sum, crop) => sum + crop.total, 0);
+    const cultivationExpenses = seedExpenses + substrateExpenses + activeHarvestCostInPeriod;
+    const packingExpenses = packagingExpenses + labelExpenses;
 
     const boundsStart = new Date(`${selectedBounds.start}T12:00:00`);
     const boundsEnd = new Date(`${selectedBounds.end}T12:00:00`);
@@ -396,6 +398,8 @@ export default function Dashboard() {
       pendingExpenses,
       expenseCount: periodExpenses.length,
       productionExpenses,
+      cultivationExpenses,
+      packingExpenses,
       seedExpenses,
       substrateExpenses,
       packagingExpenses,
