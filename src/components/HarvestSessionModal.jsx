@@ -231,8 +231,7 @@ export default function HarvestSessionModal({ open, onClose }) {
   }).filter(row => row.requested > 0 || row.harvested > 0).sort((a, b) => b.missing - a.missing || b.requested - a.requested), [harvests, isInHarvestWeek, isPastWeek, orders, products]);
   const weekRequestedUnits = weekDemand.reduce((sum, row) => sum + row.requested, 0);
   const weekHarvestedUnits = weekDemand.reduce((sum, row) => sum + row.harvested, 0);
-  const weekPendingRegistrationUnits = weekDemand.reduce((sum, row) => sum + row.pendingRegistration, 0);
-  const weekPendingProductionUnits = weekDemand.reduce((sum, row) => sum + row.pendingProduction, 0);
+  const weekPendingHarvestUnits = weekDemand.reduce((sum, row) => sum + row.missing, 0);
   const retroactivePending = useMemo(() => (products || []).map(product => {
     const movements = (productMovements || []).filter(movement =>
       movement.type === 'ORDER'
@@ -314,6 +313,8 @@ export default function HarvestSessionModal({ open, onClose }) {
   };
   const demandPlanRows = weekDemand.filter(row => row.missing > 0
     && selectableProducts.some(product => String(product.id) === String(row.product.id)));
+  const compatibleDemandUnits = demandPlanRows.reduce((sum, row) => sum + row.missing, 0);
+  const unavailableDemandUnits = Math.max(0, weekPendingHarvestUnits - compatibleDemandUnits);
   const openDemandPlan = focusId => {
     const draft = {};
     demandPlanRows.forEach(row => {
@@ -458,15 +459,19 @@ export default function HarvestSessionModal({ open, onClose }) {
         {step === 3 && <section className="harvest-demand">
           <header>
             <div><span>{isPastWeek ? 'SEMANA PASADA' : 'SEMANA ACTUAL'}</span><h3>{harvestWeek.start.toLocaleDateString('es-ES', { day: '2-digit', month: 'short' })} — {new Date(harvestWeek.end.getTime() - 86400000).toLocaleDateString('es-ES', { day: '2-digit', month: 'short' })}</h3><p>{isPastWeek ? 'Cantidades realmente vendidas en pedidos entregados.' : 'Necesidades calculadas con todos los pedidos registrados de la semana.'}</p></div>
-            <div className="harvest-demand__totals"><span><small>{isPastWeek ? 'VENDIDO' : 'PEDIDO'}</small><b>{weekRequestedUnits}</b></span><span><small>YA COSECHADO</small><b>{weekHarvestedUnits}</b></span><span className={weekPendingRegistrationUnits > 0 ? 'has-missing' : ''}><small>POR REGISTRAR</small><b>{weekPendingRegistrationUnits}</b></span><span className={weekPendingProductionUnits > 0 ? 'has-missing' : ''}><small>POR PRODUCIR</small><b>{weekPendingProductionUnits}</b></span></div>
+            <div className="harvest-demand__totals"><span><small>{isPastWeek ? 'VENDIDO' : 'PEDIDO ESTA SEMANA'}</small><b>{weekRequestedUnits}</b></span><span><small>YA COSECHADO</small><b>{weekHarvestedUnits}</b></span><span className={weekPendingHarvestUnits > 0 ? 'has-missing' : ''}><small>QUEDA POR COSECHAR</small><b>{weekPendingHarvestUnits}</b></span></div>
           </header>
-          {demandPlanRows.length > 0 && <button type="button" className="harvest-demand__prepare" onClick={() => openDemandPlan()}><span>⚡ Preparar todas desde pedidos</span><strong>{demandPlanRows.length} productos · {demandPlanRows.reduce((sum, row) => sum + row.missing, 0)} uds.</strong></button>}
+          {demandPlanRows.length > 0 && <button type="button" className="harvest-demand__prepare" onClick={() => openDemandPlan()}><span>⚡ Preparar cosecha según pedidos de la semana</span><strong>{demandPlanRows.length} productos compatibles · {compatibleDemandUnits} uds.</strong></button>}
+          {unavailableDemandUnits > 0 && <p className="harvest-demand__warning">⚠ Hay {unavailableDemandUnits} unidades pedidas que no se pueden preparar con los cultivos seleccionados. Se muestran debajo para que puedas identificarlas.</p>}
           <div className="harvest-demand__products">
-            {weekDemand.filter(row => selectableProducts.some(product => String(product.id) === String(row.product.id))).map(row => <button type="button" key={row.product.id} className={row.missing > 0 ? 'needs-harvest' : 'is-complete'} onClick={() => prepareDemandProduct(row)}>
-              <span><b>{row.product.name}</b><small>{row.orderCount} pedido{row.orderCount === 1 ? '' : 's'} · {row.harvested} ya cosechados</small></span>
-              <strong>{row.pendingRegistration > 0 ? `${row.pendingRegistration} por registrar` : row.pendingProduction > 0 ? `${row.pendingProduction} por producir` : '✓ Completo'}</strong>
-            </button>)}
-            {!weekDemand.some(row => selectableProducts.some(product => String(product.id) === String(row.product.id))) && <p className="harvest-demand__empty">No hay pedidos compatibles con los cultivos seleccionados. Puedes elegir igualmente una variedad o mix debajo.</p>}
+            {weekDemand.map(row => {
+              const compatible = selectableProducts.some(product => String(product.id) === String(row.product.id));
+              return <button type="button" key={row.product.id} disabled={!compatible} className={`${row.missing > 0 ? 'needs-harvest' : 'is-complete'} ${compatible ? '' : 'is-unavailable'}`} onClick={() => compatible && prepareDemandProduct(row)}>
+                <span><b>{row.product.name}</b><small>{row.requested} uds. pedidas esta semana · {row.harvested} ya cosechadas</small></span>
+                <strong>{row.missing > 0 ? `${row.missing} por cosechar` : '✓ Completo'}</strong>
+              </button>;
+            })}
+            {!weekDemand.length && <p className="harvest-demand__empty">No hay pedidos registrados para esta semana. Puedes introducir la cosecha manualmente debajo.</p>}
           </div>
           <small className="harvest-demand__hint">Pulsa un producto para editarlo por separado o prepara todos los compatibles con los cultivos seleccionados.</small>
         </section>}
@@ -544,7 +549,7 @@ export default function HarvestSessionModal({ open, onClose }) {
                     <div className={`harvest-line__need ${demand?.missing > 0 ? 'has-missing' : 'is-covered'}`}>
                       <div><span>{isPastWeek ? 'VENDIDOS ESTA SEMANA' : 'PEDIDOS ESTA SEMANA'}</span><strong>{demand?.requested || 0}</strong></div>
                       <div><span>YA COSECHADOS</span><strong>{demand?.harvested || 0}</strong></div>
-                      <div><span>RECOMENDACIÓN</span><strong>{demand?.pendingRegistration > 0 ? `${demand.pendingRegistration} táperes` : demand?.pendingProduction > 0 ? `${demand.pendingProduction} táperes` : 'Completo'}</strong><small>{demand?.pendingRegistration > 0 ? 'entregados pendientes de registrar o vincular' : demand?.pendingProduction > 0 ? 'pedidos abiertos pendientes de producir' : 'no hace falta producir ni registrar más'}</small></div>
+                      <div><span>QUEDA POR COSECHAR</span><strong>{demand?.missing > 0 ? `${demand.missing} táperes` : 'Completo'}</strong><small>{demand?.missing > 0 ? 'según todos los pedidos de la semana' : 'los pedidos de la semana ya están cubiertos'}</small></div>
                     </div>
                     <div className="harvest-line__formats">
                       {packagingFor(product).map(format => {

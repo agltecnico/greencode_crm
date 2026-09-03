@@ -50,7 +50,8 @@
 .harvest-session__footer .harvest-session__submit{border-color:#059669;background:linear-gradient(135deg,#10b981,#059669);color:#fff}
 body>.swal2-container{z-index:3000!important}
 
-.harvest-demand__totals{grid-template-columns:repeat(4,82px)}
+.harvest-demand__totals{grid-template-columns:repeat(3,110px)}
+.harvest-demand__warning{padding:.45rem .55rem;border:1px solid #fcd34d;border-radius:8px;background:#fffbeb;color:#92400e!important;font-weight:750}.harvest-demand__products button:disabled{cursor:not-allowed}.harvest-demand__products button.is-unavailable{opacity:.65;border-style:dashed;background:#f8fafc}.harvest-demand__products button.is-unavailable>strong{color:#64748b}
 .harvest-demand__prepare{display:flex;justify-content:space-between;align-items:center;gap:1rem;width:100%;padding:.65rem .8rem;border:1px solid #059669;border-radius:10px;background:linear-gradient(135deg,#10b981,#059669);color:#fff;font-weight:900;cursor:pointer}.harvest-demand__prepare strong{font-size:.65rem;white-space:nowrap}
 .harvest-line__allocation{grid-template-columns:repeat(3,minmax(0,1fr))}.harvest-line__allocation .is-reserved{background:#fffbeb;border-color:#fcd34d}.harvest-line__allocation .is-reserved span,.harvest-line__allocation .is-reserved strong{color:#a16207}
 .harvest-demand-plan-overlay{position:fixed;inset:0;z-index:1950;display:grid;place-items:center;padding:1rem;background:rgba(15,23,42,.72);backdrop-filter:blur(5px)}
