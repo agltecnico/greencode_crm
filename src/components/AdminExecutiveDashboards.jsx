@@ -94,6 +94,23 @@ export default function AdminExecutiveDashboards({ data, view, onViewChange, ope
         <article className="executive-chart chart-purple"><header><div><h3>Producción por cultivo</h3><p>Bandejas y coste previsto de cada cultivo</p></div></header><div>{productionVarieties.length ? <ResponsiveContainer><BarChart data={productionVarieties} layout="vertical"><XAxis type="number" hide/><YAxis type="category" dataKey="shortName" width={105}/><Tooltip formatter={(value, name) => name === 'Bandejas' ? [`${value} bandejas`, name] : [money(value), name]}/><Legend iconType="circle" iconSize={8}/><Bar dataKey="cost" name="Coste" radius={[0,7,7,0]}>{productionVarieties.map((row,index)=><Cell key={row.name} fill={colors[index%colors.length]}/>)}</Bar><Bar dataKey="trays" name="Bandejas" fill="#0ea5e9" radius={[0,7,7,0]}/></BarChart></ResponsiveContainer> : <Empty>No hay cosechas previstas en el periodo.</Empty>}</div></article>
         <article className="executive-chart chart-green"><header><div><h3>Cosecha por producto</h3><p>Unidades obtenidas y coste real registrado</p></div></header><div>{harvestedProducts.length ? <ResponsiveContainer><BarChart data={harvestedProducts} layout="vertical"><XAxis type="number" hide/><YAxis type="category" dataKey="shortName" width={105}/><Tooltip formatter={(value, name) => name === 'Unidades' ? [`${value} uds.`, name] : [money(value), name]}/><Legend iconType="circle" iconSize={8}/><Bar dataKey="cost" name="Coste" radius={[0,7,7,0]}>{harvestedProducts.map((row,index)=><Cell key={row.name} fill={colors[(index+1)%colors.length]}/>)}</Bar><Bar dataKey="units" name="Unidades" fill="#10b981" radius={[0,7,7,0]}/></BarChart></ResponsiveContainer> : <Empty>Sin cosechas terminadas en el periodo.</Empty>}</div></article>
       </div>
+      <article className="executive-variety-forecast">
+        <header><div><h3>Rendimiento y rentabilidad de cada cosecha</h3><p>Coste real de las bandejas utilizadas frente a los táperes obtenidos y su precio medio de venta.</p></div><strong>{data.harvestYieldEconomics.length} cosechas</strong></header>
+        <div className="table-container">
+          <table>
+            <thead><tr><th>Producto / lote</th><th>Bandejas</th><th>Coste/bandeja</th><th>Táperes</th><th>Coste/táper</th><th>Venta estimada</th><th>Beneficio</th><th>Margen</th></tr></thead>
+            <tbody>
+              {data.harvestYieldEconomics.map(row => <tr key={row.id}>
+                <td><strong>{row.productName}</strong><small className="profit-cell-note">{row.batchNumber} · {row.date}</small></td>
+                <td>{row.trays.toFixed(2)}</td><td>{money(row.costPerTray)}</td><td>{row.units}</td><td><strong>{money(row.costPerUnit)}</strong></td>
+                <td>{money(row.revenue)}<small className="profit-cell-note">{money(row.averageSalePrice)}/ud.</small></td>
+                <td><strong>{money(row.profit)}</strong></td><td>{row.marginPercent.toFixed(1)} %</td>
+              </tr>)}
+              {!data.harvestYieldEconomics.length && <tr><td colSpan="8" className="executive-variety-empty">No hay cosechas registradas en este periodo.</td></tr>}
+            </tbody>
+          </table>
+        </div>
+      </article>
     </section>}
 
     {view === 'profitability' && <section className="executive-dashboard-view">

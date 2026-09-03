@@ -413,6 +413,31 @@ export default function Dashboard() {
     };
     const productSales = [...productTotals.values()].map(finishEconomicRow).sort((a, b) => b.total - a.total);
     const allClients = [...clientTotals.values()].map(finishEconomicRow).sort((a, b) => b.total - a.total);
+    const harvestYieldEconomics = periodHarvests.map(harvest => {
+      const product = (products || []).find(item => String(item.id) === String(harvest.productId));
+      const sold = productSales.find(item => String(item.id) === String(harvest.productId));
+      const units = Number(harvest.tuppersCount || 0);
+      const trays = Object.values(harvest.selectedCropUsages || {}).reduce((sum, value) => sum + Number(value || 0), 0);
+      const cost = Number(harvest.totalCost ?? (Number(harvest.seedCost || 0) + Number(harvest.substrateCost || 0) + Number(harvest.packagingCost || 0) + Number(harvest.labelCost || 0)));
+      const averageSalePrice = sold?.units > 0 ? sold.total / sold.units : Number(product?.price || 0);
+      const revenue = units * averageSalePrice;
+      const profit = revenue - cost;
+      return {
+        id: harvest.id,
+        date: String(harvest.harvestDate || harvest.recordedAt || '').slice(0, 10),
+        batchNumber: harvest.batchNumber || 'Sin lote',
+        productName: product?.name || 'Producto histórico',
+        trays,
+        units,
+        cost,
+        costPerTray: trays > 0 ? cost / trays : 0,
+        costPerUnit: units > 0 ? cost / units : 0,
+        averageSalePrice,
+        revenue,
+        profit,
+        marginPercent: revenue > 0 ? profit / revenue * 100 : 0
+      };
+    }).sort((a, b) => b.date.localeCompare(a.date) || b.profit - a.profit);
     const bestSaleOrder = periodOrders.reduce((best, order) => Number(order.total || 0) > Number(best?.total || 0) ? order : best, null);
     const bestSaleNote = bestSaleOrder ? noteByOrder.get(bestSaleOrder.id) : null;
     const bestSaleClient = bestSaleOrder
@@ -476,6 +501,7 @@ export default function Dashboard() {
       estimatedCostUnits,
       mostProfitable,
       bestSale,
+      harvestYieldEconomics,
       orderCount: periodOrders.length,
       requestedOrderCount: requestedOrders.length,
       requestedOrderValue,
