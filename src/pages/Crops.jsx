@@ -443,7 +443,8 @@ export default function Crops() {
 
   useEffect(() => {
     const cropsReadyByDate = (crops || []).filter(crop => {
-      if (String(crop.status || '').toUpperCase() !== 'LIGHT' || readinessSyncRef.current.has(crop.id)) return false;
+      const status = String(crop.status || '').toUpperCase();
+      if (['READY', 'HARVESTED', 'DISCARDED'].includes(status) || readinessSyncRef.current.has(crop.id)) return false;
       const cropType = cropTypes?.find(type => type.id === crop.cropTypeId || type.id === crop.seedId);
       if (!cropType) return false;
       return cropCycleDay(crop.datePlanted || crop.plantedAt, crop.cycleDayAdjustment) >= getCropCycleOffsets(cropType).harvest;

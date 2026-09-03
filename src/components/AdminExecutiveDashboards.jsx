@@ -60,17 +60,16 @@ export default function AdminExecutiveDashboards({ data, view, onViewChange, ope
         <article className="executive-chart chart-purple"><header><div><h3>Clientes principales</h3><p>Importe y túperes por cliente</p></div></header><div>{topClients.length ? <ResponsiveContainer><BarChart data={topClients} layout="vertical"><XAxis xAxisId="sales" type="number" hide/><XAxis xAxisId="units" type="number" hide/><YAxis type="category" dataKey="shortName" width={98}/><Tooltip formatter={(value, name) => name === 'Túperes' ? [`${value} túperes`, name] : [money(value), name]}/><Legend iconType="circle" iconSize={8}/><Bar xAxisId="sales" dataKey="total" name="Facturación" fill="#8b5cf6" radius={[0,6,6,0]}/><Bar xAxisId="units" dataKey="units" name="Túperes" fill="#0ea5e9" radius={[0,6,6,0]}/></BarChart></ResponsiveContainer> : <Empty>Sin clientes con ventas.</Empty>}</div></article>
       </div>
       <article className="executive-variety-forecast">
-        <header><div><h3>Necesidad por variedad</h3><p>Unidades de producto entregadas y pendientes dentro del periodo seleccionado.</p></div><strong>{data.requestedUnits} uds. previstas</strong></header>
+        <header><div><h3>Pedidos por producto</h3><p>Cantidad de cada producto entregada y pendiente dentro del periodo seleccionado.</p></div><strong>{data.requestedUnits} uds. previstas</strong></header>
         <div className="table-container">
           <table>
-            <thead><tr><th>Variedad</th><th>Entregado</th><th>Pendiente</th><th>Total previsto</th></tr></thead>
+            <thead><tr><th>Producto</th><th>Entregado</th><th>Pendiente</th><th>Total previsto</th></tr></thead>
             <tbody>
-              {data.varietyDemand.map(row => <tr key={row.id}><td><strong>{row.name}</strong></td><td>{row.deliveredUnits} uds.</td><td>{row.pendingUnits} uds.</td><td><strong>{row.totalUnits} uds.</strong></td></tr>)}
-              {!data.varietyDemand.length && <tr><td colSpan="4" className="executive-variety-empty">No hay pedidos en este periodo.</td></tr>}
+              {data.productDemand.map(row => <tr key={row.id}><td><strong>{row.name}</strong></td><td>{row.deliveredUnits} uds.</td><td>{row.pendingUnits} uds.</td><td><strong>{row.totalUnits} uds.</strong></td></tr>)}
+              {!data.productDemand.length && <tr><td colSpan="4" className="executive-variety-empty">No hay pedidos en este periodo.</td></tr>}
             </tbody>
           </table>
         </div>
-        <small>En productos mix, una unidad aparece como necesidad en cada variedad incluida en su receta. No representa gramos ni porcentajes de mezcla.</small>
       </article>
     </section>}
 

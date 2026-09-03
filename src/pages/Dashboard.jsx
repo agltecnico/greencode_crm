@@ -57,7 +57,7 @@ const Metric = ({ icon, label, value, detail, tone, onClick }) => (
 export default function Dashboard() {
   const {
     companyProfile, updateCompanyProfile, clients, orders, deliveryNotes, invoices, expenses,
-    products, seedVarieties, articles, stockEntries, stockLots, crops, cropTypes, harvests, productMovements
+    products, articles, stockEntries, stockLots, crops, cropTypes, harvests, productMovements
   } = useData();
   const navigate = useNavigate();
   const [today] = useState(() => new Date());
@@ -123,26 +123,22 @@ export default function Dashboard() {
     const pendingOrderUnits = pendingOrders.reduce((sum, order) => sum + (order.items || []).reduce((itemSum, item) => itemSum + Number(item.quantity || 0), 0), 0);
     const requestedDeliveredValue = requestedDeliveredOrders.reduce((sum, order) => sum + Number(order.total || 0), 0);
     const requestedDeliveredUnits = requestedDeliveredOrders.reduce((sum, order) => sum + (order.items || []).reduce((itemSum, item) => itemSum + Number(item.quantity || 0), 0), 0);
-    const varietyDemandMap = new Map();
+    const productDemandMap = new Map();
     requestedOrders.forEach(order => {
       const isDelivered = String(order.status || '').toUpperCase() === 'DELIVERED';
       (order.items || []).forEach(item => {
         const quantity = Number(item.quantity || 0);
         const product = (products || []).find(candidate => String(candidate.id) === String(item.productId));
-        const varietyIds = [...new Set((product?.recipeVarieties || []).map(recipe => recipe.varietyId).filter(Boolean))];
-        const demandKeys = varietyIds.length ? varietyIds : [`unassigned:${item.productId || item.name || 'historical'}`];
-        demandKeys.forEach(varietyId => {
-          const variety = (seedVarieties || []).find(candidate => String(candidate.id) === String(varietyId));
-          const name = variety?.name || (varietyIds.length ? 'Variedad no disponible' : `${product?.name || item.name || 'Producto histórico'} · sin variedad`);
-          const current = varietyDemandMap.get(varietyId) || { id: varietyId, name, deliveredUnits: 0, pendingUnits: 0, totalUnits: 0 };
-          current.totalUnits += quantity;
-          if (isDelivered) current.deliveredUnits += quantity;
-          else current.pendingUnits += quantity;
-          varietyDemandMap.set(varietyId, current);
-        });
+        const productKey = item.productId || item.name || 'historical';
+        const name = product?.name || item.name || 'Producto histórico';
+        const current = productDemandMap.get(productKey) || { id: productKey, name, deliveredUnits: 0, pendingUnits: 0, totalUnits: 0 };
+        current.totalUnits += quantity;
+        if (isDelivered) current.deliveredUnits += quantity;
+        else current.pendingUnits += quantity;
+        productDemandMap.set(productKey, current);
       });
     });
-    const varietyDemand = [...varietyDemandMap.values()].sort((a, b) => b.totalUnits - a.totalUnits || a.name.localeCompare(b.name, 'es'));
+    const productDemand = [...productDemandMap.values()].sort((a, b) => b.totalUnits - a.totalUnits || a.name.localeCompare(b.name, 'es'));
     const periodInvoices = (invoices || []).filter(invoice => inPeriod(invoice.date));
     const collectedInvoices = periodInvoices.filter(invoice => invoice.isPaid === true);
     const pendingInvoices = periodInvoices.filter(invoice => invoice.isPaid !== true);
@@ -380,7 +376,7 @@ export default function Dashboard() {
       requestedUnits,
       requestedDeliveredValue,
       requestedDeliveredUnits,
-      varietyDemand,
+      productDemand,
       requestedDeliveredCount: requestedDeliveredOrders.length,
       preparingOrderCount: preparingOrders.length,
       preparedOrderCount: preparedOrders.length,
@@ -421,7 +417,7 @@ export default function Dashboard() {
       productSales,
       lowStock
     };
-  }, [articles, clients, cropTypes, crops, deliveryNotes, expenses, harvests, invoices, orders, productMovements, products, seedVarieties, selectedBounds.end, selectedBounds.start, stockEntries, stockLots]);
+  }, [articles, clients, cropTypes, crops, deliveryNotes, expenses, harvests, invoices, orders, productMovements, products, selectedBounds.end, selectedBounds.start, stockEntries, stockLots]);
 
   const saveCompany = async event => {
     event.preventDefault();
