@@ -1,4 +1,4 @@
-import { BarChart3, CircleDollarSign, Clock3, PackageCheck, ShoppingBag, Sprout, TrendingUp, Truck, Users, WalletCards } from 'lucide-react';
+import { BarChart3, CircleDollarSign, Clock3, PackageCheck, ShoppingBag, Sprout, TrendingUp, Users, WalletCards } from 'lucide-react';
 import {
   Bar, BarChart, CartesianGrid, Cell, Legend, Pie, PieChart,
   ResponsiveContainer, Tooltip, XAxis, YAxis
@@ -39,14 +39,12 @@ export default function AdminExecutiveDashboards({ data, view, onViewChange, ope
     </nav>
 
     {view === 'sales' && <section className="executive-dashboard-view">
-      <header><div><span>CONTROL DE PEDIDOS</span><h2>Operativa comercial de la semana</h2><p>Qué se ha solicitado, qué se ha entregado y qué queda por preparar o repartir.</p></div><button onClick={openOrders}>Abrir pedidos</button></header>
+      <header><div><span>CONTROL DE PEDIDOS</span><h2>Ventas y previsión del periodo</h2><p>{data.periodLabel} · Entregado, pendiente y necesidad total de producto.</p></div><button onClick={openOrders}>Abrir pedidos</button></header>
       <div className="executive-order-control">
-        <OrderStat icon={<ShoppingBag />} label="Pedidos solicitados" value={data.requestedOrderCount} detail={`${data.requestedUnits} unidades · ${money(data.requestedOrderValue)}`} tone="navy" onClick={openOrders} />
-        <OrderStat icon={<PackageCheck />} label="Entregados" value={data.requestedDeliveredCount} detail={`${data.requestedOrderCount ? Math.round((data.requestedDeliveredCount / data.requestedOrderCount) * 100) : 0} % completado`} tone="green" onClick={openOrders} />
-        <OrderStat icon={<Clock3 />} label="Por preparar" value={data.preparingOrderCount} detail="Pedidos todavía pendientes" tone="amber" onClick={openOrders} />
-        <OrderStat icon={<PackageCheck />} label="Preparados" value={data.preparedOrderCount} detail="Listos para salir" tone="blue" onClick={openOrders} />
-        <OrderStat icon={<Truck />} label="En reparto" value={data.inTransitOrderCount} detail="En camino al cliente" tone="purple" onClick={openOrders} />
-        <OrderStat icon={<Clock3 />} label="Queda por entregar" value={data.pendingOrders} detail={`${data.pendingOrderUnits} unidades · ${money(data.pendingOrderValue)}`} tone="red" onClick={openOrders} />
+        <OrderStat icon={<PackageCheck />} label="Venta entregada" value={money(data.requestedDeliveredValue)} detail={`${data.requestedDeliveredCount} pedidos · ${data.requestedDeliveredUnits} unidades`} tone="green" onClick={openOrders} />
+        <OrderStat icon={<Clock3 />} label="Pendiente de entregar" value={money(data.pendingOrderValue)} detail={`${data.pendingOrders} pedidos · ${data.pendingOrderUnits} unidades`} tone="red" onClick={openOrders} />
+        <OrderStat icon={<ShoppingBag />} label="Previsión total" value={money(data.requestedOrderValue)} detail={`${data.requestedOrderCount} pedidos · ${data.requestedUnits} unidades`} tone="purple" onClick={openOrders} />
+        <OrderStat icon={<TrendingUp />} label="Periodo completado" value={`${data.requestedOrderCount ? Math.round((data.requestedDeliveredCount / data.requestedOrderCount) * 100) : 0} %`} detail="Pedidos entregados sobre el total" tone="blue" onClick={openOrders} />
       </div>
       <div className="executive-kpis">
         <Kpi icon={<CircleDollarSign />} label="Ventas entregadas" value={money(data.monthSales)} detail={`${data.orderCount} pedidos entregados en el periodo`} onClick={() => openFinancial('orders')} />
@@ -61,6 +59,19 @@ export default function AdminExecutiveDashboards({ data, view, onViewChange, ope
         <article className="executive-chart chart-blue"><header><div><h3>Variedades más vendidas</h3><p>Facturación exterior · túperes interior</p></div></header><div>{topProducts.length ? <ResponsiveContainer><PieChart><Pie data={topProducts} dataKey="total" nameKey="shortName" name="Facturación" innerRadius={57} outerRadius={84} paddingAngle={3}>{topProducts.map((row,index)=><Cell key={`sales-${row.name}`} fill={colors[index%colors.length]}/>)}</Pie><Pie data={topProducts} dataKey="units" nameKey="shortName" name="Túperes" innerRadius={34} outerRadius={50} paddingAngle={3}>{topProducts.map((row,index)=><Cell key={`units-${row.name}`} fill={colors[index%colors.length]} opacity={.65}/>)}</Pie><Tooltip formatter={(value, name, entry) => [entry?.dataKey === 'units' ? `${value} túperes` : money(value), name]}/><Legend iconType="circle" iconSize={8}/></PieChart></ResponsiveContainer> : <Empty>Sin productos vendidos.</Empty>}</div></article>
         <article className="executive-chart chart-purple"><header><div><h3>Clientes principales</h3><p>Importe y túperes por cliente</p></div></header><div>{topClients.length ? <ResponsiveContainer><BarChart data={topClients} layout="vertical"><XAxis xAxisId="sales" type="number" hide/><XAxis xAxisId="units" type="number" hide/><YAxis type="category" dataKey="shortName" width={98}/><Tooltip formatter={(value, name) => name === 'Túperes' ? [`${value} túperes`, name] : [money(value), name]}/><Legend iconType="circle" iconSize={8}/><Bar xAxisId="sales" dataKey="total" name="Facturación" fill="#8b5cf6" radius={[0,6,6,0]}/><Bar xAxisId="units" dataKey="units" name="Túperes" fill="#0ea5e9" radius={[0,6,6,0]}/></BarChart></ResponsiveContainer> : <Empty>Sin clientes con ventas.</Empty>}</div></article>
       </div>
+      <article className="executive-variety-forecast">
+        <header><div><h3>Necesidad por variedad</h3><p>Unidades de producto entregadas y pendientes dentro del periodo seleccionado.</p></div><strong>{data.requestedUnits} uds. previstas</strong></header>
+        <div className="table-container">
+          <table>
+            <thead><tr><th>Variedad</th><th>Entregado</th><th>Pendiente</th><th>Total previsto</th></tr></thead>
+            <tbody>
+              {data.varietyDemand.map(row => <tr key={row.id}><td><strong>{row.name}</strong></td><td>{row.deliveredUnits} uds.</td><td>{row.pendingUnits} uds.</td><td><strong>{row.totalUnits} uds.</strong></td></tr>)}
+              {!data.varietyDemand.length && <tr><td colSpan="4" className="executive-variety-empty">No hay pedidos en este periodo.</td></tr>}
+            </tbody>
+          </table>
+        </div>
+        <small>En productos mix, una unidad aparece como necesidad en cada variedad incluida en su receta. No representa gramos ni porcentajes de mezcla.</small>
+      </article>
     </section>}
 
     {view === 'production' && <section className="executive-dashboard-view">
