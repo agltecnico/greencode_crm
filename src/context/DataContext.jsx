@@ -623,6 +623,72 @@ export const DataProvider = ({ children, mode = 'full' }) => {
       return data || [];
     };
 
+    const createSowingTasksForDate = async plannedDate => {
+      const dateKey = String(plannedDate || '').slice(0, 10);
+      const selectedDate = new Date(`${dateKey}T12:00:00`);
+      const today = new Date();
+      today.setHours(23, 59, 59, 999);
+      if (!dateKey || Number.isNaN(selectedDate.getTime()) || selectedDate > today) {
+        throw new Error('Selecciona una fecha anterior o la fecha de hoy.');
+      }
+
+      const dayOfWeek = selectedDate.getDay();
+      const routines = (harvestTargets || []).filter(target => {
+        const cropType = cropTypes.find(type => String(type.id) === String(target.productId));
+        if (!cropType) return false;
+        const soakingDays = Number(cropType.soakingHours || 0) > 0
+          ? Math.max(1, Math.ceil(Number(cropType.soakingHours) / 24))
+          : 0;
+        const cycleDays = soakingDays + Number(cropType.germinationDays || 0)
+          + Number(cropType.darknessDays || 0) + Number(cropType.lightDays || 0);
+        return ((Number(target.targetDayOfWeek) - cycleDays) % 7 + 7) % 7 === dayOfWeek;
+      });
+
+      const existingTaskKeys = new Set((sowingTasks || [])
+        .filter(task => String(task.plannedDate).slice(0, 10) === dateKey)
+        .map(task => String(task.harvestTargetId)));
+      const existingCropTypeIds = new Set((crops || [])
+        .filter(crop => {
+          const planted = new Date(crop.datePlanted || crop.plantedAt);
+          if (Number.isNaN(planted.getTime())) return false;
+          const localKey = `${planted.getFullYear()}-${String(planted.getMonth() + 1).padStart(2, '0')}-${String(planted.getDate()).padStart(2, '0')}`;
+          return localKey === dateKey;
+        })
+        .map(crop => String(crop.cropTypeId || crop.seedId)));
+
+      const candidates = routines.flatMap(target => {
+        const cropType = cropTypes.find(type => String(type.id) === String(target.productId));
+        if (!cropType || existingTaskKeys.has(String(target.id)) || existingCropTypeIds.has(String(cropType.id))) return [];
+        const compatibleLots = (stockLots || []).filter(lot => {
+          const article = articles.find(item => String(item.id) === String(lot.articleId));
+          return article?.type === 'SEMILLA'
+            && String(article.varietyId) === String(cropType.varietyId)
+            && article.active !== false
+            && Number(lot.remainingQuantity || 0) > 0;
+        }).sort((a, b) => String(a.receivedAt || a.createdAt || '').localeCompare(String(b.receivedAt || b.createdAt || '')));
+        return [{
+          id: createId(),
+          originKey: `${target.id}:${dateKey}`,
+          harvestTargetId: target.id,
+          cropTypeId: cropType.id,
+          plannedDate: dateKey,
+          plannedTrays: Number(target.tuppersCount || 1),
+          trays: Number(target.tuppersCount || 1),
+          stockLotId: compatibleLots[0]?.id || null,
+          actualPlantedAt: new Date(`${dateKey}T09:00:00`).toISOString(),
+          status: 'PENDING'
+        }];
+      });
+
+      if (!candidates.length) return { created: 0, planned: routines.length };
+      const { data, error } = await supabase.from('sowing_tasks')
+        .upsert(candidates, { onConflict: 'originKey', ignoreDuplicates: true })
+        .select();
+      if (error) throw error;
+      setSowingTasks(previous => [...previous, ...(data || [])]);
+      return { created: data?.length || candidates.length, planned: routines.length };
+    };
+
     const updateSowingTask = async (id, fields) => {
       const payload = { ...fields, updatedAt: new Date().toISOString() };
       const { data, error } = await supabase
@@ -1664,7 +1730,7 @@ export const DataProvider = ({ children, mode = 'full' }) => {
         substrates, addSubstrate, deleteSubstrate,
         substrateInventory, addSubstrateInventory, deleteSubstrateInventory,
         crops, addCrop, sowCrop, updateCrop, increaseCropTrays, deleteCrop, advanceCropStatus, reverseCropStatus, setCropPhase, discardCrop,
-        sowingTasks, syncSowingTasks, updateSowingTask, cancelSowingTask, completeSowingTasks,
+        sowingTasks, syncSowingTasks, createSowingTasksForDate, updateSowingTask, cancelSowingTask, completeSowingTasks,
         harvestTargets, addHarvestTarget, updateHarvestTarget, deleteHarvestTarget,
       harvests, addHarvest, registerHarvest, registerHarvestSession, updateHarvest, editHarvestPackaging, deleteHarvest,
       dailyLogs, addDailyLog, updateDailyLog, deleteDailyLog,

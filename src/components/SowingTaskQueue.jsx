@@ -20,7 +20,7 @@ const localDateKey = () => {
 
 export default function SowingTaskQueue({ summaryOnly = false, onOpen }) {
   const {
-    sowingTasks, syncSowingTasks, updateSowingTask, cancelSowingTask, completeSowingTasks,
+    sowingTasks, syncSowingTasks, createSowingTasksForDate, updateSowingTask, cancelSowingTask, completeSowingTasks,
     cropTypes, seedVarieties, articles, stockLots
   } = useData();
   const syncStarted = useRef(false);
@@ -29,6 +29,8 @@ export default function SowingTaskQueue({ summaryOnly = false, onOpen }) {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [loadError, setLoadError] = useState('');
+  const [recoveryDate, setRecoveryDate] = useState('');
+  const [recovering, setRecovering] = useState(false);
 
   useEffect(() => {
     if (syncStarted.current) return;
@@ -106,6 +108,29 @@ export default function SowingTaskQueue({ summaryOnly = false, onOpen }) {
     }
   };
 
+  const recoverPastTasks = async () => {
+    if (!recoveryDate) {
+      await Swal.fire('Falta la fecha', 'Selecciona el día real en que se hicieron las siembras.', 'warning');
+      return;
+    }
+    setRecovering(true);
+    try {
+      const result = await createSowingTasksForDate(recoveryDate);
+      if (!result.created) {
+        await Swal.fire('Nada que recuperar', result.planned
+          ? 'Las siembras de ese día ya están registradas o ya existen como tareas.'
+          : 'El planificador no contiene siembras recurrentes para ese día de la semana.', 'info');
+        return;
+      }
+      await Swal.fire('Tareas recuperadas', `Se han preparado ${result.created} siembras. Revisa bandejas, fecha real y lotes antes de confirmarlas.`, 'success');
+      setRecoveryDate('');
+    } catch (error) {
+      await Swal.fire('No se pudieron recuperar', error.message || 'Revisa la fecha e inténtalo de nuevo.', 'error');
+    } finally {
+      setRecovering(false);
+    }
+  };
+
   const executeSelected = async (scope = pendingTasks) => {
     const selected = scope.filter(task => !deselectedIds.has(task.id));
     if (!selected.length) return;
@@ -151,11 +176,6 @@ export default function SowingTaskQueue({ summaryOnly = false, onOpen }) {
 
   if (loading) return <div style={{ padding: '1rem', marginBottom: '1rem', borderRadius: '14px', background: '#f0fdf4', color: '#166534' }}>⏳ Preparando siembras pendientes…</div>;
   if (loadError) return <div style={{ padding: '1rem', marginBottom: '1rem', borderRadius: '14px', background: '#fef2f2', color: '#991b1b' }}>⚠️ {loadError}</div>;
-  if (!pendingTasks.length) {
-    if (summaryOnly) return null;
-    return <div style={{ padding: '2.5rem 1rem', textAlign: 'center', border: '1px solid #d1fae5', borderRadius: '14px', background: '#f0fdf4', color: '#166534' }}><strong>✓ No hay siembras pendientes de validar</strong><p style={{ margin: '0.4rem 0 0', color: '#64748b' }}>Las nuevas propuestas aparecerán aquí según el planificador.</p></div>;
-  }
-
   const todayKey = localDateKey();
   const overdueCount = pendingTasks.filter(task => task.plannedDate < todayKey).length;
   const selectedCount = pendingTasks.filter(task => !deselectedIds.has(task.id)).length;
@@ -176,6 +196,20 @@ export default function SowingTaskQueue({ summaryOnly = false, onOpen }) {
     );
   }
 
+  const recoveryControls = (
+    <div style={{ display: 'flex', alignItems: 'flex-end', gap: '0.55rem', flexWrap: 'wrap' }}>
+      <label style={{ display: 'grid', gap: '0.2rem', color: '#64748b', fontSize: '0.68rem', fontWeight: 800 }}>
+        RECUPERAR SIEMBRAS DE OTRO DÍA
+        <input type="date" value={recoveryDate} max={todayKey} onChange={event => setRecoveryDate(event.target.value)} style={{ padding: '0.5rem 0.6rem', border: '1px solid #cbd5e1', borderRadius: '7px', background: 'white' }} />
+      </label>
+      <button type="button" className="btn btn-secondary" disabled={!recoveryDate || recovering} onClick={recoverPastTasks}>{recovering ? 'Recuperando…' : 'Cargar desde el planificador'}</button>
+    </div>
+  );
+
+  if (!pendingTasks.length) {
+    return <div style={{ padding: '1.5rem', display: 'grid', justifyItems: 'center', gap: '1rem', textAlign: 'center', border: '1px solid #d1fae5', borderRadius: '14px', background: '#f0fdf4', color: '#166534' }}><div><strong>✓ No hay siembras pendientes de validar</strong><p style={{ margin: '0.4rem 0 0', color: '#64748b' }}>Puedes recuperar una fecha pasada si olvidaste registrar sus siembras.</p></div>{recoveryControls}</div>;
+  }
+
   return (
     <section style={{ marginBottom: '1.5rem', border: '1px solid #dbe4df', borderRadius: '14px', background: 'white', overflow: 'hidden', boxShadow: '0 4px 14px rgba(15, 23, 42, 0.05)' }}>
       <header style={{ padding: '0.9rem 1rem', display: 'flex', justifyContent: 'space-between', gap: '1rem', alignItems: 'center', flexWrap: 'wrap', background: '#f8faf9', borderBottom: '1px solid #e2e8f0' }}>
@@ -183,9 +217,7 @@ export default function SowingTaskQueue({ summaryOnly = false, onOpen }) {
           <h3 style={{ margin: 0, color: '#14532d', fontSize: '1.05rem' }}>🌱 Siembras pendientes de validar</h3>
           <p style={{ margin: '0.2rem 0 0', color: '#64748b', fontSize: '0.85rem' }}>{pendingTasks.length} siembras{overdueCount ? ` · ${overdueCount} atrasadas` : ''}. Desmarca una variedad para dejarla pendiente.</p>
         </div>
-        <button type="button" className="btn btn-success" disabled={!selectedCount || saving} onClick={() => executeSelected()}>
-          {saving ? 'Realizando…' : `Realizar siembras seleccionadas (${selectedCount})`}
-        </button>
+        <div style={{ display: 'flex', alignItems: 'flex-end', gap: '0.75rem', flexWrap: 'wrap' }}>{recoveryControls}<button type="button" className="btn btn-success" disabled={!selectedCount || saving} onClick={() => executeSelected()}>{saving ? 'Realizando…' : `Realizar siembras seleccionadas (${selectedCount})`}</button></div>
       </header>
       <div style={{ overflowX: 'auto' }}>
         <table style={{ width: '100%', minWidth: '920px', borderCollapse: 'collapse', textAlign: 'left' }}>
