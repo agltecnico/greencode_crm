@@ -74,7 +74,7 @@ export default function AdminExecutiveDashboards({ data, view, onViewChange, ope
     {view === 'production' && <section className="executive-dashboard-view">
       <header><div><span>PRODUCCIÓN</span><h2>Coste y rendimiento de los cultivos</h2><p>Inversión en marcha, cosechas terminadas y materiales consumidos.</p></div><button onClick={() => openFinancial('harvests')}>Abrir control de producción</button></header>
       <div className="executive-kpis">
-        <Kpi icon={<Sprout />} label="Coste productivo total" value={money(productionTotal)} detail="En marcha + cosechado y envasado" tone="amber" onClick={() => openFinancial('harvests')} />
+        <Kpi icon={<Sprout />} label="Coste de producción del periodo" value={money(productionTotal)} detail={`Cosechado y envasado ${money(data.productionExpenses)} · en marcha ${money(data.activeHarvestCostInPeriod)}`} tone="amber" onClick={() => openFinancial('harvests')} />
         <Kpi icon={<Sprout />} label="Cultivos en marcha" value={money(data.activeHarvestCostInPeriod)} detail={`${data.activeHarvestCountInPeriod} cultivos con cosecha en el periodo`} tone="purple" onClick={() => openFinancial('cultivations')} />
         <Kpi icon={<PackageCheck />} label="Producción terminada" value={money(data.productionExpenses)} detail={`${data.seedExpenses + data.substrateExpenses > 0 ? 'Cultivo trazado' : 'Sin cosechas registradas'}`} tone="blue" onClick={() => openFinancial('harvests')} />
         <Kpi icon={<PackageCheck />} label="Envasado" value={money(data.packagingExpenses + data.labelExpenses)} detail={`Táperes ${money(data.packagingExpenses)} · etiquetas ${money(data.labelExpenses)}`} onClick={() => openFinancial('harvests')} />
