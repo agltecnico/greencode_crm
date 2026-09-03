@@ -59,7 +59,7 @@ export default function ActiveCropsBoard({
           return (
             <button type="button" className="active-crop-group" key={group.id} style={{ '--phase-color': mainPhase.color, '--phase-soft': mainPhase.soft }} onClick={() => setSelectedGroupId(group.id)} title="Abrir lotes y acciones">
               <header><span>{group.name.charAt(0).toUpperCase()}</span><div><strong>{group.name}</strong><small>{group.crops.length} lote{group.crops.length === 1 ? '' : 's'} activo{group.crops.length === 1 ? '' : 's'}</small></div><b>{group.trays}<small> bandejas</small></b></header>
-              <div className="active-crop-group__phases">{activePhases.map(phase => <span key={phase.id} style={{ '--item-color': phase.color, '--item-soft': phase.soft }}><i>{phase.icon}</i><b>{group.phases[phase.id]}</b><small>{phase.label}</small></span>)}</div>
+              <div className="active-crop-group__phases">{activePhases.map(phase => <span key={phase.id} data-phase={phase.id} style={{ '--item-color': phase.color, '--item-soft': phase.soft }}><i>{phase.icon}</i><b>{group.phases[phase.id]}</b><small>{phase.label}</small></span>)}</div>
               <footer>Ver lotes, fechas y acciones <b>→</b></footer>
             </button>
           );
