@@ -90,16 +90,26 @@ export default function Dashboard() {
       return value && value >= selectedBounds.start && value <= selectedBounds.end;
     };
     const noteByOrder = new Map((deliveryNotes || []).map(note => [note.orderId, note]));
-    const harvestByBatch = new Map((harvests || []).map(harvest => [String(harvest.batchNumber), harvest]));
+    const harvestCostByBatch = new Map();
+    (harvests || []).forEach(harvest => {
+      const batch = String(harvest.batchNumber || '');
+      if (!batch) return;
+      const units = Number(harvest.tuppersCount || 0);
+      const totalCost = Number(harvest.totalCost ?? (Number(harvest.seedCost || 0) + Number(harvest.substrateCost || 0) + Number(harvest.packagingCost || 0) + Number(harvest.labelCost || 0)));
+      const current = harvestCostByBatch.get(batch) || { units: 0, cost: 0 };
+      current.units += units;
+      current.cost += totalCost;
+      harvestCostByBatch.set(batch, current);
+    });
     const movementCostByOrderProduct = new Map();
     (productMovements || [])
       .filter(movement => movement.type === 'ORDER' && movement.referenceId?.includes('|'))
       .forEach(movement => {
         const [orderId, batch] = movement.referenceId.split('|');
-        const harvest = harvestByBatch.get(String(batch));
+        const harvestBatch = harvestCostByBatch.get(String(batch));
         const key = `${orderId}::${movement.productId}`;
         const quantity = Math.abs(Number(movement.quantity || 0));
-        const unitCost = Number(harvest?.costPerTupper || 0);
+        const unitCost = Number(harvestBatch?.units || 0) > 0 ? Number(harvestBatch.cost || 0) / Number(harvestBatch.units) : 0;
         const current = movementCostByOrderProduct.get(key) || { cost: 0, costedUnits: 0 };
         current.cost += quantity * unitCost;
         if (unitCost > 0) current.costedUnits += quantity;
@@ -107,7 +117,7 @@ export default function Dashboard() {
       });
     const periodOrders = (orders || []).filter(order => {
       if (order.status !== 'DELIVERED') return false;
-      return inPeriod(noteByOrder.get(order.id)?.date || order.date);
+      return inPeriod(order.date || order.createdAt);
     });
     const monthSales = periodOrders.reduce((sum, order) => sum + Number(order.total || 0), 0);
     const requestedOrders = (orders || []).filter(order => inPeriod(order.date || order.createdAt));
@@ -166,6 +176,47 @@ export default function Dashboard() {
     const packagingExpenses = periodHarvests.reduce((sum, harvest) => sum + Number(harvest.packagingCost || 0), 0);
     const labelExpenses = periodHarvests.reduce((sum, harvest) => sum + Number(harvest.labelCost || 0), 0);
     const productionExpenses = seedExpenses + substrateExpenses + packagingExpenses + labelExpenses;
+    const harvestUnitCost = harvest => {
+      const units = Number(harvest.tuppersCount || 0);
+      if (Number(harvest.costPerTupper || 0) > 0) return Number(harvest.costPerTupper);
+      return units > 0 ? Number(harvest.totalCost || 0) / units : 0;
+    };
+    const estimatedUnitCostForProduct = productId => {
+      const samePeriod = periodHarvests.filter(harvest => String(harvest.productId) === String(productId) && harvestUnitCost(harvest) > 0);
+      if (samePeriod.length) {
+        const units = samePeriod.reduce((sum, harvest) => sum + Number(harvest.tuppersCount || 0), 0);
+        const cost = samePeriod.reduce((sum, harvest) => sum + harvestUnitCost(harvest) * Number(harvest.tuppersCount || 0), 0);
+        return units > 0 ? cost / units : 0;
+      }
+      const latestKnown = (harvests || [])
+        .filter(harvest => String(harvest.productId) === String(productId)
+          && String(harvest.harvestDate || harvest.recordedAt || '').slice(0, 10) <= selectedBounds.end
+          && harvestUnitCost(harvest) > 0)
+        .sort((a, b) => String(b.harvestDate || b.recordedAt || '').localeCompare(String(a.harvestDate || a.recordedAt || '')))[0];
+      if (latestKnown) return harvestUnitCost(latestKnown);
+
+      const product = (products || []).find(item => String(item.id) === String(productId));
+      const recipe = new Set((product?.recipeVarieties || []).map(item => String(item.varietyId)).filter(Boolean));
+      const comparable = (products || []).map(candidate => {
+        const candidateRecipe = new Set((candidate.recipeVarieties || []).map(item => String(item.varietyId)).filter(Boolean));
+        if (!recipe.size || !candidateRecipe.size) return null;
+        const intersection = [...recipe].filter(id => candidateRecipe.has(id)).length;
+        const union = new Set([...recipe, ...candidateRecipe]).size;
+        return { id: candidate.id, similarity: union ? intersection / union : 0 };
+      }).filter(candidate => candidate?.similarity > 0).sort((a, b) => b.similarity - a.similarity);
+      for (const candidate of comparable) {
+        const candidateHarvests = (harvests || []).filter(harvest => String(harvest.productId) === String(candidate.id) && harvestUnitCost(harvest) > 0);
+        if (!candidateHarvests.length) continue;
+        const units = candidateHarvests.reduce((sum, harvest) => sum + Number(harvest.tuppersCount || 0), 0);
+        const cost = candidateHarvests.reduce((sum, harvest) => sum + harvestUnitCost(harvest) * Number(harvest.tuppersCount || 0), 0);
+        if (units > 0) return cost / units;
+      }
+
+      const knownHarvests = (harvests || []).filter(harvest => harvestUnitCost(harvest) > 0);
+      const knownUnits = knownHarvests.reduce((sum, harvest) => sum + Number(harvest.tuppersCount || 0), 0);
+      const knownCost = knownHarvests.reduce((sum, harvest) => sum + harvestUnitCost(harvest) * Number(harvest.tuppersCount || 0), 0);
+      return knownUnits > 0 ? knownCost / knownUnits : 0;
+    };
 
     const productionPeriodStart = new Date(`${selectedBounds.start}T00:00:00`);
     const productionPeriodEnd = new Date(`${selectedBounds.end}T23:59:59`);
@@ -240,7 +291,7 @@ export default function Dashboard() {
     }
     const chartMap = new Map(chart.map(item => [periodDays <= 62 ? item.key : item.key, item]));
     periodOrders.forEach(order => {
-      const orderDate = noteByOrder.get(order.id)?.date || order.date;
+      const orderDate = order.date || order.createdAt;
       const key = periodDays <= 62 ? String(orderDate || '').slice(0, 10) : monthKey(orderDate);
       const item = chartMap.get(key);
       if (item) {
@@ -249,7 +300,11 @@ export default function Dashboard() {
         item['Coste vendido'] += (order.items || []).reduce((sum, orderItem) => {
           if (costedProducts.has(orderItem.productId)) return sum;
           costedProducts.add(orderItem.productId);
-          return sum + Number(movementCostByOrderProduct.get(`${order.id}::${orderItem.productId}`)?.cost || 0);
+          const quantity = Number(orderItem.quantity || 0);
+          const movementCost = movementCostByOrderProduct.get(`${order.id}::${orderItem.productId}`) || { cost: 0, costedUnits: 0 };
+          const exactUnits = Math.min(quantity, Number(movementCost.costedUnits || 0));
+          const estimatedUnits = Math.max(quantity - exactUnits, 0);
+          return sum + Number(movementCost.cost || 0) + estimatedUnits * estimatedUnitCostForProduct(orderItem.productId);
         }, 0);
       }
     });
@@ -287,7 +342,7 @@ export default function Dashboard() {
         || order.clientCommercialName || order.clientName || 'Cliente sin identificar';
       const clientKey = clientId || clientName.trim().toLocaleLowerCase('es');
       const clientCurrent = clientTotals.get(clientKey)
-        || { name: clientName, total: 0, cost: 0, units: 0, costedUnits: 0 };
+        || { name: clientName, total: 0, cost: 0, units: 0, costedUnits: 0, exactCostedUnits: 0, estimatedUnits: 0 };
       const costAppliedProducts = new Set();
       (order.items || []).forEach(item => {
         const name = products.find(product => product.id === item.productId)?.name
@@ -299,17 +354,25 @@ export default function Dashboard() {
           ? { cost: 0, costedUnits: 0 }
           : (movementCostByOrderProduct.get(`${order.id}::${item.productId}`) || { cost: 0, costedUnits: 0 });
         costAppliedProducts.add(item.productId);
+        const exactUnits = Math.min(quantity, Number(movementCost.costedUnits || 0));
+        const estimatedUnitCost = estimatedUnitCostForProduct(item.productId);
+        const estimatedUnits = estimatedUnitCost > 0 ? Math.max(quantity - exactUnits, 0) : 0;
+        const appliedCost = Number(movementCost.cost || 0) + estimatedUnits * estimatedUnitCost;
         const current = productTotals.get(item.productId || name)
-          || { id: item.productId || name, name, units: 0, total: 0, cost: 0, costedUnits: 0 };
+          || { id: item.productId || name, name, units: 0, total: 0, cost: 0, costedUnits: 0, exactCostedUnits: 0, estimatedUnits: 0 };
         current.units += quantity;
         current.total += revenue;
-        current.cost += movementCost.cost;
-        current.costedUnits += Math.min(quantity, movementCost.costedUnits);
+        current.cost += appliedCost;
+        current.exactCostedUnits += exactUnits;
+        current.estimatedUnits += estimatedUnits;
+        current.costedUnits += exactUnits + estimatedUnits;
         productTotals.set(item.productId || name, current);
         clientCurrent.total += revenue;
-        clientCurrent.cost += movementCost.cost;
+        clientCurrent.cost += appliedCost;
         clientCurrent.units += quantity;
-        clientCurrent.costedUnits += Math.min(quantity, movementCost.costedUnits);
+        clientCurrent.exactCostedUnits += exactUnits;
+        clientCurrent.estimatedUnits += estimatedUnits;
+        clientCurrent.costedUnits += exactUnits + estimatedUnits;
       });
       clientTotals.set(clientKey, clientCurrent);
     });
@@ -342,6 +405,8 @@ export default function Dashboard() {
     const mostProfitable = tracedProducts.slice().sort((a, b) => b.margin - a.margin)[0] || null;
     const totalCost = productSales.reduce((sum, item) => sum + item.cost, 0);
     const costedUnits = productSales.reduce((sum, item) => sum + item.costedUnits, 0);
+    const exactCostedUnits = productSales.reduce((sum, item) => sum + item.exactCostedUnits, 0);
+    const estimatedCostUnits = productSales.reduce((sum, item) => sum + item.estimatedUnits, 0);
     const tracedRevenue = productSales.reduce((sum, item) => sum + item.tracedRevenue, 0);
     const grossMargin = tracedRevenue - totalCost;
     const generalExpensesTotal = paidExpenses + pendingExpenses;
@@ -383,6 +448,8 @@ export default function Dashboard() {
       generalExpensesTotal,
       operatingResult,
       costedUnits,
+      exactCostedUnits,
+      estimatedCostUnits,
       mostProfitable,
       bestSale,
       orderCount: periodOrders.length,
