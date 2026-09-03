@@ -47,8 +47,6 @@ export default function AdminExecutiveDashboards({ data, view, onViewChange, ope
         <OrderStat icon={<TrendingUp />} label="Periodo completado" value={`${data.requestedOrderCount ? Math.round((data.requestedDeliveredCount / data.requestedOrderCount) * 100) : 0} %`} detail="Pedidos entregados sobre el total" tone="blue" onClick={openOrders} />
       </div>
       <div className="executive-kpis">
-        <Kpi icon={<CircleDollarSign />} label="Ventas entregadas" value={money(data.monthSales)} detail={`${data.orderCount} pedidos entregados en el periodo`} onClick={() => openFinancial('orders')} />
-        <Kpi icon={<ShoppingBag />} label="Venta solicitada" value={money(data.requestedOrderValue)} detail={`${data.requestedOrderCount} pedidos · ${data.requestedUnits} unidades`} tone="purple" onClick={openOrders} />
         <Kpi icon={<Sprout />} label="Coste de cultivo" value={money(data.cultivationExpenses)} detail={`Semillas ${money(data.seedExpenses)} · sustrato ${money(data.substrateExpenses)} · cultivos en marcha ${money(data.activeHarvestCostInPeriod)}`} tone="amber" onClick={() => openFinancial('cultivations')} />
         <Kpi icon={<PackageCheck />} label="Coste de envasado" value={money(data.packingExpenses)} detail={`Táperes ${money(data.packagingExpenses)} · etiquetas ${money(data.labelExpenses)}`} tone="blue" onClick={() => openFinancial('packaging')} />
         <Kpi icon={<TrendingUp />} label="Margen bruto" value={money(data.margin)} detail={`${data.marginPercent.toFixed(1)} % sobre venta trazada`} onClick={() => openFinancial('profit-products')} />
