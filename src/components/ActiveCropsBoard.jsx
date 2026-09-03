@@ -15,25 +15,32 @@ export default function ActiveCropsBoard({
   crops, cropTypes, statusFilter, onFilterChange, onAddTrays, onAdjust, onDelete,
   cycleDay, expectedHarvest, formatSowingDate
 }) {
-  const [selectedCropId, setSelectedCropId] = useState(null);
+  const [selectedGroupId, setSelectedGroupId] = useState(null);
   const counts = Object.fromEntries(PHASES.map(phase => [phase.id,
     phase.id === 'ALL' ? crops.length : crops.filter(crop => cropStatus(crop) === phase.id).length
   ]));
   const visible = crops
     .filter(crop => statusFilter === 'ALL' || cropStatus(crop) === statusFilter)
     .sort((a, b) => new Date(a.datePlanted || a.plantedAt) - new Date(b.datePlanted || b.plantedAt));
-  const selectedCrop = crops.find(crop => String(crop.id) === String(selectedCropId));
-  const selectedType = selectedCrop && cropTypes?.find(item => item.id === selectedCrop.seedId || item.id === selectedCrop.cropTypeId);
-  const selectedPhase = selectedCrop ? (PHASES.find(item => item.id === cropStatus(selectedCrop)) || PHASES[0]) : null;
-  const selectedDays = selectedCrop ? cycleDay(selectedCrop.datePlanted || selectedCrop.plantedAt, selectedCrop.cycleDayAdjustment) : 0;
-  const selectedExpectedDays = selectedType ? (Number(selectedType.germinationDays || 0) + Number(selectedType.darknessDays || 0) + Number(selectedType.lightDays || 0) || 14) : 14;
-  const selectedHarvestDate = selectedCrop ? expectedHarvest(selectedType, selectedCrop.datePlanted || selectedCrop.plantedAt, selectedCrop.cycleDayAdjustment) : null;
+  const grouped = [...visible.reduce((map, crop) => {
+    const type = cropTypes?.find(item => item.id === crop.seedId || item.id === crop.cropTypeId);
+    const key = String(type?.id || crop.cropTypeId || crop.seedId || 'unknown');
+    const current = map.get(key) || { id: key, type, name: type?.name || 'Cultivo sin nombre', crops: [], trays: 0, phases: {} };
+    const phaseId = cropStatus(crop);
+    const trays = Number(crop.traysCount || crop.trays || 0);
+    current.crops.push(crop);
+    current.trays += trays;
+    current.phases[phaseId] = (current.phases[phaseId] || 0) + trays;
+    map.set(key, current);
+    return map;
+  }, new Map()).values()].sort((a, b) => a.name.localeCompare(b.name, 'es'));
+  const selectedGroup = grouped.find(group => group.id === selectedGroupId);
 
   return (
     <section className="active-crops-board">
       <header className="active-crops-board__header">
         <div><h3>Cultivos activos</h3><p>Selecciona una fase para centrarte solo en ese trabajo.</p></div>
-        <strong>{visible.length} lotes · {visible.reduce((sum, crop) => sum + Number(crop.traysCount || crop.trays || 0), 0)} bandejas</strong>
+        <strong>{grouped.length} tipos · {visible.length} lotes · {visible.reduce((sum, crop) => sum + Number(crop.traysCount || crop.trays || 0), 0)} bandejas</strong>
       </header>
 
       <nav className="active-crops-phases" aria-label="Filtrar cultivos por fase">
@@ -46,31 +53,30 @@ export default function ActiveCropsBoard({
       </nav>
 
       <div className="active-crops-grid">
-        {visible.map(crop => {
-          const type = cropTypes?.find(item => item.id === crop.seedId || item.id === crop.cropTypeId);
-          const phase = PHASES.find(item => item.id === cropStatus(crop)) || PHASES[0];
-          const harvestDate = expectedHarvest(type, crop.datePlanted || crop.plantedAt, crop.cycleDayAdjustment);
+        {grouped.map(group => {
+          const activePhases = PHASES.filter(phase => phase.id !== 'ALL' && group.phases[phase.id] > 0);
+          const mainPhase = activePhases[activePhases.length - 1] || PHASES[0];
           return (
-            <button type="button" className="active-crop-tag" key={crop.id} style={{ '--phase-color': phase.color, '--phase-soft': phase.soft }} onClick={() => setSelectedCropId(crop.id)} title={`${phase.label} · abrir detalle`}>
-              <span><i /> <strong>{type?.name || 'Cultivo sin nombre'}</strong><b>{Number(crop.traysCount || crop.trays || 0)} bdj.</b></span>
-              <small>Siembra {new Date(crop.datePlanted || crop.plantedAt).toLocaleDateString('es-ES', { day: '2-digit', month: '2-digit' })} · Cosecha {harvestDate ? harvestDate.toLocaleDateString('es-ES', { day: '2-digit', month: '2-digit' }) : '—'}</small>
+            <button type="button" className="active-crop-group" key={group.id} style={{ '--phase-color': mainPhase.color, '--phase-soft': mainPhase.soft }} onClick={() => setSelectedGroupId(group.id)} title="Abrir lotes y acciones">
+              <header><span>{group.name.charAt(0).toUpperCase()}</span><div><strong>{group.name}</strong><small>{group.crops.length} lote{group.crops.length === 1 ? '' : 's'} activo{group.crops.length === 1 ? '' : 's'}</small></div><b>{group.trays}<small> bandejas</small></b></header>
+              <div className="active-crop-group__phases">{activePhases.map(phase => <span key={phase.id} style={{ '--item-color': phase.color, '--item-soft': phase.soft }}><i>{phase.icon}</i><b>{group.phases[phase.id]}</b><small>{phase.label}</small></span>)}</div>
+              <footer>Ver lotes, fechas y acciones <b>→</b></footer>
             </button>
           );
         })}
         {!visible.length && <div className="active-crops-board__empty"><span>🌱</span><b>No hay cultivos en esta fase</b><small>Selecciona otra etiqueta o registra una nueva siembra.</small></div>}
       </div>
-      {selectedCrop && (
-        <div className="active-crop-detail-overlay" onMouseDown={event => { if (event.target === event.currentTarget) setSelectedCropId(null); }}>
-          <article className="active-crop-detail" style={{ '--phase-color': selectedPhase.color, '--phase-soft': selectedPhase.soft }}>
-            <header><div><span>{selectedPhase.icon} {selectedPhase.label}</span><h3>{selectedType?.name || 'Cultivo sin nombre'}</h3><small>{selectedCrop.batchNumber || 'Sin lote'}</small></div><button type="button" onClick={() => setSelectedCropId(null)}>×</button></header>
-            <div className="active-crop-row__facts">
-              <span><small>Bandejas activas</small>{Number(selectedCrop.traysCount || selectedCrop.trays || 0)}</span>
-              <span><small>Fecha de siembra</small>{formatSowingDate(selectedCrop.datePlanted || selectedCrop.plantedAt)}</span>
-              <span><small>Cosecha prevista</small>{selectedHarvestDate ? selectedHarvestDate.toLocaleDateString('es-ES') : 'Sin fecha'}</span>
-              <span><small>Desarrollo</small>Día {selectedDays} de {selectedExpectedDays}</span>
-            </div>
-            <div className="active-crop-card__progress"><i style={{ width: `${Math.min(100, Math.max(0, selectedDays / selectedExpectedDays * 100))}%` }} /></div>
-            <footer><button type="button" onClick={() => { setSelectedCropId(null); onAddTrays(selectedCrop); }}>＋ Añadir bandejas</button><button type="button" onClick={() => { setSelectedCropId(null); onAdjust(selectedCrop); }}>Ajustar ciclo y fechas</button><button type="button" className="is-danger" onClick={() => { setSelectedCropId(null); onDelete(selectedCrop); }}>Eliminar cultivo</button></footer>
+      {selectedGroup && (
+        <div className="active-crop-detail-overlay" onMouseDown={event => { if (event.target === event.currentTarget) setSelectedGroupId(null); }}>
+          <article className="active-crop-detail active-crop-group-detail" style={{ '--phase-color': '#10b981', '--phase-soft': '#ecfdf5' }}>
+            <header><div><span>{selectedGroup.trays} bandejas activas</span><h3>{selectedGroup.name}</h3><small>{selectedGroup.crops.length} lote{selectedGroup.crops.length === 1 ? '' : 's'} en producción</small></div><button type="button" onClick={() => setSelectedGroupId(null)}>×</button></header>
+            <div className="active-crop-group-detail__lots">{selectedGroup.crops.map(crop => {
+              const phase = PHASES.find(item => item.id === cropStatus(crop)) || PHASES[0];
+              const days = cycleDay(crop.datePlanted || crop.plantedAt, crop.cycleDayAdjustment);
+              const expectedDays = Number(selectedGroup.type?.germinationDays || 0) + Number(selectedGroup.type?.darknessDays || 0) + Number(selectedGroup.type?.lightDays || 0) || 14;
+              const harvestDate = expectedHarvest(selectedGroup.type, crop.datePlanted || crop.plantedAt, crop.cycleDayAdjustment);
+              return <section key={crop.id} style={{ '--item-color': phase.color, '--item-soft': phase.soft }}><header><span>{phase.icon} {phase.label}</span><strong>{Number(crop.traysCount || crop.trays || 0)} bandejas</strong></header><div><small>{crop.batchNumber || 'Sin lote'}</small><p>Siembra: {formatSowingDate(crop.datePlanted || crop.plantedAt)}</p><p>Día {days} de {expectedDays} · Cosecha: {harvestDate ? harvestDate.toLocaleDateString('es-ES') : 'sin fecha'}</p></div><footer><button type="button" onClick={() => { setSelectedGroupId(null); onAddTrays(crop); }}>＋ Bandejas</button><button type="button" onClick={() => { setSelectedGroupId(null); onAdjust(crop); }}>Ajustar</button><button type="button" className="is-danger" onClick={() => { setSelectedGroupId(null); onDelete(crop); }}>Eliminar</button></footer></section>;
+            })}</div>
           </article>
         </div>
       )}
