@@ -49,7 +49,8 @@ export default function Products() {
 
   const handleSubmit = async (event) => {
     event.preventDefault();
-    const recipe = formData.isMix ? formData.recipeVarieties : formData.recipeVarieties.slice(0, 1);
+    const recipe = (formData.isMix ? formData.recipeVarieties : formData.recipeVarieties.slice(0, 1))
+      .map(item => ({ ...item, gramsPerUnit: Number(item.gramsPerUnit || 0) }));
     const payload = {
       name: formData.name.trim(),
       price: Number(formData.price),
@@ -92,9 +93,18 @@ export default function Products() {
       const exists = prev.recipeVarieties.some(item => item.varietyId === varietyId);
       const recipeVarieties = exists
         ? prev.recipeVarieties.filter(item => item.varietyId !== varietyId)
-        : [...prev.recipeVarieties, { varietyId }];
+        : [...prev.recipeVarieties, { varietyId, gramsPerUnit: '' }];
       return { ...prev, recipeVarieties };
     });
+  };
+
+  const updateRecipeGrams = (varietyId, value) => {
+    setFormData(prev => ({
+      ...prev,
+      recipeVarieties: prev.recipeVarieties.map(item => item.varietyId === varietyId
+        ? { ...item, gramsPerUnit: value }
+        : item)
+    }));
   };
 
   const togglePackagingArticle = articleId => {
@@ -175,18 +185,22 @@ export default function Products() {
               {formData.isMix ? (
                 <div className="grid grid-cols-2 gap-2">
                   {seedVarieties?.filter(v => v.active !== false).map(variety => (
-                    <label key={variety.id} className="premium-card" style={{ padding: '0.75rem', cursor: 'pointer' }}>
-                      <input type="checkbox" checked={formData.recipeVarieties.some(item => item.varietyId === variety.id)} onChange={() => toggleVariety(variety.id)} />{' '}
-                      {variety.name}
-                    </label>
+                    <div key={variety.id} className="premium-card" style={{ padding: '0.75rem' }}>
+                      <label style={{ cursor: 'pointer' }}>
+                        <input type="checkbox" checked={formData.recipeVarieties.some(item => item.varietyId === variety.id)} onChange={() => toggleVariety(variety.id)} />{' '}
+                        {variety.name}
+                      </label>
+                      {formData.recipeVarieties.some(item => item.varietyId === variety.id) && <input aria-label={`Gramos de ${variety.name} por unidad`} min="0" step="0.1" type="number" className="premium-input w-full mt-2" placeholder="Gramos por táper" value={formData.recipeVarieties.find(item => item.varietyId === variety.id)?.gramsPerUnit ?? ''} onChange={event => updateRecipeGrams(variety.id, event.target.value)} />}
+                    </div>
                   ))}
                 </div>
               ) : (
-                <select required className="premium-input w-full" value={formData.recipeVarieties[0]?.varietyId || ''} onChange={e => setFormData({ ...formData, recipeVarieties: e.target.value ? [{ varietyId: e.target.value }] : [] })}>
+                <select required className="premium-input w-full" value={formData.recipeVarieties[0]?.varietyId || ''} onChange={e => setFormData({ ...formData, recipeVarieties: e.target.value ? [{ varietyId: e.target.value, gramsPerUnit: '' }] : [] })}>
                   <option value="">Selecciona una variedad...</option>
                   {seedVarieties?.filter(v => v.active !== false).map(variety => <option key={variety.id} value={variety.id}>{variety.name}</option>)}
                 </select>
               )}
+              {!formData.isMix && formData.recipeVarieties[0] && <input aria-label="Gramos por táper" min="0" step="0.1" type="number" className="premium-input w-full mt-2" placeholder="Gramos utilizados por táper" value={formData.recipeVarieties[0].gramsPerUnit ?? ''} onChange={event => updateRecipeGrams(formData.recipeVarieties[0].varietyId, event.target.value)} />}
               {!seedVarieties?.length && <p className="text-muted text-sm mt-2">Primero crea una variedad en Cultivo → Variedades.</p>}
             </div>
 
@@ -255,7 +269,7 @@ export default function Products() {
               <div className="flex flex-wrap gap-2 mt-3">
                 {recipe.map(item => {
                   const variety = seedVarieties?.find(v => v.id === item.varietyId);
-                  return <span key={item.varietyId} className="badge badge-primary">{variety?.name || 'Variedad no disponible'}</span>;
+                  return <span key={item.varietyId} className="badge badge-primary">{variety?.name || 'Variedad no disponible'}{Number(item.gramsPerUnit || 0) > 0 ? ` · ${Number(item.gramsPerUnit)} g` : ''}</span>;
                 })}
                 {!recipe.length && <span className="text-muted text-sm">Receta pendiente de asignar</span>}
               </div>

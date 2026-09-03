@@ -181,6 +181,30 @@ export default function Dashboard() {
       if (Number(harvest.costPerTupper || 0) > 0) return Number(harvest.costPerTupper);
       return units > 0 ? Number(harvest.totalCost || 0) / units : 0;
     };
+    const latestArticleUnitCost = articleId => {
+      const latestLot = (stockLots || [])
+        .filter(lot => String(lot.articleId) === String(articleId))
+        .sort((a, b) => String(b.receivedAt || b.createdAt || '').localeCompare(String(a.receivedAt || a.createdAt || '')))[0];
+      const article = (articles || []).find(item => String(item.id) === String(articleId));
+      return Number(latestLot?.unitCost ?? article?.currentUnitCost ?? article?.lastPurchaseUnitCost ?? 0);
+    };
+    const varietyCostPerGram = varietyId => {
+      const rows = (crops || []).map(crop => {
+        const cropType = (cropTypes || []).find(type => String(type.id) === String(crop.cropTypeId || crop.seedId));
+        if (String(cropType?.varietyId || '') !== String(varietyId)) return null;
+        const trays = Number(crop.traysCount || 0) + Number(crop.discardedTrays || 0);
+        const expectedGrams = Number(cropType?.expectedYieldGrams || 0) * trays;
+        if (trays <= 0 || expectedGrams <= 0) return null;
+        const seedLot = (stockLots || []).find(lot => String(lot.id) === String(crop.seedStockLotId));
+        const seedCost = Number(seedLot?.unitCost || latestArticleUnitCost(cropType?.seedId))
+          * Number(crop.gramsPerTray || cropType?.seedGrams || 0) * trays;
+        const substrateCost = latestArticleUnitCost(cropType?.substrateId) * Number(cropType?.substrateLiters || 0) * trays;
+        const trayCost = latestArticleUnitCost(cropType?.containerId) * trays;
+        return { cost: Number(crop.exactCost || 0) || seedCost + substrateCost + trayCost, grams: expectedGrams };
+      }).filter(Boolean);
+      const grams = rows.reduce((sum, row) => sum + row.grams, 0);
+      return grams > 0 ? rows.reduce((sum, row) => sum + row.cost, 0) / grams : 0;
+    };
     const estimatedUnitCostForProduct = productId => {
       const samePeriod = periodHarvests.filter(harvest => String(harvest.productId) === String(productId) && harvestUnitCost(harvest) > 0);
       if (samePeriod.length) {
@@ -196,6 +220,13 @@ export default function Dashboard() {
       if (latestKnown) return harvestUnitCost(latestKnown);
 
       const product = (products || []).find(item => String(item.id) === String(productId));
+      const recipeRows = (product?.recipeVarieties || []).filter(item => Number(item.gramsPerUnit || 0) > 0);
+      if (recipeRows.length && recipeRows.length === (product?.recipeVarieties || []).length) {
+        const cropCost = recipeRows.reduce((sum, item) => sum + Number(item.gramsPerUnit) * varietyCostPerGram(item.varietyId), 0);
+        const packagingCost = (product.packagingArticleIds || []).reduce((sum, articleId) => sum + latestArticleUnitCost(articleId), 0);
+        const labelCost = latestArticleUnitCost(product.labelArticleId) * Number(product.labelsPerUnit || 1);
+        if (cropCost > 0) return cropCost + packagingCost + labelCost;
+      }
       const recipe = new Set((product?.recipeVarieties || []).map(item => String(item.varietyId)).filter(Boolean));
       const comparable = (products || []).map(candidate => {
         const candidateRecipe = new Set((candidate.recipeVarieties || []).map(item => String(item.varietyId)).filter(Boolean));
@@ -220,13 +251,6 @@ export default function Dashboard() {
 
     const productionPeriodStart = new Date(`${selectedBounds.start}T00:00:00`);
     const productionPeriodEnd = new Date(`${selectedBounds.end}T23:59:59`);
-    const latestArticleUnitCost = articleId => {
-      const latestLot = (stockLots || [])
-        .filter(lot => String(lot.articleId) === String(articleId))
-        .sort((a, b) => String(b.receivedAt || b.createdAt || '').localeCompare(String(a.receivedAt || a.createdAt || '')))[0];
-      const article = (articles || []).find(item => String(item.id) === String(articleId));
-      return Number(latestLot?.unitCost ?? article?.currentUnitCost ?? article?.lastPurchaseUnitCost ?? 0);
-    };
     const activeProductionRows = (crops || []).map(crop => {
       if (['HARVESTED', 'DISCARDED'].includes(String(crop.status || '').toUpperCase()) || Number(crop.traysCount || 0) <= 0) return false;
       const cropType = (cropTypes || []).find(type => String(type.id) === String(crop.cropTypeId || crop.seedId));
