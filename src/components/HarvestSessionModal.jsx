@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import Swal from 'sweetalert2';
 import { useData } from '../context/DataContext';
 import './HarvestSessionModal.css';
@@ -35,9 +35,6 @@ const harvestProductName = name => String(name || 'Producto')
   .replace(/\s+\d+\s*ML\s*$/i, '')
   .trim();
 
-const harvestProductKey = name => harvestProductName(name)
-  .normalize('NFD').replace(/[\u0300-\u036f]/g, '').toUpperCase();
-
 const isoWeek = value => {
   const source = new Date(value);
   const date = new Date(Date.UTC(source.getFullYear(), source.getMonth(), source.getDate()));
@@ -63,7 +60,10 @@ const pendingDeliveryGroups = movements => {
 };
 
 const makeLine = () => ({ id: crypto.randomUUID(), productId: '', packagingQuantities: {} });
-const HARVEST_CATCH_UP_EXCLUDED_ORDER_IDS = new Set(['07e10c7f-9fd9-4ccf-82e3-2382b7c5fbb1']);
+const HARVEST_CATCH_UP_EXCLUDED_ORDER_IDS = new Set([
+  '07e10c7f-9fd9-4ccf-82e3-2382b7c5fbb1', // La Plaza, 31/08 (entregado el 01/09)
+  '013fed16-ae16-4808-9a87-b7133ad0ab30' // Masía de Chencho, 31/08
+]);
 
 export default function HarvestSessionModal({ open, onClose }) {
   const {
@@ -83,6 +83,7 @@ export default function HarvestSessionModal({ open, onClose }) {
   const [demandPlanOpen, setDemandPlanOpen] = useState(false);
   const [demandPlanFocusId, setDemandPlanFocusId] = useState(null);
   const [demandPlanDraft, setDemandPlanDraft] = useState({});
+  const cropSelectionDateRef = useRef('');
 
   const harvestWeek = useMemo(() => {
     const selected = new Date(harvestDate);
@@ -137,10 +138,14 @@ export default function HarvestSessionModal({ open, onClose }) {
     setDemandPlanOpen(false);
     setDemandPlanFocusId(null);
     setDemandPlanDraft({});
+    cropSelectionDateRef.current = '';
   }, [open]);
 
   useEffect(() => {
     if (!open) return;
+    const dateKey = String(harvestDate).slice(0, 10);
+    if (cropSelectionDateRef.current === dateKey) return;
+    cropSelectionDateRef.current = dateKey;
     setSelectedCropTrays(Object.fromEntries(readyCrops.map(crop => [
       crop.id,
       Number(crop.traysCount || crop.trays || 0)
@@ -183,14 +188,7 @@ export default function HarvestSessionModal({ open, onClose }) {
     const minimumVarieties = Math.min(4, new Set(recipe).size);
     return recipe.length > 0 && packagingFor(product).length > 0 && selectedRecipeVarieties.size >= minimumVarieties;
   });
-  const selectableProducts = Object.values(compatibleProducts.reduce((groups, product) => {
-    const key = harvestProductKey(product.name);
-    const current = groups[key];
-    const productHasCapacity = /\d+\s*ML/i.test(product.name || '');
-    const currentHasCapacity = /\d+\s*ML/i.test(current?.name || '');
-    if (!current || (currentHasCapacity && !productHasCapacity)) groups[key] = product;
-    return groups;
-  }, {}));
+  const selectableProducts = compatibleProducts;
   const totalSelectedTrays = selectedReadyCrops.reduce((sum, crop) => sum + Number(selectedCropTrays[crop.id] || 0), 0);
   const totalReadyTrays = readyCrops.reduce((sum, crop) => sum + Number(crop.traysCount || crop.trays || 0), 0);
   const remainingTrays = totalReadyTrays - totalSelectedTrays;
@@ -206,6 +204,9 @@ export default function HarvestSessionModal({ open, onClose }) {
     const key = localDateKey(value);
     return key && key >= harvestWeekStartKey && key <= harvestWeekEndKey;
   }, [harvestWeekEndKey, harvestWeekStartKey]);
+  const catchUpExcludedUnits = (orders || [])
+    .filter(order => HARVEST_CATCH_UP_EXCLUDED_ORDER_IDS.has(String(order.id)) && isInHarvestWeek(order.date || order.createdAt))
+    .reduce((sum, order) => sum + (order.items || []).reduce((itemSum, item) => itemSum + Number(item.quantity || 0), 0), 0);
   const todayStart = new Date();
   todayStart.setHours(0, 0, 0, 0);
   const selectedDateStart = new Date(harvestDate);
@@ -370,12 +371,13 @@ export default function HarvestSessionModal({ open, onClose }) {
       const varietyId = cropVarietyId(crop);
       const compatible = activeLines.filter(line => recipeIds(products.find(product => product.id === line.productId)).includes(varietyId));
       const weight = compatible.reduce((sum, line) => sum + lineUnits(line), 0);
+      let remaining = Number(selectedCropTrays[crop.id] || 0);
       compatible.forEach((line, index) => {
-        const trays = Number(selectedCropTrays[crop.id] || 0);
         const allocated = index === compatible.length - 1
-          ? trays - compatible.slice(0, -1).reduce((sum, previous) => sum + Number(allocations[previous.id][crop.id] || 0), 0)
-          : Number((trays * lineUnits(line) / weight).toFixed(3));
+          ? remaining
+          : Math.min(remaining, Number((Number(selectedCropTrays[crop.id] || 0) * lineUnits(line) / weight).toFixed(6)));
         allocations[line.id][crop.id] = allocated;
+        remaining = Math.max(0, Number((remaining - allocated).toFixed(6)));
       });
     });
     return allocations;
@@ -463,7 +465,7 @@ export default function HarvestSessionModal({ open, onClose }) {
 
         {step === 3 && <section className="harvest-demand">
           <header>
-            <div><span>{isPastWeek ? 'SEMANA PASADA' : 'SEMANA ACTUAL'}</span><h3>{harvestPeriodStart.toLocaleDateString('es-ES', { day: '2-digit', month: 'short' })} — {new Date(harvestWeek.end.getTime() - 86400000).toLocaleDateString('es-ES', { day: '2-digit', month: 'short' })}</h3><p>{isPastWeek ? 'Cantidades realmente vendidas durante la semana.' : 'Pedidos de toda la semana; se descuenta únicamente el pedido de La Plaza ya cosechado.'}</p></div>
+            <div><span>{isPastWeek ? 'SEMANA PASADA' : 'SEMANA ACTUAL'}</span><h3>{harvestPeriodStart.toLocaleDateString('es-ES', { day: '2-digit', month: 'short' })} — {new Date(harvestWeek.end.getTime() - 86400000).toLocaleDateString('es-ES', { day: '2-digit', month: 'short' })}</h3><p>{isPastWeek ? 'Cantidades realmente vendidas durante la semana.' : `Pedidos de toda la semana${catchUpExcludedUnits > 0 ? ` · ajuste de puesta al día: ${catchUpExcludedUnits} uds. ya cosechadas de La Plaza y Masía de Chencho` : ''}.`}</p></div>
             <div className="harvest-demand__totals"><span><small>{isPastWeek ? 'VENDIDO' : 'PEDIDO ESTA SEMANA'}</small><b>{weekRequestedUnits}</b></span><span><small>YA COSECHADO</small><b>{weekHarvestedUnits}</b></span><span className={weekPendingHarvestUnits > 0 ? 'has-missing' : ''}><small>QUEDA POR COSECHAR</small><b>{weekPendingHarvestUnits}</b></span></div>
           </header>
           {demandPlanRows.length > 0 && <button type="button" className="harvest-demand__prepare" onClick={() => openDemandPlan()}><span>⚡ Preparar cosecha según pedidos de la semana</span><strong>{demandPlanRows.length} productos compatibles · {compatibleDemandUnits} uds.</strong></button>}
