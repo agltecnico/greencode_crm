@@ -67,8 +67,8 @@ const HARVEST_CATCH_UP_EXCLUDED_ORDER_IDS = new Set([
 
 export default function HarvestSessionModal({ open, onClose }) {
   const {
-    crops, cropTypes, seedVarieties, articles, products, orders, harvests, stockEntries, productMovements,
-    registerHarvestSession
+    crops, cropTypes, seedVarieties, articles, products, orders, harvests, stockEntries, stockLots, productMovements,
+    registerHarvestSession, changeCropSeedLot
   } = useData();
   const [harvestDate, setHarvestDate] = useState(localInputValue());
   const [selectedCropTrays, setSelectedCropTrays] = useState({});
@@ -497,7 +497,7 @@ export default function HarvestSessionModal({ open, onClose }) {
                 const expectedThisWeek = weeklyReadyCropIds.has(crop.id);
                 return <div key={crop.id} className={`harvest-crop ${selected ? 'is-selected' : ''} ${covered ? 'is-used' : ''}`}>
                   <input type="checkbox" aria-label={`Seleccionar ${varietyName(crop)}`} checked={selected} onChange={() => setSelectedCropTrays(current => ({ ...current, [crop.id]: selected ? 0 : maxTrays }))} />
-                  <div><strong>{varietyName(crop)}</strong><small>{expectedThisWeek ? 'Previsto esta semana' : `Previsto ${expected?.toLocaleDateString('es-ES') || 'sin fecha'}`} · Lote {crop.batchNumber || 'sin lote'}</small></div>
+                  <div><strong>{varietyName(crop)}</strong><small>{expectedThisWeek ? 'Previsto esta semana' : `Previsto ${expected?.toLocaleDateString('es-ES') || 'sin fecha'}`}</small><select aria-label={`Lote de semilla de ${varietyName(crop)}`} value={crop.seedStockLotId || ''} onChange={async event => { try { await changeCropSeedLot(crop.id, event.target.value); } catch (error) { Swal.fire('No se pudo cambiar el lote', error.message, 'error'); } }}><option value="" disabled>{crop.seedStockLotId ? 'Sin lote' : '⚠ Pendiente de entrada de semilla'}</option>{(stockLots || []).filter(lot => articles.find(article => article.id === lot.articleId)?.varietyId === cropVarietyId(crop) && (String(lot.id) === String(crop.seedStockLotId) || Number(lot.remainingQuantity || 0) >= Number(crop.seedQuantityUsed || 0))).map(lot => <option key={lot.id} value={lot.id}>{lot.supplierBatch} · {Number(lot.remainingQuantity || 0)} g</option>)}</select></div>
                   <label className="harvest-crop__trays">
                     <input type="number" min="0" max={maxTrays} step="1" value={selectedTrays} onChange={event => setSelectedCropTrays(current => ({ ...current, [crop.id]: Math.min(maxTrays, Math.max(0, Number(event.target.value || 0))) }))} />
                     <small>de {maxTrays} bandejas</small>

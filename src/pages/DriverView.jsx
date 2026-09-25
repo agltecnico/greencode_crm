@@ -27,7 +27,7 @@ function DriverView() {
 
   useEffect(() => {
     let isMounted = true;
-    if (view === 'ticket' && selectedTicket) {
+    if (view === 'ticket' && selectedTicket?.id && selectedTicket?.signature) {
       if (pdfGeneratedRef.current === selectedTicket.id) return; // Prevent infinite re-trigger loop
       pdfGeneratedRef.current = selectedTicket.id;
       
@@ -157,7 +157,8 @@ function DriverView() {
       setSelectedTicket(ticket);
       setView('ticket');
     } else {
-      alert('No se encontró el albarán correspondiente.');
+      const recover = window.confirm('Este pedido figura como entregado, pero no tiene albarán. ¿Quieres generarlo ahora confirmando de nuevo el receptor y la firma?');
+      if (recover) handleStartDelivery(order);
     }
   };
 
@@ -721,15 +722,15 @@ function DriverView() {
                           return activeTab === 'delivered' && (
                             <span className="driver-badge" style={{ 
                               margin: 0, 
-                              backgroundColor: isSent ? '#e6f4ea' : '#fce8e6', 
-                              color: isSent ? '#137333' : '#c5221f',
+                              backgroundColor: !ticket ? '#fff7ed' : (isSent ? '#e6f4ea' : '#fce8e6'), 
+                              color: !ticket ? '#c2410c' : (isSent ? '#137333' : '#c5221f'),
                               border: 'none',
                               fontWeight: '600',
                               fontSize: '0.65rem',
                               padding: '0.15rem 0.35rem',
                               borderRadius: '4px'
                             }}>
-                              {isSent ? 'Enviado' : 'No Enviado'}
+                              {!ticket ? 'Albarán pendiente' : (isSent ? 'Enviado' : 'No enviado')}
                             </span>
                           );
                         })()}
@@ -785,7 +786,7 @@ function DriverView() {
                           }}
                           className="driver-btn driver-btn-primary"
                         >
-                          Ver Albarán / Compartir PDF
+                          {deliveryNotes.some(note => note.orderId === order.id) ? 'Ver albarán / Compartir PDF' : 'Generar albarán pendiente'}
                         </button>
                       )}
                     </div>
@@ -880,7 +881,7 @@ function DriverView() {
                   <h2>{companyProfile?.fiscalName || 'Albarán de Entrega'}</h2>
                 )}
                 <p style={{ fontSize: '0.8rem', opacity: 0.9 }}>{companyProfile?.address} - {companyProfile?.city}</p>
-                <p style={{ fontSize: '0.8rem', opacity: 0.9, marginTop: '0.1rem', fontWeight: 'bold' }}>{selectedTicket.albaranNumber}</p>
+                <p style={{ fontSize: '0.8rem', opacity: 0.9, marginTop: '0.1rem', fontWeight: 'bold' }}>{selectedTicket.albaranNumber || 'VISTA PREVIA · Se numerará al firmar'}</p>
               </div>
               
               <div className="ticket-body">
@@ -963,7 +964,7 @@ function DriverView() {
             <div className="driver-card" style={{ padding: '1.5rem' }}>
               <h2 style={{ fontSize: '1.3rem', fontWeight: '800', margin: '0 0 0.5rem 0', textAlign: 'center' }}>Firma del Cliente</h2>
               <p style={{ color: '#64748b', textAlign: 'center', fontSize: '0.9rem', margin: '0 0 1.5rem 0' }}>
-                Firme en el recuadro para confirmar la recepción del albarán {selectedTicket.albaranNumber}.
+                Firme en el recuadro para confirmar la entrega. El albarán se creará y numerará al guardar esta firma.
               </p>
               
               <div className="canvas-container">

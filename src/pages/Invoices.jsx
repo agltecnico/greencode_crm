@@ -2,7 +2,8 @@ import Swal from 'sweetalert2';
 import { useMemo, useState } from 'react';
 import { Banknote, CalendarClock, CheckCircle2, CircleAlert, Search, UsersRound, WalletCards } from 'lucide-react';
 import { useData } from '../context/DataContext';
-import { generateInvoicePDF, generateInvoiceBlob } from '../utils/pdf';
+import { generateInvoicePDF, generateInvoiceBlob, generateDeliveryNoteBlob } from '../utils/pdf';
+import { supabase } from '../config/supabase';
 
 const money = value => Number(value || 0).toLocaleString('es-ES', { style: 'currency', currency: 'EUR' });
 
@@ -15,7 +16,7 @@ const getDueDate = invoice => {
 };
 
 export default function Invoices() {
-  const { clients, deliveryNotes, invoices, addInvoice, deleteInvoice, markInvoiceAsPaid } = useData();
+  const { clients, deliveryNotes, invoices, addInvoice, deleteInvoice, markInvoiceAsPaid, refreshData } = useData();
   const [isAdding, setIsAdding] = useState(false);
   const [selectedClientId, setSelectedClientId] = useState('');
   const [selectedNotes, setSelectedNotes] = useState([]);
@@ -28,6 +29,10 @@ export default function Invoices() {
   const [filterQuery, setFilterQuery] = useState('');
   const [filterStartDate, setFilterStartDate] = useState('');
   const [filterEndDate, setFilterEndDate] = useState('');
+  const [sendingInvoiceId, setSendingInvoiceId] = useState(null);
+  const [emailReviewInvoice, setEmailReviewInvoice] = useState(null);
+  const [emailRecipient, setEmailRecipient] = useState('');
+  const [emailNoteIds, setEmailNoteIds] = useState([]);
 
   // Sharing state
   const [sharingInvoice, setSharingInvoice] = useState(null);
@@ -234,6 +239,10 @@ export default function Invoices() {
     if (filterQuery.trim() && !haystack.includes(filterQuery.trim().toLocaleLowerCase('es'))) return false;
     return true;
   }), [filterClientId, filterEndDate, filterQuery, filterStartDate, filterStatus, invoiceRows]);
+  const filteredInvoiceTotal = useMemo(
+    () => filteredInvoices.reduce((sum, invoice) => sum + Number(invoice.total || 0), 0),
+    [filteredInvoices]
+  );
 
   const collectionSummary = useMemo(() => invoiceRows.reduce((summary, invoice) => {
     const total = Number(invoice.total || 0);
@@ -300,6 +309,46 @@ export default function Invoices() {
       confirmButtonColor: isPaid ? '#059669' : '#d97706'
     });
     if (result.isConfirmed) await markInvoiceAsPaid(invoice.id, isPaid);
+  };
+
+  const blobToBase64 = blob => new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(String(reader.result).split(',')[1]);
+    reader.onerror = reject;
+    reader.readAsDataURL(blob);
+  });
+
+  const openEmailReview = invoice => {
+    const client = clients.find(item => item.id === invoice.clientId);
+    setEmailReviewInvoice(invoice);
+    setEmailRecipient(client?.email || '');
+    setEmailNoteIds([...(invoice.deliveryNoteIds || [])]);
+  };
+
+  const sendOfficialInvoice = async invoice => {
+    if (invoice.type === 'SUMMARY') return Swal.fire('No disponible', 'Los albaranes resumen no se envían desde este control.', 'info');
+    const client = clients.find(item => item.id === invoice.clientId);
+    if (!emailRecipient) return Swal.fire('Falta el correo', 'Indica el correo electrónico del destinatario.', 'warning');
+    const notes = deliveryNotes.filter(note => emailNoteIds.includes(note.id));
+    const unsigned = notes.filter(note => !note.signature);
+    if (!notes.length || unsigned.length) return Swal.fire('Documentación incompleta', unsigned.length ? `Hay ${unsigned.length} albarán(es) sin firma.` : 'La factura no tiene albaranes asociados.', 'warning');
+    setSendingInvoiceId(invoice.id);
+    try {
+      const invoiceBlob = await generateInvoiceBlob(invoice, client, notes);
+      const attachments = [{ filename: `${invoice.invoiceNumber}.pdf`, content: await blobToBase64(invoiceBlob) }];
+      for (const note of notes) {
+        const blob = await generateDeliveryNoteBlob(note, client);
+        attachments.push({ filename: `Albaran_${note.albaranNumber || note.id.slice(-6)}.pdf`, content: await blobToBase64(blob) });
+      }
+      const html = `<p>Hola,</p><p>Tal y como hablamos, os adjuntamos la factura <strong>${invoice.invoiceNumber}</strong> junto con los albaranes de entrega firmados.</p><p>A partir de ahora, la factura y sus correspondientes albaranes se enviarán a principios de cada mes vencido.</p><p>Quedamos a vuestra disposición para cualquier consulta o aclaración.</p><p>Gracias por vuestra confianza.</p><p>Un saludo,</p><div style="border-top:1px solid #d1d5db;padding-top:16px;color:#4b5563;font-family:Arial,sans-serif"><strong style="font-size:18px;color:#166534">Iris García</strong><br>Responsable de Administración<br><a href="mailto:administracion@mygreencode.es" style="color:#166534">administracion@mygreencode.es</a><br>Aspe · Alicante<hr style="border:0;border-top:1px solid #e5e7eb;margin:16px 0"><small><strong>Aviso de confidencialidad y protección de datos</strong><br>Este mensaje y, en su caso, los archivos adjuntos, pueden contener información confidencial dirigida exclusivamente a su destinatario. Si lo ha recibido por error, comuníquelo al remitente y elimínelo. Los datos personales serán tratados por Antonio José Gómez López, NIF 4835348N, conforme al Reglamento (UE) 2016/679 y la Ley Orgánica 3/2018. Puede ejercer sus derechos escribiendo a administracion@mygreencode.es.<br><br>Por favor, piense en el medio ambiente antes de imprimir este correo.</small></div>`;
+      const { error } = await supabase.functions.invoke('send-invoice-email', { body: { invoiceId: invoice.id, to: emailRecipient, subject: `Factura ${invoice.invoiceNumber} y albaranes de entrega – GreenCode`, html, attachments } });
+      if (error) throw error;
+      await refreshData({ force: true });
+      setEmailReviewInvoice(null);
+      await Swal.fire('Factura enviada', `Enviada correctamente a ${emailRecipient}.`, 'success');
+    } catch (error) {
+      await Swal.fire('No se pudo enviar', error.message || 'Revisa la configuración SMTP.', 'error');
+    } finally { setSendingInvoiceId(null); }
   };
 
   return (
@@ -485,7 +534,7 @@ export default function Invoices() {
 
       <div>
         <section className="billing-register">
-          <header><div><span>REGISTRO DE FACTURAS</span><h3>Documentos y situación de cobro</h3></div><strong>{filteredInvoices.length} resultados</strong></header>
+          <header><div><span>REGISTRO DE FACTURAS</span><h3>Documentos y situación de cobro</h3></div><div className="billing-list-total"><span>Total del listado</span><strong>{money(filteredInvoiceTotal)}</strong><small>{filteredInvoices.length} documentos</small></div></header>
           <div className="billing-filters">
             <label className="billing-search"><Search size={17} /><input value={filterQuery} onChange={event => setFilterQuery(event.target.value)} placeholder="Buscar factura o cliente" /></label>
             <select value={filterClientId} onChange={event => setFilterClientId(event.target.value)}>
@@ -589,6 +638,15 @@ export default function Invoices() {
                         >
                           Enviar
                         </button>
+                        {inv.type !== 'SUMMARY' && <button
+                          className="btn btn-primary"
+                          style={{ padding: '0.3rem 0.6rem', fontSize: '0.8rem', backgroundColor: inv.emailStatus === 'SENT' ? '#64748b' : '#0f766e' }}
+                          onClick={() => openEmailReview(inv)}
+                          disabled={sendingInvoiceId === inv.id}
+                          title={inv.emailStatus === 'SENT' ? `Enviada a ${inv.emailRecipient || 'cliente'}` : 'Enviar factura y albaranes firmados por correo'}
+                        >
+                          {sendingInvoiceId === inv.id ? 'Enviando…' : inv.emailStatus === 'SENT' ? 'Reenviar correo' : 'Enviar correo'}
+                        </button>}
                         <button 
                           className="btn btn-secondary" 
                           style={{ padding: '0.3rem 0.6rem', fontSize: '0.8rem', color: 'red' }}
@@ -602,11 +660,27 @@ export default function Invoices() {
                   );
                 })}
               </tbody>
+              <tfoot><tr className="billing-total-row"><td colSpan="4">TOTAL DEL LISTADO</td><td>{money(filteredInvoiceTotal)}</td><td colSpan="3">{filteredInvoices.length} documentos</td></tr></tfoot>
             </table>
           </div>
         )}
         </section>
       </div>
+
+      {emailReviewInvoice && (() => {
+        const associatedNotes = deliveryNotes.filter(note => (emailReviewInvoice.deliveryNoteIds || []).includes(note.id));
+        return <div className="invoice-email-backdrop" onMouseDown={event => { if (event.target === event.currentTarget) setEmailReviewInvoice(null); }}>
+          <section className="invoice-email-modal" role="dialog" aria-modal="true">
+            <header><div><span>ENVÍO DE FACTURA OFICIAL</span><h3>{emailReviewInvoice.invoiceNumber}</h3><p>Revisa el destinatario y los documentos adjuntos.</p></div><button onClick={() => setEmailReviewInvoice(null)}>×</button></header>
+            <div className="invoice-email-body">
+              <label>Correo del cliente<input type="email" value={emailRecipient} onChange={event => setEmailRecipient(event.target.value)} placeholder="cliente@empresa.com"/></label>
+              <div className="invoice-email-invoice"><input type="checkbox" checked readOnly/><div><strong>{emailReviewInvoice.invoiceNumber}.pdf</strong><small>Factura oficial · siempre adjunta</small></div><span>{money(emailReviewInvoice.total)}</span></div>
+              <div className="invoice-email-notes"><div><strong>Albaranes asociados</strong><small>Todos están seleccionados por defecto.</small></div>{associatedNotes.map(note => <label key={note.id} className={!note.signature ? 'is-unsigned' : ''}><input type="checkbox" checked={emailNoteIds.includes(note.id)} disabled={!note.signature} onChange={() => setEmailNoteIds(current => current.includes(note.id) ? current.filter(id => id !== note.id) : [...current, note.id])}/><span><strong>Albarán {note.albaranNumber || note.id.slice(-6)}</strong><small>{new Date(note.date).toLocaleDateString('es-ES')} · {note.signature ? 'Firmado' : 'Sin firma'}</small></span><b>{money(note.total)}</b></label>)}</div>
+            </div>
+            <footer><div><span>Documentos seleccionados</span><strong>{1 + emailNoteIds.length}</strong></div><button onClick={() => setEmailReviewInvoice(null)}>Cancelar</button><button className="primary" disabled={sendingInvoiceId === emailReviewInvoice.id || !emailRecipient || !emailNoteIds.length} onClick={() => sendOfficialInvoice(emailReviewInvoice)}>{sendingInvoiceId === emailReviewInvoice.id ? 'Enviando…' : 'Enviar factura'}</button></footer>
+          </section>
+        </div>;
+      })()}
 
       {sharingInvoice && (
         <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 50 }}>

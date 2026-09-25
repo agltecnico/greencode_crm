@@ -188,6 +188,74 @@ export default function Dashboard() {
       const article = (articles || []).find(item => String(item.id) === String(articleId));
       return Number(latestLot?.unitCost ?? article?.currentUnitCost ?? article?.lastPurchaseUnitCost ?? 0);
     };
+    const harvestedTraysByCrop = new Map();
+    (harvests || []).forEach(harvest => {
+      Object.entries(harvest.selectedCropUsages || {}).forEach(([cropId, trays]) => {
+        harvestedTraysByCrop.set(String(cropId), Number(harvestedTraysByCrop.get(String(cropId)) || 0) + Number(trays || 0));
+      });
+    });
+    const plantedProductionRows = (crops || []).map(crop => {
+      const cropType = (cropTypes || []).find(type => String(type.id) === String(crop.cropTypeId || crop.seedId));
+      const plantedAt = new Date(crop.datePlanted || crop.plantedAt);
+      if (!cropType || Number.isNaN(plantedAt.getTime())) return null;
+      const soakingDays = Number(cropType.soakingHours || 0) > 0
+        ? Math.max(1, Math.ceil(Number(cropType.soakingHours) / 24))
+        : 0;
+      const cycleDays = soakingDays + Number(cropType.germinationDays || 0)
+        + Number(cropType.darknessDays || 0) + Number(cropType.lightDays || 0)
+        - Number(crop.cycleDayAdjustment || 0);
+      const expectedHarvest = new Date(plantedAt);
+      expectedHarvest.setDate(expectedHarvest.getDate() + Math.max(cycleDays, 0));
+      const productionDate = crop.harvestDate || localDate(expectedHarvest);
+      if (!inPeriod(productionDate)) return null;
+      const availableTrays = Number(crop.traysCount || crop.trays || 0);
+      const harvestedTrays = Number(harvestedTraysByCrop.get(String(crop.id)) || 0);
+      const plantedTrays = availableTrays + harvestedTrays;
+      const gramsPerTray = Number(crop.gramsPerTray ?? cropType?.seedGrams ?? 0);
+      const seedGrams = gramsPerTray * plantedTrays;
+      const seedLot = (stockLots || []).find(lot => String(lot.id) === String(crop.seedStockLotId));
+      const seedUnitCost = Number(seedLot?.unitCost || latestArticleUnitCost(cropType?.seedId));
+      const seedCost = seedGrams * seedUnitCost;
+      const substrateLiters = Number(cropType?.substrateLiters || 0) * plantedTrays;
+      const substrateCost = substrateLiters * latestArticleUnitCost(cropType?.substrateId);
+      const trayCost = plantedTrays * latestArticleUnitCost(cropType?.containerId);
+      return {
+        id: crop.id,
+        name: cropType?.name || 'Variedad sin identificar',
+        plantedTrays,
+        seedGrams,
+        seedCost,
+        substrateLiters,
+        substrateCost,
+        trayCost,
+        totalCost: seedCost + substrateCost + trayCost,
+        discardedTrays: String(crop.status || '').toUpperCase() === 'DISCARDED' ? availableTrays : 0,
+        productionDate: String(productionDate).slice(0, 10)
+      };
+    }).filter(Boolean);
+    const plantedByVariety = [...plantedProductionRows.reduce((map, row) => {
+      const current = map.get(row.name) || { name: row.name, trays: 0, seedGrams: 0, seedCost: 0, substrateLiters: 0, substrateCost: 0, trayCost: 0, totalCost: 0, discardedTrays: 0 };
+      current.trays += row.plantedTrays;
+      current.seedGrams += row.seedGrams;
+      current.seedCost += row.seedCost;
+      current.substrateLiters += row.substrateLiters;
+      current.substrateCost += row.substrateCost;
+      current.trayCost += row.trayCost;
+      current.totalCost += row.totalCost;
+      current.discardedTrays += row.discardedTrays;
+      map.set(row.name, current);
+      return map;
+    }, new Map()).values()].sort((a, b) => b.trays - a.trays);
+    const plantedTotals = plantedProductionRows.reduce((totals, row) => ({
+      trays: totals.trays + row.plantedTrays,
+      seedGrams: totals.seedGrams + row.seedGrams,
+      seedCost: totals.seedCost + row.seedCost,
+      substrateLiters: totals.substrateLiters + row.substrateLiters,
+      substrateCost: totals.substrateCost + row.substrateCost,
+      trayCost: totals.trayCost + row.trayCost,
+      totalCost: totals.totalCost + row.totalCost,
+      discardedTrays: totals.discardedTrays + row.discardedTrays
+    }), { trays: 0, seedGrams: 0, seedCost: 0, substrateLiters: 0, substrateCost: 0, trayCost: 0, totalCost: 0, discardedTrays: 0 });
     const varietyCostPerGram = varietyId => {
       const rows = (crops || []).map(crop => {
         const cropType = (cropTypes || []).find(type => String(type.id) === String(crop.cropTypeId || crop.seedId));
@@ -205,8 +273,38 @@ export default function Dashboard() {
       const grams = rows.reduce((sum, row) => sum + row.grams, 0);
       return grams > 0 ? rows.reduce((sum, row) => sum + row.cost, 0) / grams : 0;
     };
-    const estimatedUnitCostForProduct = productId => {
-      const samePeriod = periodHarvests.filter(harvest => String(harvest.productId) === String(productId) && harvestUnitCost(harvest) > 0);
+    const boundsForDateWeek = date => {
+      const parsed = new Date(`${String(date || '').slice(0, 10)}T12:00:00`);
+      if (Number.isNaN(parsed.getTime())) return null;
+      const monday = new Date(parsed);
+      monday.setDate(parsed.getDate() - ((parsed.getDay() + 6) % 7));
+      const sunday = new Date(monday);
+      sunday.setDate(monday.getDate() + 6);
+      return { start: localDate(monday), end: localDate(sunday) };
+    };
+    const weeklyProductionUnitCost = saleDate => {
+      const bounds = boundsForDateWeek(saleDate);
+      if (!bounds) return 0;
+      const weeklyCost = plantedProductionRows
+        .filter(row => row.productionDate >= bounds.start && row.productionDate <= bounds.end)
+        .reduce((sum, row) => sum + Number(row.totalCost || 0), 0);
+      const weeklyUnits = (orders || [])
+        .filter(order => String(order.status || '').toUpperCase() === 'DELIVERED')
+        .filter(order => {
+          const date = String(order.date || order.createdAt || '').slice(0, 10);
+          return date >= bounds.start && date <= bounds.end;
+        })
+        .reduce((sum, order) => sum + (order.items || []).reduce((itemSum, item) => itemSum + Number(item.quantity || 0), 0), 0);
+      return weeklyUnits > 0 ? weeklyCost / weeklyUnits : 0;
+    };
+    const estimatedUnitCostForProduct = (productId, saleDate) => {
+      const saleWeek = boundsForDateWeek(saleDate);
+      const samePeriod = periodHarvests.filter(harvest => {
+        if (String(harvest.productId) !== String(productId) || harvestUnitCost(harvest) <= 0) return false;
+        if (!saleWeek) return true;
+        const date = String(harvest.harvestDate || harvest.createdAt || '').slice(0, 10);
+        return date >= saleWeek.start && date <= saleWeek.end;
+      });
       if (samePeriod.length) {
         const units = samePeriod.reduce((sum, harvest) => sum + Number(harvest.tuppersCount || 0), 0);
         const cost = samePeriod.reduce((sum, harvest) => sum + harvestUnitCost(harvest) * Number(harvest.tuppersCount || 0), 0);
@@ -226,6 +324,12 @@ export default function Dashboard() {
         const packagingCost = (product.packagingArticleIds || []).reduce((sum, articleId) => sum + latestArticleUnitCost(articleId), 0);
         const labelCost = latestArticleUnitCost(product.labelArticleId) * Number(product.labelsPerUnit || 1);
         if (cropCost > 0) return cropCost + packagingCost + labelCost;
+      }
+      const weeklyCultivationCost = weeklyProductionUnitCost(saleDate);
+      if (weeklyCultivationCost > 0) {
+        const packagingCost = (product?.packagingArticleIds || []).reduce((sum, articleId) => sum + latestArticleUnitCost(articleId), 0);
+        const labelCost = latestArticleUnitCost(product?.labelArticleId) * Number(product?.labelsPerUnit || 1);
+        return weeklyCultivationCost + packagingCost + labelCost;
       }
       const recipe = new Set((product?.recipeVarieties || []).map(item => String(item.varietyId)).filter(Boolean));
       const comparable = (products || []).map(candidate => {
@@ -328,7 +432,7 @@ export default function Dashboard() {
           const movementCost = movementCostByOrderProduct.get(`${order.id}::${orderItem.productId}`) || { cost: 0, costedUnits: 0 };
           const exactUnits = Math.min(quantity, Number(movementCost.costedUnits || 0));
           const estimatedUnits = Math.max(quantity - exactUnits, 0);
-          return sum + Number(movementCost.cost || 0) + estimatedUnits * estimatedUnitCostForProduct(orderItem.productId);
+          return sum + Number(movementCost.cost || 0) + estimatedUnits * estimatedUnitCostForProduct(orderItem.productId, orderDate);
         }, 0);
       }
     });
@@ -379,7 +483,7 @@ export default function Dashboard() {
           : (movementCostByOrderProduct.get(`${order.id}::${item.productId}`) || { cost: 0, costedUnits: 0 });
         costAppliedProducts.add(item.productId);
         const exactUnits = Math.min(quantity, Number(movementCost.costedUnits || 0));
-        const estimatedUnitCost = estimatedUnitCostForProduct(item.productId);
+        const estimatedUnitCost = estimatedUnitCostForProduct(item.productId, order.date || order.createdAt);
         const estimatedUnits = estimatedUnitCost > 0 ? Math.max(quantity - exactUnits, 0) : 0;
         const appliedCost = Number(movementCost.cost || 0) + estimatedUnits * estimatedUnitCost;
         const current = productTotals.get(item.productId || name)
@@ -460,6 +564,30 @@ export default function Dashboard() {
     const grossMargin = tracedRevenue - totalCost;
     const generalExpensesTotal = paidExpenses + pendingExpenses;
     const operatingResult = grossMargin - generalExpensesTotal;
+    const profitabilityByVariety = [...productSales.reduce((map, row) => {
+      const product = (products || []).find(item => String(item.id) === String(row.id));
+      const recipe = product?.recipeVarieties || [];
+      const weightedRecipe = recipe.length
+        ? recipe.map(item => ({ ...item, weight: Number(item.gramsPerUnit || 0) }))
+        : [{ varietyId: `unassigned-${row.id}`, name: row.name, weight: 1 }];
+      const configuredWeight = weightedRecipe.reduce((sum, item) => sum + item.weight, 0);
+      const denominator = configuredWeight > 0 ? configuredWeight : weightedRecipe.length;
+      weightedRecipe.forEach(item => {
+        const variety = (cropTypes || []).find(type => String(type.varietyId) === String(item.varietyId));
+        const name = variety?.name || item.name || 'Variedad sin configurar';
+        const share = configuredWeight > 0 ? item.weight / denominator : 1 / denominator;
+        const current = map.get(String(item.varietyId)) || { id: item.varietyId, name, total: 0, tracedRevenue: 0, cost: 0, margin: 0, units: 0 };
+        current.total += row.total * share;
+        current.tracedRevenue += row.tracedRevenue * share;
+        current.cost += row.cost * share;
+        current.margin += row.margin * share;
+        current.units += row.units * share;
+        map.set(String(item.varietyId), current);
+      });
+      return map;
+    }, new Map()).values()]
+      .map(row => ({ ...row, marginPercent: row.tracedRevenue > 0 ? row.margin / row.tracedRevenue * 100 : 0 }))
+      .sort((a, b) => b.margin - a.margin);
     const productionByVariety = [...activeProductionRows.reduce((map, row) => {
       const current = map.get(row.name) || { name: row.name, trays: 0, cost: 0 };
       current.trays += row.trays;
@@ -475,6 +603,17 @@ export default function Dashboard() {
       map.set(name, current);
       return map;
     }, new Map()).values()].sort((a, b) => b.cost - a.cost);
+    const harvestBalance = periodHarvests.reduce((totals, harvest) => {
+      const linkedUnits = (productMovements || [])
+        .filter(movement => movement.type === 'ORDER' && String(movement.harvestId || '') === String(harvest.id))
+        .reduce((sum, movement) => sum + Math.abs(Number(movement.quantity || 0)), 0);
+      const producedUnits = Number(harvest.tuppersCount || 0);
+      return {
+        producedUnits: totals.producedUnits + producedUnits,
+        linkedUnits: totals.linkedUnits + Math.min(linkedUnits, producedUnits),
+        leftoverUnits: totals.leftoverUnits + Math.max(producedUnits - linkedUnits, 0)
+      };
+    }, { producedUnits: 0, linkedUnits: 0, leftoverUnits: 0 });
 
     const lowStock = (articles || [])
       .map(article => ({
@@ -493,6 +632,11 @@ export default function Dashboard() {
       tracedRevenue,
       margin: grossMargin,
       marginPercent: tracedRevenue > 0 ? (grossMargin / tracedRevenue) * 100 : 0,
+      costPercent: tracedRevenue > 0 ? (totalCost / tracedRevenue) * 100 : 0,
+      cultivationPercent: tracedRevenue > 0 ? (cultivationExpenses / tracedRevenue) * 100 : 0,
+      packingPercent: tracedRevenue > 0 ? (packingExpenses / tracedRevenue) * 100 : 0,
+      generalExpensePercent: tracedRevenue > 0 ? (generalExpensesTotal / tracedRevenue) * 100 : 0,
+      operatingMarginPercent: tracedRevenue > 0 ? (operatingResult / tracedRevenue) * 100 : 0,
       costCoverage: monthSales > 0 ? (tracedRevenue / monthSales) * 100 : 0,
       generalExpensesTotal,
       operatingResult,
@@ -538,7 +682,10 @@ export default function Dashboard() {
       activeHarvestCostInPeriod,
       activeProductionRows,
       productionByVariety,
+      plantedByVariety,
+      plantedTotals,
       harvestCostByProduct,
+      harvestBalance,
       productionBreakdown: [
         { name: 'Semillas', value: seedExpenses + activeProductionRows.reduce((sum, row) => sum + row.seedCost, 0) },
         { name: 'Sustrato', value: substrateExpenses + activeProductionRows.reduce((sum, row) => sum + row.substrateCost, 0) },
@@ -549,6 +696,7 @@ export default function Dashboard() {
       chart,
       allClients,
       productSales,
+      profitabilityByVariety,
       lowStock
     };
   }, [articles, clients, cropTypes, crops, deliveryNotes, expenses, harvests, invoices, orders, productMovements, products, selectedBounds.end, selectedBounds.start, stockEntries, stockLots]);

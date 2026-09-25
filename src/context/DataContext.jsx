@@ -500,6 +500,8 @@ export const DataProvider = ({ children, mode = 'full' }) => {
         'guardar el albarán de entrada'
       );
       if (error) return null;
+      const { error: assignError } = await supabase.rpc('assign_pending_seed_lots');
+      if (assignError) throw assignError;
       await refreshData({ force: true });
       return data;
     };
@@ -613,6 +615,11 @@ export const DataProvider = ({ children, mode = 'full' }) => {
     const syncSowingTasks = async () => {
       const { error } = await supabase.rpc('sync_sowing_tasks');
       if (error) throw error;
+      const { error: autoCompleteError } = await supabase.rpc('auto_complete_sowing_tasks');
+      if (autoCompleteError) throw autoCompleteError;
+      const { error: detachError } = await supabase.rpc('detach_negative_seed_lots');
+      if (detachError) throw detachError;
+      await refreshData({ force: true });
       const { data, error: loadError } = await supabase
         .from('sowing_tasks')
         .select('*')
@@ -710,6 +717,18 @@ export const DataProvider = ({ children, mode = 'full' }) => {
 
     const completeSowingTasks = async tasks => {
       const { data, error } = await supabase.rpc('complete_sowing_tasks', { p_tasks: tasks });
+      if (error) throw error;
+      const { error: detachError } = await supabase.rpc('detach_negative_seed_lots');
+      if (detachError) throw detachError;
+      await refreshData({ force: true });
+      return data;
+    };
+
+    const changeCropSeedLot = async (cropId, stockLotId) => {
+      const { data, error } = await supabase.rpc('change_crop_seed_lot', {
+        p_crop_id: cropId,
+        p_new_lot_id: stockLotId
+      });
       if (error) throw error;
       await refreshData({ force: true });
       return data;
@@ -1377,7 +1396,8 @@ export const DataProvider = ({ children, mode = 'full' }) => {
 
   const markOrderAsDelivered = async (orderId, deliveredTo, editedItems = null) => {
     const order = orders.find(o => o.id === orderId);
-    if (!order || order.status === 'DELIVERED') return null;
+    const existingNote = deliveryNotes.find(note => String(note.orderId) === String(orderId));
+    if (!order || existingNote) return null;
 
     const finalItems = editedItems || order.items;
     
@@ -1399,29 +1419,19 @@ export const DataProvider = ({ children, mode = 'full' }) => {
     }
     await updateOrderList(orderId, orderUpdate);
 
-    // Calculate sequential Albaran Number
-    const date = new Date();
-    const year = date.getFullYear();
-    const albaranesThisYear = deliveryNotes.filter(dn => new Date(dn.date).getFullYear() === year);
-    const lastSequence = albaranesThisYear.reduce((max, note) => {
-      const sequence = Number(String(note.albaranNumber || '').split('-').pop());
-      return Number.isFinite(sequence) ? Math.max(max, sequence) : max;
-    }, 0);
-    const seq = String(lastSequence + 1).padStart(4, '0');
-    const albaranNumber = `${year}-${seq}`;
-
-    const tempId = createId();
+    // This is only a delivery preview. The delivery note number and record are
+    // created after the customer signs, never while the order is still open.
     const client = clients.find(c => c.id === order.clientId);
     const newAlbaran = {
-      id: tempId,
-      albaranNumber: albaranNumber,
+      id: null,
+      albaranNumber: null,
       orderId: order.id,
       clientId: order.clientId,
       clientName: client ? client.name : '',
       clientCommercialName: client ? client.commercialName : '',
       items: finalItems,
       total: finalTotal,
-      date: order.date || new Date().toISOString(),
+      date: new Date().toISOString(),
       status: 'UNBILLED',
       deliveredTo: deliveredTo || '',
       signature: null,
@@ -1432,7 +1442,24 @@ export const DataProvider = ({ children, mode = 'full' }) => {
   };
 
   const saveSignedDeliveryNote = async (albaran, signatureBase64) => {
-    const signedAlbaran = { ...albaran, signature: signatureBase64 };
+    const existingNote = deliveryNotes.find(note => String(note.orderId) === String(albaran.orderId));
+    if (existingNote) return existingNote;
+
+    const deliveryDate = new Date();
+    const year = deliveryDate.getFullYear();
+    const albaranesThisYear = deliveryNotes.filter(note => new Date(note.date).getFullYear() === year);
+    const lastSequence = albaranesThisYear.reduce((max, note) => {
+      const sequence = Number(String(note.albaranNumber || '').split('-').pop());
+      return Number.isFinite(sequence) ? Math.max(max, sequence) : max;
+    }, 0);
+    const albaranNumber = `${year}-${String(lastSequence + 1).padStart(4, '0')}`;
+    const signedAlbaran = {
+      ...albaran,
+      id: createId(),
+      albaranNumber,
+      date: deliveryDate.toISOString(),
+      signature: signatureBase64
+    };
     
     // Insert into Supabase delivery_notes table
     const { data, error } = await persistOrReload(
@@ -1729,7 +1756,7 @@ export const DataProvider = ({ children, mode = 'full' }) => {
         seedInventory, addSeedInventory, updateSeedInventory, deleteSeedInventory,
         substrates, addSubstrate, deleteSubstrate,
         substrateInventory, addSubstrateInventory, deleteSubstrateInventory,
-        crops, addCrop, sowCrop, updateCrop, increaseCropTrays, deleteCrop, advanceCropStatus, reverseCropStatus, setCropPhase, discardCrop,
+        crops, addCrop, sowCrop, updateCrop, increaseCropTrays, deleteCrop, advanceCropStatus, reverseCropStatus, setCropPhase, discardCrop, changeCropSeedLot,
         sowingTasks, syncSowingTasks, createSowingTasksForDate, updateSowingTask, cancelSowingTask, completeSowingTasks,
         harvestTargets, addHarvestTarget, updateHarvestTarget, deleteHarvestTarget,
       harvests, addHarvest, registerHarvest, registerHarvestSession, updateHarvest, editHarvestPackaging, deleteHarvest,

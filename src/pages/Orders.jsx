@@ -1,5 +1,6 @@
 import Swal from 'sweetalert2';
 import { useState, Fragment } from 'react';
+import { CalendarDays, Plus, Search, ShoppingBag, Trash2, UserRound, X } from 'lucide-react';
 import { useData } from '../context/DataContext';
 import { usePagination } from '../hooks/usePagination';
 
@@ -203,6 +204,18 @@ export default function Orders() {
     }, 0);
   };
 
+  const closeCreateModal = () => {
+    setIsAdding(false);
+    setClientId('');
+    setOrderItems([]);
+    setSelectedProductId('');
+    setCustomPrice('');
+    setQuantity(1);
+    setDiscount(0);
+    setIsFree(false);
+    setOrderDate(new Date().toISOString().split('T')[0]);
+  };
+
   const handleSubmit = (e) => {
     e.preventDefault();
     if (!clientId || orderItems.length === 0) return;
@@ -218,11 +231,7 @@ export default function Orders() {
     };
 
     addOrder(newOrder);
-    setIsAdding(false);
-    setClientId('');
-    setOrderItems([]);
-    setDiscount(0);
-    setOrderDate(new Date().toISOString().split('T')[0]);
+    closeCreateModal();
   };
 
   const filteredOrders = orders.filter(order => {
@@ -277,33 +286,33 @@ export default function Orders() {
     : false;
   
   return (
-    <div className="admin-container">
+    <div className="admin-container orders-page-clean">
       <div className="admin-header">
         <div>
-          <h2 className="text-2xl font-bold">Gestión de Pedidos</h2>
-          <p className="text-muted" style={{ marginTop: '0.25rem' }}>Administra los pedidos de los clientes y su ciclo logístico.</p>
+          <span className="orders-eyebrow">VENTAS</span>
+          <h2 className="text-2xl font-bold">Pedidos</h2>
+          <p className="text-muted" style={{ marginTop: '0.25rem' }}>Consulta, prepara y registra pedidos desde una sola vista.</p>
         </div>
-        <button className="btn btn-primary" onClick={() => setIsAdding(!isAdding)}>
-          {isAdding ? 'Cerrar Formulario' : '+ Nuevo Pedido'}
-        </button>
+        <button className="orders-primary-action" onClick={() => setIsAdding(true)}><Plus size={18}/> Nuevo pedido</button>
       </div>
 
       <div className="admin-tabs">
         {['ALL', 'PENDING', 'PREPARED', 'IN_TRANSIT', 'DELIVERED'].map(tab => {
           const labels = {
-            ALL: 'Todos los Pedidos',
-            PENDING: 'Pendientes 🟡',
-            PREPARED: 'Preparados 🔵',
-            IN_TRANSIT: 'En Reparto 🟣',
-            DELIVERED: 'Entregados 🟢'
+            ALL: 'Todos',
+            PENDING: 'Pendientes',
+            PREPARED: 'Preparados',
+            IN_TRANSIT: 'En reparto',
+            DELIVERED: 'Entregados'
           };
+          const count = tab === 'ALL' ? orders.length : orders.filter(order => order.status === tab).length;
           return (
             <button 
               key={tab}
               className={`admin-tab ${activeTab === tab ? 'active' : ''}`}
               onClick={() => setActiveTab(tab)}
             >
-              {labels[tab]}
+              {labels[tab]} <small>{count}</small>
             </button>
           );
         })}
@@ -349,101 +358,42 @@ export default function Orders() {
         </div>
       </div>
 
-      {isAdding && (
-        <div className="card" style={{ animation: 'fadeIn 0.3s ease' }}>
-          <h3 className="font-bold mb-4">Crear Pedido</h3>
-          <form onSubmit={handleSubmit}>
-            <div className="flex gap-4 mb-6">
-              <div className="flex-1 max-w-md">
-                <label className="form-label">Seleccionar Cliente</label>
-                <select className="form-control" value={clientId} onChange={handleClientChange} required>
-                  <option value="">-- Elige un cliente --</option>
-                  {clients.map(c => <option key={c.id} value={c.id}>{c.commercialName || c.name}</option>)}
-                </select>
-              </div>
-              <div className="flex-1 max-w-xs">
-                <label className="form-label">Fecha del Pedido</label>
-                <input type="date" className="form-control" value={orderDate} onChange={e => setOrderDate(e.target.value)} required />
-              </div>
+      {isAdding && <div className="order-create-backdrop" onMouseDown={event => { if (event.target === event.currentTarget) closeCreateModal(); }}>
+        <form className="order-create-modal" onSubmit={handleSubmit} role="dialog" aria-modal="true" aria-label="Crear nuevo pedido">
+          <header className="order-create-header">
+            <div className="order-create-title"><i><ShoppingBag/></i><div><span>NUEVO PEDIDO</span><h3>Crear pedido</h3><p>Selecciona el cliente y añade los productos.</p></div></div>
+            <div className="order-create-head-fields">
+              <label><span><UserRound size={14}/> Cliente</span><select value={clientId} onChange={handleClientChange} required><option value="">Seleccionar cliente…</option>{clients.map(client => <option key={client.id} value={client.id}>{client.commercialName || client.name}</option>)}</select></label>
+              <label><span><CalendarDays size={14}/> Fecha</span><input type="date" value={orderDate} onChange={event => setOrderDate(event.target.value)} required/></label>
             </div>
+            <button type="button" className="order-create-close" onClick={closeCreateModal} aria-label="Cerrar"><X/></button>
+          </header>
 
-            <div style={{ background: '#f8fafc', padding: '1rem', borderRadius: '8px', marginBottom: '1rem', border: '1px solid #e2e8f0' }}>
-              <h4 className="font-bold mb-2">Añadir Productos al Pedido</h4>
-              <div className="flex flex-wrap gap-2 items-end">
-                <div style={{ flex: '1 1 200px' }}>
-                  <label className="form-label">Producto</label>
-                  <select className="form-control" value={selectedProductId} onChange={handleProductChange}>
-                    <option value="">-- Seleccionar --</option>
-                    {products.map(p => <option key={p.id} value={p.id}>{p.name} ({p.salePrice} €)</option>)}
-                  </select>
-                </div>
-                <div style={{ width: '100px' }}>
-                  <label className="form-label">Precio</label>
-                  <input type="number" step="0.01" className="form-control" value={customPrice} onChange={e => setCustomPrice(e.target.value)} />
-                </div>
-                <div style={{ width: '80px' }}>
-                  <label className="form-label">Cant.</label>
-                  <input type="number" min="1" className="form-control" value={quantity} onChange={e => setQuantity(Number(e.target.value))} />
-                </div>
-                <div style={{ width: '80px' }}>
-                  <label className="form-label">Dto. %</label>
-                  <input type="number" min="0" max="100" className="form-control" value={discount} onChange={e => setDiscount(Number(e.target.value))} />
-                </div>
-                <div style={{ display: 'flex', alignItems: 'center', height: '42px', gap: '0.5rem' }}>
-                  <input type="checkbox" id="isFree" checked={isFree} onChange={e => setIsFree(e.target.checked)} />
-                  <label htmlFor="isFree" style={{ margin: 0, cursor: 'pointer' }}>Muestra Gratis</label>
-                </div>
-                <button type="button" className="btn btn-secondary" onClick={handleAddItem} style={{ height: '42px' }}>Añadir</button>
+          <main className="order-create-body">
+            <section className="order-create-add">
+              <div className="order-create-section-title"><div><span>1</span><h4>Añadir artículo</h4></div><small>El precio se carga automáticamente y puedes modificarlo.</small></div>
+              <div className="order-create-line-form">
+                <label className="order-create-product"><span>Producto</span><select value={selectedProductId} onChange={handleProductChange}><option value="">Buscar y seleccionar producto…</option>{products.map(product => <option key={product.id} value={product.id}>{product.name} · {Number(product.salePrice ?? product.price ?? 0).toFixed(2)} €</option>)}</select></label>
+                <label><span>Precio</span><input type="number" min="0" step="0.01" value={customPrice} onChange={event => setCustomPrice(event.target.value)}/></label>
+                <label><span>Cantidad</span><input type="number" min="1" value={quantity} onChange={event => setQuantity(Number(event.target.value))}/></label>
+                <label><span>Dto. %</span><input type="number" min="0" max="100" value={discount} onChange={event => setDiscount(Number(event.target.value))}/></label>
+                <label className="order-create-free"><input type="checkbox" checked={isFree} onChange={event => setIsFree(event.target.checked)}/><span>Sin cargo</span></label>
+                <button type="button" onClick={handleAddItem} disabled={!selectedProductId}><Plus size={17}/> Añadir</button>
               </div>
-            </div>
+            </section>
 
-            {orderItems.length > 0 && (
-              <div className="table-container mb-6">
-                <table className="admin-table">
-                  <thead>
-                    <tr>
-                      <th>Producto</th>
-                      <th>Precio Unit.</th>
-                      <th>Cantidad</th>
-                      <th>Descuento</th>
-                      <th>Total Línea</th>
-                      <th>Acción</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {orderItems.map((item, index) => {
-                      const lineTotal = (item.price * item.quantity) * (1 - item.discount / 100);
-                      return (
-                        <tr key={index}>
-                          <td>{item.name}</td>
-                          <td>{item.price.toFixed(2)} €</td>
-                          <td>{item.quantity}</td>
-                          <td>{item.discount}%</td>
-                          <td className="font-semibold">{lineTotal.toFixed(2)} €</td>
-                          <td>
-                            <button type="button" className="btn btn-danger" style={{ padding: '0.2rem 0.5rem', fontSize: '0.75rem' }} onClick={() => handleRemoveItem(index)}>Quitar</button>
-                          </td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                  <tfoot>
-                    <tr style={{ background: '#f8fafc' }}>
-                      <td colSpan="4" className="text-right font-bold pt-4 pb-4">TOTAL:</td>
-                      <td colSpan="2" className="font-bold text-primary text-xl pt-4 pb-4">{calculateTotal().toFixed(2)} €</td>
-                    </tr>
-                  </tfoot>
-                </table>
-              </div>
-            )}
+            <section className="order-create-lines">
+              <div className="order-create-section-title"><div><span>2</span><h4>Artículos del pedido</h4></div><small>{orderItems.length} líneas · {orderItems.reduce((sum, item) => sum + Number(item.quantity || 0), 0)} unidades</small></div>
+              {orderItems.length ? <div className="table-container"><table><thead><tr><th>Producto</th><th>Precio</th><th>Cantidad</th><th>Descuento</th><th>Total</th><th/></tr></thead><tbody>{orderItems.map((item, index) => {
+                const lineTotal = Number(item.price) * Number(item.quantity) * (1 - Number(item.discount) / 100);
+                return <tr key={`${item.productId}-${index}`}><td><strong>{item.name}</strong></td><td>{Number(item.price).toFixed(2)} €</td><td>{item.quantity}</td><td>{item.discount || 0} %</td><td><strong>{lineTotal.toFixed(2)} €</strong></td><td><button type="button" onClick={() => handleRemoveItem(index)} aria-label={`Quitar ${item.name}`}><Trash2 size={16}/></button></td></tr>;
+              })}</tbody></table></div> : <div className="order-create-empty"><Search/><strong>El pedido está vacío</strong><span>Selecciona un producto arriba para empezar.</span></div>}
+            </section>
+          </main>
 
-            <div className="flex justify-end gap-2">
-              <button type="button" className="btn btn-secondary" onClick={() => setIsAdding(false)}>Cancelar</button>
-              <button type="submit" className="btn btn-primary" disabled={orderItems.length === 0 || !clientId}>Guardar Pedido</button>
-            </div>
-          </form>
-        </div>
-      )}
+          <footer className="order-create-footer"><div><span>Total del pedido</span><strong>{calculateTotal().toFixed(2)} €</strong><small>Impuestos incluidos según producto</small></div><button type="button" onClick={closeCreateModal}>Cancelar</button><button type="submit" className="primary" disabled={!clientId || !orderItems.length}>Guardar pedido</button></footer>
+        </form>
+      </div>}
 
       {editingOrder && editFormData && (
         <div className="order-edit-backdrop" onMouseDown={event => { if (event.target === event.currentTarget) setEditingOrder(null); }}>
