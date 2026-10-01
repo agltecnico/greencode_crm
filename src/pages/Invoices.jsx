@@ -7,6 +7,59 @@ import { supabase } from '../config/supabase';
 
 const money = value => Number(value || 0).toLocaleString('es-ES', { style: 'currency', currency: 'EUR' });
 
+const buildInvoiceEmailHtml = invoice => `
+  <div style="margin:0;background:#f3f7f2;padding:28px 12px;font-family:Arial,Helvetica,sans-serif;color:#26352b">
+    <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="max-width:640px;margin:0 auto;background:#ffffff;border-radius:18px;overflow:hidden;box-shadow:0 8px 28px rgba(34,84,50,.12)">
+      <tr>
+        <td style="padding:34px 28px;text-align:center;background:#176b3a;color:#ffffff">
+          <div style="font-size:13px;letter-spacing:3px;text-transform:uppercase;color:#c9f2d5">GreenCode</div>
+          <div style="margin-top:8px;font-size:30px;font-weight:700;line-height:1.15">FACTURA ADJUNTA</div>
+          <div style="margin-top:10px;font-size:15px;color:#e4f7e9">Cultivamos frescura para tus platos 🌱</div>
+        </td>
+      </tr>
+      <tr>
+        <td style="padding:34px 34px 18px">
+          <p style="margin:0 0 18px;font-size:17px;line-height:1.7">Hola,</p>
+          <p style="margin:0 0 22px;font-size:16px;line-height:1.7">Gracias por confiar en <strong style="color:#176b3a">GreenCode</strong> y en nuestros microgreens. Seguimos cultivando sabor, color y mucha vida para cada uno de vuestros platos.</p>
+          <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="margin:0 0 24px;background:#edf8ef;border:1px solid #cfe9d5;border-radius:12px">
+            <tr>
+              <td style="padding:20px 22px">
+                <div style="font-size:12px;letter-spacing:1.5px;text-transform:uppercase;color:#578065">Documentación adjunta</div>
+                <div style="margin-top:6px;font-size:21px;font-weight:700;color:#176b3a">Factura ${invoice.invoiceNumber}</div>
+                <div style="margin-top:7px;font-size:14px;line-height:1.5;color:#52705c">Incluye los albaranes correspondientes debidamente firmados.</div>
+              </td>
+            </tr>
+          </table>
+          <p style="margin:0 0 10px;font-size:16px;line-height:1.7">Si tienes cualquier consulta o necesitas que revisemos algún documento, estaremos encantados de ayudarte.</p>
+          <p style="margin:0;font-size:16px;line-height:1.7">Gracias por formar parte de este pequeño gran mundo verde.</p>
+        </td>
+      </tr>
+      <tr>
+        <td style="padding:22px 34px 28px">
+          <div style="border-top:1px solid #dfe9e1;padding-top:22px">
+            <div style="font-size:19px;font-weight:700;color:#176b3a">Iris García</div>
+            <div style="margin-top:3px;font-size:14px;color:#647269">Responsable de Administración</div>
+            <div style="margin-top:10px;font-size:14px;line-height:1.6">
+              <a href="mailto:administracion@mygreencode.es" style="color:#176b3a;text-decoration:none">administracion@mygreencode.es</a><br>
+              Aspe · Alicante
+            </div>
+          </div>
+        </td>
+      </tr>
+      <tr>
+        <td style="padding:18px 28px;text-align:center;background:#e6f3e8;color:#315f3e;font-size:13px;line-height:1.55">
+          🌿 <strong>Hazlo más verde:</strong> evita imprimir este correo y sus documentos si no es necesario.
+        </td>
+      </tr>
+      <tr>
+        <td style="padding:18px 28px;background:#f8faf8;color:#7a837d;font-size:10px;line-height:1.5;text-align:center">
+          <strong>Aviso de confidencialidad y protección de datos</strong><br>
+          Este mensaje y sus archivos adjuntos pueden contener información confidencial dirigida exclusivamente a su destinatario. Si lo ha recibido por error, comuníquelo al remitente y elimínelo. Los datos personales serán tratados por Antonio José Gómez López, NIF 4835348N, conforme al Reglamento (UE) 2016/679 y la Ley Orgánica 3/2018. Puede ejercer sus derechos escribiendo a administracion@mygreencode.es.
+        </td>
+      </tr>
+    </table>
+  </div>`;
+
 const getDueDate = invoice => {
   const date = new Date(invoice.date);
   const termMatch = String(invoice.paymentMethod || '').match(/(\d+)/);
@@ -318,17 +371,24 @@ export default function Invoices() {
     reader.readAsDataURL(blob);
   });
 
+  const findInvoiceClient = invoice => clients.find(item =>
+    String(item.id) === String(invoice.clientId)
+    || (invoice.clientName && item.name === invoice.clientName)
+    || (invoice.clientCommercialName && item.commercialName === invoice.clientCommercialName)
+  );
+
   const openEmailReview = invoice => {
-    const client = clients.find(item => item.id === invoice.clientId);
+    const client = findInvoiceClient(invoice);
     setEmailReviewInvoice(invoice);
-    setEmailRecipient(client?.email || '');
+    setEmailRecipient(client?.email?.trim() || '');
     setEmailNoteIds([...(invoice.deliveryNoteIds || [])]);
   };
 
   const sendOfficialInvoice = async invoice => {
     if (invoice.type === 'SUMMARY') return Swal.fire('No disponible', 'Los albaranes resumen no se envían desde este control.', 'info');
-    const client = clients.find(item => item.id === invoice.clientId);
-    if (!emailRecipient) return Swal.fire('Falta el correo', 'Indica el correo electrónico del destinatario.', 'warning');
+    const client = findInvoiceClient(invoice);
+    const recipient = emailRecipient.trim();
+    if (!recipient) return Swal.fire('Falta el correo', 'Indica el correo electrónico del destinatario.', 'warning');
     const notes = deliveryNotes.filter(note => emailNoteIds.includes(note.id));
     const unsigned = notes.filter(note => !note.signature);
     if (!notes.length || unsigned.length) return Swal.fire('Documentación incompleta', unsigned.length ? `Hay ${unsigned.length} albarán(es) sin firma.` : 'La factura no tiene albaranes asociados.', 'warning');
@@ -340,12 +400,12 @@ export default function Invoices() {
         const blob = await generateDeliveryNoteBlob(note, client);
         attachments.push({ filename: `Albaran_${note.albaranNumber || note.id.slice(-6)}.pdf`, content: await blobToBase64(blob) });
       }
-      const html = `<p>Hola,</p><p>Tal y como hablamos, os adjuntamos la factura <strong>${invoice.invoiceNumber}</strong> junto con los albaranes de entrega firmados.</p><p>A partir de ahora, la factura y sus correspondientes albaranes se enviarán a principios de cada mes vencido.</p><p>Quedamos a vuestra disposición para cualquier consulta o aclaración.</p><p>Gracias por vuestra confianza.</p><p>Un saludo,</p><div style="border-top:1px solid #d1d5db;padding-top:16px;color:#4b5563;font-family:Arial,sans-serif"><strong style="font-size:18px;color:#166534">Iris García</strong><br>Responsable de Administración<br><a href="mailto:administracion@mygreencode.es" style="color:#166534">administracion@mygreencode.es</a><br>Aspe · Alicante<hr style="border:0;border-top:1px solid #e5e7eb;margin:16px 0"><small><strong>Aviso de confidencialidad y protección de datos</strong><br>Este mensaje y, en su caso, los archivos adjuntos, pueden contener información confidencial dirigida exclusivamente a su destinatario. Si lo ha recibido por error, comuníquelo al remitente y elimínelo. Los datos personales serán tratados por Antonio José Gómez López, NIF 4835348N, conforme al Reglamento (UE) 2016/679 y la Ley Orgánica 3/2018. Puede ejercer sus derechos escribiendo a administracion@mygreencode.es.<br><br>Por favor, piense en el medio ambiente antes de imprimir este correo.</small></div>`;
-      const { error } = await supabase.functions.invoke('send-invoice-email', { body: { invoiceId: invoice.id, to: emailRecipient, subject: `Factura ${invoice.invoiceNumber} y albaranes de entrega – GreenCode`, html, attachments } });
+      const html = buildInvoiceEmailHtml(invoice);
+      const { error } = await supabase.functions.invoke('send-invoice-email', { body: { invoiceId: invoice.id, to: recipient, subject: `Factura ${invoice.invoiceNumber} · GreenCode 🌱`, html, attachments } });
       if (error) throw error;
       await refreshData({ force: true });
       setEmailReviewInvoice(null);
-      await Swal.fire('Factura enviada', `Enviada correctamente a ${emailRecipient}.`, 'success');
+      await Swal.fire('Factura enviada', `Enviada correctamente a ${recipient}.`, 'success');
     } catch (error) {
       await Swal.fire('No se pudo enviar', error.message || 'Revisa la configuración SMTP.', 'error');
     } finally { setSendingInvoiceId(null); }
@@ -671,13 +731,13 @@ export default function Invoices() {
         const associatedNotes = deliveryNotes.filter(note => (emailReviewInvoice.deliveryNoteIds || []).includes(note.id));
         return <div className="invoice-email-backdrop" onMouseDown={event => { if (event.target === event.currentTarget) setEmailReviewInvoice(null); }}>
           <section className="invoice-email-modal" role="dialog" aria-modal="true">
-            <header><div><span>ENVÍO DE FACTURA OFICIAL</span><h3>{emailReviewInvoice.invoiceNumber}</h3><p>Revisa el destinatario y los documentos adjuntos.</p></div><button onClick={() => setEmailReviewInvoice(null)}>×</button></header>
+            <header><div><span>ENVÍO DE FACTURA OFICIAL</span><h3>{emailReviewInvoice.invoiceNumber}</h3><p>Confirma el correo de destino antes de realizar el envío.</p></div><button onClick={() => setEmailReviewInvoice(null)}>×</button></header>
             <div className="invoice-email-body">
-              <label>Correo del cliente<input type="email" value={emailRecipient} onChange={event => setEmailRecipient(event.target.value)} placeholder="cliente@empresa.com"/></label>
+              <label>Correo de destino<input type="email" value={emailRecipient} onChange={event => setEmailRecipient(event.target.value)} placeholder="cliente@empresa.com"/><small>Se carga desde la ficha del cliente. Puedes cambiarlo para este envío sin modificar su ficha.</small></label>
               <div className="invoice-email-invoice"><input type="checkbox" checked readOnly/><div><strong>{emailReviewInvoice.invoiceNumber}.pdf</strong><small>Factura oficial · siempre adjunta</small></div><span>{money(emailReviewInvoice.total)}</span></div>
               <div className="invoice-email-notes"><div><strong>Albaranes asociados</strong><small>Todos están seleccionados por defecto.</small></div>{associatedNotes.map(note => <label key={note.id} className={!note.signature ? 'is-unsigned' : ''}><input type="checkbox" checked={emailNoteIds.includes(note.id)} disabled={!note.signature} onChange={() => setEmailNoteIds(current => current.includes(note.id) ? current.filter(id => id !== note.id) : [...current, note.id])}/><span><strong>Albarán {note.albaranNumber || note.id.slice(-6)}</strong><small>{new Date(note.date).toLocaleDateString('es-ES')} · {note.signature ? 'Firmado' : 'Sin firma'}</small></span><b>{money(note.total)}</b></label>)}</div>
             </div>
-            <footer><div><span>Documentos seleccionados</span><strong>{1 + emailNoteIds.length}</strong></div><button onClick={() => setEmailReviewInvoice(null)}>Cancelar</button><button className="primary" disabled={sendingInvoiceId === emailReviewInvoice.id || !emailRecipient || !emailNoteIds.length} onClick={() => sendOfficialInvoice(emailReviewInvoice)}>{sendingInvoiceId === emailReviewInvoice.id ? 'Enviando…' : 'Enviar factura'}</button></footer>
+            <footer><div><span>Documentos seleccionados</span><strong>{1 + emailNoteIds.length}</strong></div><button onClick={() => setEmailReviewInvoice(null)}>Cancelar</button><button className="primary" disabled={sendingInvoiceId === emailReviewInvoice.id || !emailRecipient.trim() || !emailNoteIds.length} onClick={() => sendOfficialInvoice(emailReviewInvoice)}>{sendingInvoiceId === emailReviewInvoice.id ? 'Enviando…' : 'Confirmar y enviar'}</button></footer>
           </section>
         </div>;
       })()}
