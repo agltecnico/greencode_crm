@@ -50,7 +50,11 @@ export const getLogoBase64 = async () => {
           ctx.fillRect(0, 0, canvas.width, canvas.height);
           ctx.drawImage(img, 0, 0, targetW, targetH);
           const jpegBase64 = canvas.toDataURL('image/jpeg', 0.9);
-          try { localStorage.setItem('crm_company_logo_jpeg_v3', jpegBase64); } catch(e) {}
+          try {
+            localStorage.setItem('crm_company_logo_jpeg_v3', jpegBase64);
+          } catch (storageError) {
+            console.warn('Could not cache the company logo', storageError);
+          }
           resolve(jpegBase64);
         } catch(e) {
           console.warn(e);
@@ -205,6 +209,12 @@ export const generateDeliveryNoteBlob = async (albaran, client) => {
 
 const buildInvoiceDoc = async (invoice, client, deliveryNotes) => {
   const doc = new jsPDF();
+  const pageBottom = doc.internal.pageSize.getHeight() - 20;
+  const ensureVerticalSpace = (currentY, requiredHeight) => {
+    if (currentY + requiredHeight <= pageBottom) return currentY;
+    doc.addPage();
+    return 20;
+  };
   const logoData = await getLogoBase64();
   const defaultCompanyProfile = {
     fiscalName: 'GREENCODE',
@@ -308,7 +318,8 @@ const buildInvoiceDoc = async (invoice, client, deliveryNotes) => {
   // We loop over all delivery notes included in this invoice
   currentY += 6;
 
-  deliveryNotes.forEach((dn, index) => {
+  deliveryNotes.forEach((dn) => {
+    currentY = ensureVerticalSpace(currentY, 20);
     doc.setFontSize(11);
     doc.setTextColor(0);
     const albaranDisplay = dn.albaranNumber || dn.id.slice(-6);
@@ -350,6 +361,10 @@ const buildInvoiceDoc = async (invoice, client, deliveryNotes) => {
   const ivaPercentage = invoice.ivaPercentage !== undefined ? invoice.ivaPercentage : 0;
   const ivaAmount = subtotal * (ivaPercentage / 100);
   const finalTotal = invoice.total;
+
+  // Keep the complete totals block together. Without this check, long invoices
+  // could render the VAT and total below the printable area of the last page.
+  currentY = ensureVerticalSpace(currentY, invoice.type === 'SUMMARY' ? 12 : 28);
 
   if (invoice.type !== 'SUMMARY') {
     doc.text(`SUBTOTAL:`, 160, currentY, { align: 'right' }); 
