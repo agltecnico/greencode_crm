@@ -7,7 +7,6 @@ function PublicTicket() {
   const { id } = useParams();
   const [ticket, setTicket] = useState(null);
   const [client, setClient] = useState(null);
-  const [profile, setProfile] = useState(null);
   const [logo, setLogo] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -26,17 +25,13 @@ function PublicTicket() {
         setTicket(dn);
 
         // Load client details to generate identical PDF
-        const { data: cl, error: clError } = await supabase
+        const { data: cl } = await supabase
           .from('clients')
           .select('*')
           .eq('id', dn.clientId)
           .single();
         
         if (cl) setClient(cl);
-
-        // Load company profile
-        const { data: prof } = await supabase.from('company_profile').select('*').single();
-        if (prof) setProfile(prof);
 
         // Load logo
         const savedLogo = localStorage.getItem('crm_companyLogo');
@@ -300,18 +295,7 @@ function PublicTicket() {
         {/* Document Header */}
         <div className="doc-header">
           <div className="company-info">
-            {logo ? (
-              <img src={logo} alt="Logo" className="doc-logo" />
-            ) : (
-              <h1 className="company-name">{profile?.fiscalName || 'GREENCODE'}</h1>
-            )}
-            <div className="company-details">
-              {profile?.ownerName && <p>{profile.ownerName}</p>}
-              {profile?.nif && <p>NIF/CIF: {profile.nif}</p>}
-              {profile?.address && <p>{profile.address}</p>}
-              <p>{[profile?.postalCode, profile?.city, profile?.province].filter(Boolean).join(' ')}</p>
-              {profile?.phone && <p>Tlf: {profile.phone}</p>}
-            </div>
+            {logo ? <img src={logo} alt="GreenCode" className="doc-logo" /> : <h1 className="company-name">GREENCODE</h1>}
           </div>
           <div className="doc-title-block">
             <h2 className="doc-title">ALBARÁN</h2>
@@ -325,20 +309,11 @@ function PublicTicket() {
         {/* Client & Delivery Info */}
         <div className="doc-columns">
           <div className="info-card">
-            <h3>Datos del Cliente</h3>
-            {client?.commercialName ? (
-              <>
-                <p className="client-name">{client.commercialName}</p>
-                <p className="client-details">{client.name}</p>
-              </>
-            ) : (
-              <p className="client-name">{client?.name || 'Cliente Desconocido'}</p>
-            )}
+            <h3>Cliente</h3>
+            <p className="client-name">{client?.commercialName || client?.name || 'Cliente desconocido'}</p>
             <div className="client-details" style={{ marginTop: '0.5rem' }}>
-              <p>NIF: {client?.nif || '-'}</p>
-              <p>Dir: {client?.address || '-'}</p>
+              {client?.address && <p>{client.address}</p>}
               <p>{[client?.postalCode, client?.city, client?.province].filter(Boolean).join(' ')}</p>
-              <p>Tlf: {client?.phone || '-'}</p>
             </div>
           </div>
           <div className="info-card">

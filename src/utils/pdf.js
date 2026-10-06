@@ -3,7 +3,7 @@ import autoTable from 'jspdf-autotable';
 
 export const getLogoBase64 = async () => {
   try {
-    const cachedJpeg = localStorage.getItem('crm_company_logo_jpeg_v3');
+    const cachedJpeg = localStorage.getItem('crm_company_logo_jpeg_v4');
     if (cachedJpeg) return cachedJpeg;
 
     let logoData = null;
@@ -43,15 +43,37 @@ export const getLogoBase64 = async () => {
             targetH = Math.floor(targetH * (800 / targetW));
             targetW = 800;
           }
-          canvas.width = targetW;
-          canvas.height = targetH;
+          const sourceCanvas = document.createElement('canvas');
+          sourceCanvas.width = targetW;
+          sourceCanvas.height = targetH;
+          const sourceCtx = sourceCanvas.getContext('2d');
+          sourceCtx.drawImage(img, 0, 0, targetW, targetH);
+          const pixels = sourceCtx.getImageData(0, 0, targetW, targetH).data;
+          let minX = targetW, minY = targetH, maxX = 0, maxY = 0;
+          for (let y = 0; y < targetH; y += 1) {
+            for (let x = 0; x < targetW; x += 1) {
+              const index = (y * targetW + x) * 4;
+              const visible = pixels[index + 3] > 20 && (pixels[index] < 245 || pixels[index + 1] < 245 || pixels[index + 2] < 245);
+              if (visible) {
+                minX = Math.min(minX, x); maxX = Math.max(maxX, x);
+                minY = Math.min(minY, y); maxY = Math.max(maxY, y);
+              }
+            }
+          }
+          const hasVisibleContent = minX <= maxX && minY <= maxY;
+          const cropX = hasVisibleContent ? minX : 0;
+          const cropY = hasVisibleContent ? minY : 0;
+          const cropW = hasVisibleContent ? maxX - minX + 1 : targetW;
+          const cropH = hasVisibleContent ? maxY - minY + 1 : targetH;
+          canvas.width = cropW;
+          canvas.height = cropH;
           const ctx = canvas.getContext('2d');
           ctx.fillStyle = '#FFFFFF';
-          ctx.fillRect(0, 0, canvas.width, canvas.height);
-          ctx.drawImage(img, 0, 0, targetW, targetH);
+          ctx.fillRect(0, 0, cropW, cropH);
+          ctx.drawImage(sourceCanvas, cropX, cropY, cropW, cropH, 0, 0, cropW, cropH);
           const jpegBase64 = canvas.toDataURL('image/jpeg', 0.9);
           try {
-            localStorage.setItem('crm_company_logo_jpeg_v3', jpegBase64);
+            localStorage.setItem('crm_company_logo_jpeg_v4', jpegBase64);
           } catch (storageError) {
             console.warn('Could not cache the company logo', storageError);
           }
@@ -73,6 +95,7 @@ export const getLogoBase64 = async () => {
   }
 };
 
+/* Plantilla anterior conservada temporalmente como referencia.
 const buildDeliveryNoteDoc = async (albaran, client) => {
   const doc = new jsPDF();
   const logoData = await getLogoBase64();
@@ -210,8 +233,14 @@ export const generateDeliveryNoteBlob = async (albaran, client) => {
 const buildInvoiceDoc = async (invoice, client, deliveryNotes) => {
   const doc = new jsPDF();
   const pageBottom = doc.internal.pageSize.getHeight() - 20;
-  const ensureVerticalSpace = (currentY, requiredHeight) => {
+  const ensureVerticalSpace = (currentY, requiredHeight, showContinuation = false) => {
     if (currentY + requiredHeight <= pageBottom) return currentY;
+    if (showContinuation) {
+      doc.setFont('helvetica', 'italic');
+      doc.setFontSize(9);
+      doc.setTextColor(120);
+      doc.text('-- sigue --', doc.internal.pageSize.getWidth() / 2, pageBottom + 8, { align: 'center' });
+    }
     doc.addPage();
     return 20;
   };
@@ -364,7 +393,7 @@ const buildInvoiceDoc = async (invoice, client, deliveryNotes) => {
 
   // Keep the complete totals block together. Without this check, long invoices
   // could render the VAT and total below the printable area of the last page.
-  currentY = ensureVerticalSpace(currentY, invoice.type === 'SUMMARY' ? 12 : 28);
+  currentY = ensureVerticalSpace(currentY, invoice.type === 'SUMMARY' ? 12 : 28, true);
 
   if (invoice.type !== 'SUMMARY') {
     doc.text(`SUBTOTAL:`, 160, currentY, { align: 'right' }); 
@@ -390,6 +419,370 @@ const buildInvoiceDoc = async (invoice, client, deliveryNotes) => {
   doc.text(`${finalTotal.toFixed(2)} €`, 196, currentY + 3, { align: 'right' });
 
   return doc;
+};
+
+export const generateInvoicePDF = async (invoice, client, deliveryNotes) => {
+  const doc = await buildInvoiceDoc(invoice, client, deliveryNotes);
+  const prefix = invoice.type === 'SUMMARY' ? 'Resumen' : 'Factura';
+  doc.save(`${prefix}_${invoice.invoiceNumber}_${client.name}.pdf`);
+};
+
+export const generateInvoiceBlob = async (invoice, client, deliveryNotes) => {
+  const doc = await buildInvoiceDoc(invoice, client, deliveryNotes);
+  return doc.output('blob');
+};
+*/
+
+const PDF_COLORS = {
+  green: [47, 143, 80],
+  dark: [41, 68, 56],
+  muted: [102, 118, 110],
+  light: [243, 247, 244],
+  lighter: [247, 250, 248],
+  border: [215, 225, 218],
+  soft: [131, 174, 145],
+  white: [255, 255, 255]
+};
+
+const DEFAULT_COMPANY_PROFILE = {
+  fiscalName: 'GREENCODE',
+  ownerName: 'ANTONIO JOSÉ GÓMEZ LÓPEZ',
+  nif: '48351348N',
+  address: 'CALLE SANTA FAZ 41',
+  postalCode: '',
+  city: 'ASPE',
+  province: 'ALICANTE',
+  bankAccount: ''
+};
+
+const getCompanyProfile = () => ({
+  ...DEFAULT_COMPANY_PROFILE,
+  ...(JSON.parse(localStorage.getItem('crm_company_profile') || '{}'))
+});
+
+const formatMoney = (value) => `${Number(value || 0).toLocaleString('es-ES', {
+  minimumFractionDigits: 2,
+  maximumFractionDigits: 2
+})} €`;
+
+const formatDate = (value) => new Date(value).toLocaleDateString('es-ES');
+
+const documentNumber = (value, prefix) => {
+  const number = String(value || '').trim();
+  return number.startsWith(prefix) ? number : `${prefix}${number}`;
+};
+
+const addImageWithRatio = (doc, image, x, y, maxWidth, maxHeight) => {
+  if (!image) return;
+  const props = doc.getImageProperties(image);
+  const scale = Math.min(maxWidth / props.width, maxHeight / props.height);
+  const width = props.width * scale;
+  const height = props.height * scale;
+  const format = image.startsWith('data:image/jpeg') ? 'JPEG' : 'PNG';
+  doc.addImage(image, format, x, y + (maxHeight - height) / 2, width, height, undefined, 'FAST');
+};
+
+const drawTopHeader = (doc, logoData, { title, number, date }) => {
+  doc.setFillColor(...PDF_COLORS.soft);
+  doc.rect(0, 0, 210, 0.8, 'F');
+  addImageWithRatio(doc, logoData, 14, 12, 76, 29);
+
+  doc.setFillColor(...PDF_COLORS.light);
+  doc.roundedRect(116, 16, 79, 28, 3, 3, 'F');
+  doc.setFillColor(...PDF_COLORS.soft);
+  doc.rect(116, 18, 1, 24, 'F');
+  doc.setTextColor(...PDF_COLORS.dark);
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(title.length > 18 ? 9 : 10);
+  doc.text(title, 124, 23);
+  doc.setTextColor(...PDF_COLORS.green);
+  doc.setFontSize(number.length > 14 ? 14 : 16);
+  doc.text(number, 124, 32);
+  doc.setTextColor(...PDF_COLORS.muted);
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(8);
+  doc.text(title === 'ALBARÁN DE ENTREGA' ? 'Fecha de entrega' : 'Fecha de emisión', 124, 39);
+  doc.setTextColor(...PDF_COLORS.dark);
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(9);
+  doc.text(formatDate(date), 190, 39, { align: 'right' });
+  doc.setDrawColor(...PDF_COLORS.border);
+  doc.line(14, 51, 196, 51);
+};
+
+const drawContinuationHeader = (doc, label, clientName) => {
+  doc.setFillColor(...PDF_COLORS.soft);
+  doc.rect(0, 0, 210, 0.8, 'F');
+  doc.setTextColor(...PDF_COLORS.dark);
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(9);
+  doc.text(label, 14, 18);
+  doc.setTextColor(...PDF_COLORS.muted);
+  doc.setFont('helvetica', 'italic');
+  doc.setFontSize(8.5);
+  doc.text(clientName || 'Continuación', 196, 18, { align: 'right' });
+  doc.setDrawColor(...PDF_COLORS.border);
+  doc.line(14, 23, 196, 23);
+};
+
+const drawFooter = (doc) => {
+  const pages = doc.getNumberOfPages();
+  for (let page = 1; page <= pages; page += 1) {
+    doc.setPage(page);
+    doc.setDrawColor(...PDF_COLORS.border);
+    doc.line(14, 282, 196, 282);
+    doc.setTextColor(...PDF_COLORS.muted);
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(8);
+    doc.text('GREENCODE', 14, 287);
+    doc.setFont('helvetica', 'italic');
+    doc.text('Tu código verde', 35, 287);
+    doc.text(`Página ${page} de ${pages}`, 196, 287, { align: 'right' });
+  }
+};
+
+const drawClientCard = (doc, client, y, invoiceDocument = false) => {
+  const x = invoiceDocument ? 111 : 14;
+  const width = invoiceDocument ? 85 : 182;
+  doc.setFillColor(...PDF_COLORS.lighter);
+  doc.roundedRect(x, y, width, 43, 3, 3, 'F');
+  doc.setTextColor(...PDF_COLORS.dark);
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(9);
+  doc.text('CLIENTE', x + 7, y + 8);
+  const lines = [];
+  if (invoiceDocument) {
+    if (client.commercialName) lines.push(client.commercialName, client.name);
+    else lines.push(client.name);
+    if (client.nif) lines.push(`NIF/CIF: ${client.nif}`);
+  } else {
+    lines.push(client.commercialName || client.name);
+  }
+  if (client.address) lines.push(client.address);
+  const location = [client.postalCode, client.city, client.province].filter(Boolean).join(' ');
+  if (location) lines.push(location);
+  doc.setFontSize(9);
+  lines.slice(0, 5).forEach((line, index) => {
+    doc.setFont('helvetica', index === 0 ? 'bold' : 'normal');
+    doc.text(String(line), x + 7, y + 17 + index * 5, { maxWidth: width - 14 });
+  });
+};
+
+const drawCompanyCard = (doc, profile, y) => {
+  doc.setFillColor(...PDF_COLORS.lighter);
+  doc.roundedRect(14, y, 91, 43, 3, 3, 'F');
+  doc.setTextColor(...PDF_COLORS.dark);
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(9);
+  doc.text('DATOS FISCALES', 21, y + 8);
+  const lines = [
+    profile.fiscalName || 'GREENCODE',
+    profile.ownerName,
+    profile.nif ? `NIF/CIF: ${profile.nif}` : '',
+    profile.address,
+    [profile.postalCode, profile.city, profile.province].filter(Boolean).join(' ')
+  ].filter(Boolean);
+  lines.slice(0, 5).forEach((line, index) => {
+    doc.setFont('helvetica', index === 0 ? 'bold' : 'normal');
+    doc.text(String(line), 21, y + 17 + index * 5, { maxWidth: 77 });
+  });
+};
+
+const deliveryRows = (note) => (note.items || []).map((item) => {
+  const discount = Number(item.discount || 0);
+  const total = Number(item.price || 0) * Number(item.quantity || 0) * (1 - discount / 100);
+  return [item.name, item.quantity, formatMoney(item.price), `${discount}%`, formatMoney(total)];
+});
+
+const drawItemsTable = (doc, note, y) => {
+  autoTable(doc, {
+    head: [['Producto', 'Cantidad', 'Precio unit.', 'Dto.', 'Total']],
+    body: deliveryRows(note),
+    startY: y,
+    theme: 'grid',
+    margin: { left: 14, right: 14, bottom: 22 },
+    tableWidth: 182,
+    styles: { font: 'helvetica', fontSize: 8.2, cellPadding: 2.2, textColor: PDF_COLORS.muted, lineColor: PDF_COLORS.border, lineWidth: 0.25 },
+    headStyles: { fillColor: PDF_COLORS.dark, textColor: PDF_COLORS.white, fontStyle: 'bold' },
+    columnStyles: {
+      0: { cellWidth: 63 }, 1: { cellWidth: 25, halign: 'right' },
+      2: { cellWidth: 34, halign: 'right' }, 3: { cellWidth: 25, halign: 'right' },
+      4: { cellWidth: 35, halign: 'right' }
+    }
+  });
+  return doc.lastAutoTable.finalY;
+};
+
+const addContinuationPage = (doc, label, clientName, showMarker = true) => {
+  if (showMarker) {
+    doc.setTextColor(...PDF_COLORS.muted);
+    doc.setFont('helvetica', 'italic');
+    doc.setFontSize(8.5);
+    doc.text('Continúa en la página siguiente  >', 105, 275, { align: 'center' });
+  }
+  doc.addPage();
+  drawContinuationHeader(doc, label, clientName);
+  return 37;
+};
+
+const buildDeliveryNoteDoc = async (note, client) => {
+  const doc = new jsPDF();
+  const logoData = await getLogoBase64();
+  const displayNumber = documentNumber(note.albaranNumber || note.id.slice(-6), 'ALB-');
+  drawTopHeader(doc, logoData, { title: 'ALBARÁN DE ENTREGA', number: displayNumber, date: note.date });
+  drawClientCard(doc, client, 58, false);
+
+  doc.setTextColor(...PDF_COLORS.dark);
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(10);
+  doc.text('DETALLE DE LA ENTREGA', 14, 120);
+  let y = drawItemsTable(doc, note, 125) + 8;
+
+  const closingHeight = 63;
+  if (y + closingHeight > 274) y = addContinuationPage(doc, `ALBARÁN ${displayNumber}`, 'Continuación');
+  doc.setFillColor(...PDF_COLORS.light);
+  doc.roundedRect(128, y, 68, 18, 3, 3, 'F');
+  doc.setTextColor(...PDF_COLORS.dark);
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(9);
+  doc.text('TOTAL ALBARÁN', 135, y + 10);
+  doc.setTextColor(...PDF_COLORS.green);
+  doc.setFontSize(14);
+  doc.text(formatMoney(note.total), 189, y + 11, { align: 'right' });
+  y += 27;
+
+  if (note.deliveredTo || note.signature) {
+    doc.setFillColor(...PDF_COLORS.light);
+    doc.roundedRect(14, y, 182, 33, 3, 3, 'F');
+    doc.setTextColor(...PDF_COLORS.dark);
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(9);
+    doc.text('ENTREGA', 21, y + 9);
+    doc.setFont('helvetica', 'normal');
+    if (note.deliveredTo) doc.text(`Entregado a: ${note.deliveredTo}`, 21, y + 20);
+    if (note.signature) {
+      doc.setFont('helvetica', 'bold');
+      doc.text('FIRMA DE CONFORMIDAD', 132, y + 9);
+      try {
+        const isJpeg = note.signature.startsWith('/9j/') || note.signature.startsWith('data:image/jpeg');
+        const format = isJpeg ? 'JPEG' : 'PNG';
+        const image = note.signature.startsWith('data:image') ? note.signature : `data:image/${isJpeg ? 'jpeg' : 'png'};base64,${note.signature}`;
+        doc.addImage(image, format, 137, y + 11, 44, 18, undefined, 'FAST');
+      } catch (error) {
+        console.warn('Could not render signature on PDF', error);
+      }
+    }
+  }
+  drawFooter(doc);
+  return doc;
+};
+
+const drawNoteSection = (doc, note, y, continuationLabel, clientName, reserveAfter = 0) => {
+  const estimatedHeight = 10 + (deliveryRows(note).length + 1) * 8;
+  if (y + estimatedHeight + reserveAfter > 270) y = addContinuationPage(doc, continuationLabel, clientName);
+  const number = documentNumber(note.albaranNumber || note.id.slice(-6), 'ALB-');
+  doc.setTextColor(...PDF_COLORS.dark);
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(9.5);
+  doc.text(`Albarán ${number}`, 14, y);
+  doc.setTextColor(...PDF_COLORS.muted);
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(8.5);
+  doc.text(formatDate(note.date), 196, y, { align: 'right' });
+  return drawItemsTable(doc, note, y + 4) + 8;
+};
+
+const buildInvoiceDoc = async (invoice, client, deliveryNotes) => {
+  const doc = new jsPDF();
+  const logoData = await getLogoBase64();
+  const profile = getCompanyProfile();
+  const isSummary = invoice.type === 'SUMMARY';
+  const title = isSummary ? 'RESUMEN DE ALBARANES' : 'FACTURA';
+  const number = invoice.invoiceNumber;
+  drawTopHeader(doc, logoData, { title, number, date: invoice.date });
+
+  if (isSummary) {
+    drawClientCard(doc, client, 58, false);
+  } else {
+    drawCompanyCard(doc, profile, 58);
+    drawClientCard(doc, client, 58, true);
+  }
+
+  let y = 116;
+  const continuationLabel = `${isSummary ? 'RESUMEN' : 'FACTURA'} ${number}`;
+  const notes = deliveryNotes || [];
+  const totalsHeight = isSummary ? 27 : 47;
+  notes.forEach((note, index) => {
+    const keepWithTotals = index === notes.length - 1 ? totalsHeight : 0;
+    y = drawNoteSection(doc, note, y, continuationLabel, client.commercialName || client.name, keepWithTotals);
+  });
+
+  if (y + totalsHeight > 270) y = addContinuationPage(doc, continuationLabel, client.commercialName || client.name);
+  const totalX = isSummary ? 112 : 112;
+  if (invoice.paymentMethod) {
+    doc.setFillColor(...PDF_COLORS.light);
+    doc.roundedRect(14, y, 86, isSummary ? 18 : 34, 3, 3, 'F');
+    doc.setTextColor(...PDF_COLORS.dark);
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(9);
+    doc.text('FORMA DE PAGO', 21, y + 10);
+    doc.setFont('helvetica', 'normal');
+    doc.text(invoice.paymentMethod, 52, y + 10);
+    if (!isSummary && invoice.paymentMethod === 'Transferencia' && profile.bankAccount) {
+      doc.setFontSize(8.5);
+      doc.text(`IBAN: ${profile.bankAccount}`, 21, y + 21, { maxWidth: 72 });
+    }
+  }
+
+  if (isSummary) {
+    doc.setFillColor(...PDF_COLORS.light);
+    doc.roundedRect(totalX, y, 84, 18, 3, 3, 'F');
+    doc.setTextColor(...PDF_COLORS.dark);
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(9);
+    doc.text('TOTAL RESUMEN', 119, y + 10);
+    doc.setTextColor(...PDF_COLORS.green);
+    doc.setFontSize(14);
+    doc.text(formatMoney(invoice.total), 189, y + 11, { align: 'right' });
+  } else {
+    const subtotal = invoice.subtotal !== undefined ? invoice.subtotal : invoice.total;
+    const vatPercent = Number(invoice.ivaPercentage || 0);
+    const vat = Number(invoice.taxTotal ?? (subtotal * vatPercent / 100));
+    autoTable(doc, {
+      body: [
+        ['Subtotal', formatMoney(subtotal)],
+        [`IVA (${vatPercent}%)`, formatMoney(vat)],
+        ['TOTAL FACTURA', formatMoney(invoice.total)]
+      ],
+      startY: y,
+      margin: { left: totalX },
+      tableWidth: 84,
+      theme: 'plain',
+      styles: { fontSize: 9, cellPadding: 3, textColor: PDF_COLORS.dark, fillColor: PDF_COLORS.light },
+      columnStyles: { 0: { cellWidth: 47 }, 1: { cellWidth: 37, halign: 'right' } },
+      didParseCell: (data) => {
+        if (data.row.index === 2) {
+          data.cell.styles.fillColor = PDF_COLORS.green;
+          data.cell.styles.textColor = PDF_COLORS.white;
+          data.cell.styles.fontStyle = 'bold';
+          data.cell.styles.fontSize = 11;
+        }
+      }
+    });
+  }
+  drawFooter(doc);
+  return doc;
+};
+
+export const generateDeliveryNotePDF = async (albaran, client) => {
+  const doc = await buildDeliveryNoteDoc(albaran, client);
+  const display = albaran.albaranNumber || albaran.id.slice(-6);
+  doc.save(`Albaran_${display}_${client.name}.pdf`);
+};
+
+export const generateDeliveryNoteBlob = async (albaran, client) => {
+  const doc = await buildDeliveryNoteDoc(albaran, client);
+  return doc.output('blob');
 };
 
 export const generateInvoicePDF = async (invoice, client, deliveryNotes) => {
