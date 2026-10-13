@@ -370,7 +370,7 @@ export default function Profitability({
     const periodNotes = (deliveryNotes || []).filter(note => inPeriod(note.date || note.createdAt));
     const officialInvoices = (invoices || []).filter(invoice => invoice.type !== 'SUMMARY');
     const periodInvoices = officialInvoices.filter(invoice => inPeriod(invoice.date || invoice.createdAt));
-    const invoicedNoteIds = new Set(officialInvoices.flatMap(invoice => invoice.deliveryNoteIds || []).map(String));
+    const invoicedNoteIds = new Set((invoices || []).flatMap(invoice => invoice.deliveryNoteIds || []).map(String));
     const unbilledNotes = periodNotes.filter(note => !invoicedNoteIds.has(String(note.id)));
     const invoiceNetAmount = invoice => {
       if (invoice.subtotal !== undefined && invoice.subtotal !== null) return Number(invoice.subtotal || 0);

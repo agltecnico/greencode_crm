@@ -351,18 +351,13 @@ export default function Invoices() {
     return Array.from(grouped.values()).sort((a, b) => b.pending - a.pending);
   }, [invoiceRows]);
 
-  const unbilledSummary = useMemo(() => {
-    const officiallyInvoicedNoteIds = new Set(
-      invoiceRows.filter(invoice => invoice.isCollectible).flatMap(invoice => invoice.deliveryNoteIds || []).map(String)
-    );
-    return deliveryNotes.reduce((summary, note) => {
-      if (!officiallyInvoicedNoteIds.has(String(note.id))) {
+  const unbilledSummary = useMemo(() => deliveryNotes.reduce((summary, note) => {
+    if (note.status === 'UNBILLED') {
       summary.total += Number(note.total || 0);
       summary.count += 1;
-      }
-      return summary;
-    }, { total: 0, count: 0 });
-  }, [deliveryNotes, invoiceRows]);
+    }
+    return summary;
+  }, { total: 0, count: 0 }), [deliveryNotes]);
 
   const clearFilters = () => {
     setFilterStatus('PENDING');

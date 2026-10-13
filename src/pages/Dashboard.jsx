@@ -160,7 +160,7 @@ export default function Dashboard() {
     const collected = collectedInvoices.reduce((sum, invoice) => sum + invoiceNetAmount(invoice), 0);
     const pendingCollection = pendingInvoices.reduce((sum, invoice) => sum + invoiceNetAmount(invoice), 0);
     const invoicedNoteIds = new Set(
-      (invoices || []).filter(invoice => invoice.type !== 'SUMMARY').flatMap(invoice => invoice.deliveryNoteIds || []).map(String)
+      (invoices || []).flatMap(invoice => invoice.deliveryNoteIds || []).map(String)
     );
     const unbilledOrders = periodOrders.filter(order => {
       const note = noteByOrder.get(order.id);
