@@ -466,15 +466,18 @@ export default function Invoices() {
         </button>
       </div>
 
-      <section className="billing-kpis">
-        <article><WalletCards /><div><span>Total vendido · sin IVA</span><strong>{money(reconciliation.sold)}</strong><small>{deliveryNotes.length} albaranes entregados</small></div></article>
-        <article><WalletCards /><div><span>Facturas oficiales · sin IVA</span><strong>{money(reconciliation.official)}</strong><small>{money(reconciliation.officialPaid)} cobrado · {money(reconciliation.officialPending)} pendiente</small></div></article>
-        <article className="is-purple"><CalendarClock /><div><span>Albaranes resumen · sin IVA</span><strong>{money(reconciliation.summaries)}</strong><small>{money(reconciliation.summaryPaid)} cobrado · {money(reconciliation.summaryPending)} pendiente</small></div></article>
-        <article className="is-warning"><Banknote /><div><span>Facturas sin cobrar · sin IVA</span><strong>{money(reconciliation.officialPending)}</strong><small>Facturas oficiales pendientes</small></div></article>
-        <article className="is-warning"><Banknote /><div><span>Albaranes sin cobrar · sin IVA</span><strong>{money(reconciliation.summaryPending)}</strong><small>Albaranes resumen pendientes</small></div></article>
-        <article className="is-danger"><CircleAlert /><div><span>Total pendiente de cobro · sin IVA</span><strong>{money(reconciliation.officialPending + reconciliation.summaryPending)}</strong><small>Facturas + albaranes resumen</small></div></article>
-        <article className="is-positive"><CheckCircle2 /><div><span>Total cobrado · sin IVA</span><strong>{money(reconciliation.officialPaid + reconciliation.summaryPaid)}</strong><small>Facturas + albaranes resumen</small></div></article>
-        <article className="is-purple"><CalendarClock /><div><span>Sin facturar · sin IVA</span><strong>{money(reconciliation.unbilled)}</strong><small>{reconciliation.unbilledCount} albaranes entregados</small></div></article>
+      <section className="billing-summary-rows" aria-label="Resumen de facturación sin IVA">
+        <div className="billing-summary-row">
+          <article className="is-total"><WalletCards /><div><span>Total facturado · sin IVA</span><strong>{money(reconciliation.official + reconciliation.summaries)}</strong><small>Facturas + albaranes resumen</small></div></article>
+          <article><WalletCards /><div><span>Facturado con factura · sin IVA</span><strong>{money(reconciliation.official)}</strong><small>Facturas oficiales</small></div></article>
+          <article className="is-purple"><CalendarClock /><div><span>Facturado con albarán · sin IVA</span><strong>{money(reconciliation.summaries)}</strong><small>Albaranes resumen</small></div></article>
+        </div>
+        <div className="billing-summary-row">
+          <article className="is-total-pending"><CircleAlert /><div><span>Total pendiente de cobro · sin IVA</span><strong>{money(reconciliation.officialPending + reconciliation.summaryPending)}</strong><small>Facturas + albaranes resumen</small></div></article>
+          <article className="is-warning"><Banknote /><div><span>Pendiente en facturas · sin IVA</span><strong>{money(reconciliation.officialPending)}</strong><small>Facturas oficiales sin cobrar</small></div></article>
+          <article className="is-warning"><Banknote /><div><span>Pendiente en albaranes · sin IVA</span><strong>{money(reconciliation.summaryPending)}</strong><small>Albaranes resumen sin cobrar</small></div></article>
+        </div>
+        <article className="billing-unbilled-card"><CalendarClock /><div><span>Pendiente de facturar · sin IVA</span><strong>{money(reconciliation.unbilled)}</strong><small>{reconciliation.unbilledCount} albaranes entregados todavía sin factura ni resumen</small></div></article>
       </section>
       <div className="billing-reconciliation"><strong>Conciliación:</strong> {money(reconciliation.official)} en facturas + {money(reconciliation.summaries)} en albaranes resumen + {money(reconciliation.unbilled)} sin facturar = <strong>{money(reconciliation.sold)} vendidos</strong></div>
 
