@@ -115,11 +115,23 @@ export default function Dashboard() {
         if (unitCost > 0) current.costedUnits += quantity;
         movementCostByOrderProduct.set(key, current);
       });
-    const periodOrders = (orders || []).filter(order => {
-      if (order.status !== 'DELIVERED') return false;
-      return inPeriod(order.date || order.createdAt);
+    const ordersById = new Map((orders || []).map(order => [String(order.id), order]));
+    const periodDeliveryNotes = (deliveryNotes || []).filter(note => inPeriod(note.date || note.createdAt));
+    const periodSales = periodDeliveryNotes.map(note => {
+      const order = ordersById.get(String(note.orderId)) || {};
+      return {
+        ...order,
+        id: note.orderId || order.id || note.id,
+        noteId: note.id,
+        date: note.date || note.createdAt,
+        clientId: note.clientId || order.clientId,
+        clientName: note.clientName || order.clientName,
+        clientCommercialName: note.clientCommercialName || order.clientCommercialName,
+        items: note.items?.length ? note.items : (order.items || []),
+        total: Number(note.total || 0)
+      };
     });
-    const monthSales = periodOrders.reduce((sum, order) => sum + Number(order.total || 0), 0);
+    const monthSales = periodSales.reduce((sum, sale) => sum + Number(sale.total || 0), 0);
     const requestedOrders = (orders || []).filter(order => inPeriod(order.date || order.createdAt));
     const ordersByStatus = status => requestedOrders.filter(order => String(order.status || 'PENDING').toUpperCase() === status);
     const requestedDeliveredOrders = ordersByStatus('DELIVERED');
@@ -149,24 +161,36 @@ export default function Dashboard() {
       });
     });
     const productDemand = [...productDemandMap.values()].sort((a, b) => b.totalUnits - a.totalUnits || a.name.localeCompare(b.name, 'es'));
-    const periodInvoices = (invoices || []).filter(invoice => invoice.type !== 'SUMMARY' && inPeriod(invoice.date));
-    const collectedInvoices = periodInvoices.filter(invoice => invoice.isPaid === true);
-    const pendingInvoices = periodInvoices.filter(invoice => invoice.isPaid !== true);
-    const invoiceNetAmount = invoice => {
-      if (invoice.subtotal !== undefined && invoice.subtotal !== null) return Number(invoice.subtotal || 0);
-      const vatRate = Number(invoice.ivaPercentage || 0) / 100;
-      return vatRate > 0 ? Number(invoice.total || 0) / (1 + vatRate) : Number(invoice.total || 0);
-    };
-    const collected = collectedInvoices.reduce((sum, invoice) => sum + invoiceNetAmount(invoice), 0);
-    const pendingCollection = pendingInvoices.reduce((sum, invoice) => sum + invoiceNetAmount(invoice), 0);
-    const invoicedNoteIds = new Set(
-      (invoices || []).flatMap(invoice => invoice.deliveryNoteIds || []).map(String)
-    );
-    const unbilledOrders = periodOrders.filter(order => {
-      const note = noteByOrder.get(order.id);
-      return !note || !invoicedNoteIds.has(String(note.id));
-    });
-    const unbilledSales = unbilledOrders.reduce((sum, order) => sum + Number(order.total || 0), 0);
+    const invoiceByNote = new Map();
+    (invoices || []).forEach(invoice => (invoice.deliveryNoteIds || []).forEach(noteId => {
+      const key = String(noteId);
+      const current = invoiceByNote.get(key);
+      if (!current || (current.type === 'SUMMARY' && invoice.type !== 'SUMMARY')) invoiceByNote.set(key, invoice);
+    }));
+    const salesReconciliation = periodDeliveryNotes.reduce((summary, note) => {
+      const amount = Number(note.total || 0);
+      const invoice = invoiceByNote.get(String(note.id));
+      if (!invoice) {
+        summary.unbilled += amount;
+        summary.unbilledCount += 1;
+      } else if (invoice.type === 'SUMMARY') {
+        summary.summary += amount;
+        summary.summaryCount += 1;
+        if (invoice.isPaid) summary.summaryPaid += amount;
+        else summary.summaryPending += amount;
+      } else {
+        summary.official += amount;
+        summary.officialCount += 1;
+        if (invoice.isPaid) summary.officialPaid += amount;
+        else summary.officialPending += amount;
+      }
+      return summary;
+    }, { official: 0, officialPaid: 0, officialPending: 0, officialCount: 0, summary: 0, summaryPaid: 0, summaryPending: 0, summaryCount: 0, unbilled: 0, unbilledCount: 0 });
+    const collected = salesReconciliation.officialPaid + salesReconciliation.summaryPaid;
+    const pendingCollection = salesReconciliation.officialPending + salesReconciliation.summaryPending;
+    const collectedInvoices = (invoices || []).filter(invoice => invoice.isPaid === true && (invoice.deliveryNoteIds || []).some(id => periodDeliveryNotes.some(note => String(note.id) === String(id))));
+    const pendingInvoices = (invoices || []).filter(invoice => invoice.isPaid !== true && (invoice.deliveryNoteIds || []).some(id => periodDeliveryNotes.some(note => String(note.id) === String(id))));
+    const unbilledSales = salesReconciliation.unbilled;
     const periodExpenses = (expenses || []).filter(expense => inPeriod(expense.date));
     const paidExpenses = periodExpenses
       .filter(expense => expense.isPaid === true)
@@ -423,7 +447,7 @@ export default function Dashboard() {
       }
     }
     const chartMap = new Map(chart.map(item => [periodDays <= 62 ? item.key : item.key, item]));
-    periodOrders.forEach(order => {
+    periodSales.forEach(order => {
       const orderDate = order.date || order.createdAt;
       const key = periodDays <= 62 ? String(orderDate || '').slice(0, 10) : monthKey(orderDate);
       const item = chartMap.get(key);
@@ -466,7 +490,7 @@ export default function Dashboard() {
 
     const productTotals = new Map();
     const clientTotals = new Map();
-    periodOrders.forEach(order => {
+    periodSales.forEach(order => {
       const note = noteByOrder.get(order.id);
       const clientId = order.clientId || note?.clientId;
       const clientRecord = clients.find(client => client.id === clientId);
@@ -547,7 +571,7 @@ export default function Dashboard() {
         marginPercent: revenue > 0 ? profit / revenue * 100 : 0
       };
     }).sort((a, b) => b.date.localeCompare(a.date) || b.profit - a.profit);
-    const bestSaleOrder = periodOrders.reduce((best, order) => Number(order.total || 0) > Number(best?.total || 0) ? order : best, null);
+    const bestSaleOrder = periodSales.reduce((best, order) => Number(order.total || 0) > Number(best?.total || 0) ? order : best, null);
     const bestSaleNote = bestSaleOrder ? noteByOrder.get(bestSaleOrder.id) : null;
     const bestSaleClient = bestSaleOrder
       ? clients.find(client => String(client.id) === String(bestSaleOrder.clientId || bestSaleNote?.clientId))
@@ -651,7 +675,7 @@ export default function Dashboard() {
       mostProfitable,
       bestSale,
       harvestYieldEconomics,
-      orderCount: periodOrders.length,
+      orderCount: periodSales.length,
       requestedOrderCount: requestedOrders.length,
       requestedOrderValue,
       requestedUnits,
@@ -663,7 +687,7 @@ export default function Dashboard() {
       preparedOrderCount: preparedOrders.length,
       inTransitOrderCount: inTransitOrders.length,
       units: [...productTotals.values()].reduce((sum, item) => sum + item.units, 0),
-      averageTicket: periodOrders.length ? monthSales / periodOrders.length : 0,
+      averageTicket: periodSales.length ? monthSales / periodSales.length : 0,
       pendingOrders: pendingOrders.length,
       pendingOrderValue,
       pendingOrderUnits,
@@ -671,8 +695,14 @@ export default function Dashboard() {
       collectedInvoiceCount: collectedInvoices.length,
       pendingCollection,
       pendingInvoiceCount: pendingInvoices.length,
+      officialInvoiced: salesReconciliation.official,
+      officialCollected: salesReconciliation.officialPaid,
+      officialPending: salesReconciliation.officialPending,
+      summaryInvoiced: salesReconciliation.summary,
+      summaryCollected: salesReconciliation.summaryPaid,
+      summaryPending: salesReconciliation.summaryPending,
       unbilledSales,
-      unbilledOrderCount: unbilledOrders.length,
+      unbilledOrderCount: salesReconciliation.unbilledCount,
       paidExpenses,
       pendingExpenses,
       expenseCount: periodExpenses.length,
@@ -799,13 +829,13 @@ export default function Dashboard() {
         </header>
         <div className="admin-financial-cards">
           <button type="button" onClick={() => openFinancial('receivables')}>
-            <CircleDollarSign /><span>Facturas cobradas · sin IVA</span><strong>{money(data.collected)}</strong><small>{data.collectedInvoiceCount} facturas</small>
+            <CircleDollarSign /><span>Total cobrado · sin IVA</span><strong>{money(data.collected)}</strong><small>{money(data.officialCollected)} facturas · {money(data.summaryCollected)} albaranes resumen</small>
           </button>
           <button type="button" className="is-pending" onClick={() => openFinancial('receivables')}>
-            <Clock3 /><span>Pendiente de cobro · sin IVA</span><strong>{money(data.pendingCollection)}</strong><small>{data.pendingInvoiceCount} facturas</small>
+            <Clock3 /><span>Pendiente de cobro · sin IVA</span><strong>{money(data.pendingCollection)}</strong><small>{money(data.officialPending)} facturas · {money(data.summaryPending)} albaranes resumen</small>
           </button>
           <button type="button" className="is-unbilled" onClick={() => openFinancial('receivables')}>
-            <ReceiptText /><span>Entregado sin facturar · sin IVA</span><strong>{money(data.unbilledSales)}</strong><small>{data.unbilledOrderCount} pedidos</small>
+            <ReceiptText /><span>Entregado sin facturar · sin IVA</span><strong>{money(data.unbilledSales)}</strong><small>{data.unbilledOrderCount} albaranes</small>
           </button>
           <button type="button" className="is-expense" onClick={() => openFinancial('expenses')}>
             <WalletCards /><span>Gastos</span><strong>{money(data.paidExpenses + data.pendingExpenses)}</strong><small>{money(data.paidExpenses)} pagado · {money(data.pendingExpenses)} pendiente</small>

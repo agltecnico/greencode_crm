@@ -292,14 +292,14 @@ export default function Invoices() {
   const invoiceRows = useMemo(() => invoices.map(invoice => {
     const client = clients.find(item => item.id === invoice.clientId);
     const dueDate = getDueDate(invoice);
-    const isCollectible = invoice.type !== 'SUMMARY';
-    const isOverdue = isCollectible && invoice.isPaid !== true && dueDate.getTime() < new Date().setHours(0, 0, 0, 0);
-    return { ...invoice, client, dueDate, isOverdue, isCollectible };
+    const isOfficial = invoice.type !== 'SUMMARY';
+    const isOverdue = isOfficial && invoice.isPaid !== true && dueDate.getTime() < new Date().setHours(0, 0, 0, 0);
+    return { ...invoice, client, dueDate, isOverdue, isCollectible: true, isOfficial };
   }), [clients, invoices]);
 
   const filteredInvoices = useMemo(() => invoiceRows.filter(invoice => {
-    if (filterStatus === 'PENDING' && (!invoice.isCollectible || invoice.isPaid)) return false;
-    if (filterStatus === 'PAID' && (!invoice.isCollectible || !invoice.isPaid)) return false;
+    if (filterStatus === 'PENDING' && invoice.isPaid) return false;
+    if (filterStatus === 'PAID' && !invoice.isPaid) return false;
     if (filterStatus === 'OVERDUE' && !invoice.isOverdue) return false;
     if (filterClientId && invoice.clientId !== filterClientId) return false;
     const invoiceTime = new Date(invoice.date).getTime();
@@ -315,7 +315,6 @@ export default function Invoices() {
   );
 
   const collectionSummary = useMemo(() => invoiceRows.reduce((summary, invoice) => {
-    if (!invoice.isCollectible) return summary;
     const total = invoiceNetAmount(invoice);
     summary.invoiced += total;
     if (invoice.isPaid) summary.collected += total;
@@ -332,7 +331,7 @@ export default function Invoices() {
 
   const debtorClients = useMemo(() => {
     const grouped = new Map();
-    invoiceRows.filter(invoice => invoice.isCollectible && !invoice.isPaid).forEach(invoice => {
+    invoiceRows.filter(invoice => !invoice.isPaid).forEach(invoice => {
       const key = invoice.clientId || 'unknown';
       const current = grouped.get(key) || {
         id: key,
@@ -351,13 +350,38 @@ export default function Invoices() {
     return Array.from(grouped.values()).sort((a, b) => b.pending - a.pending);
   }, [invoiceRows]);
 
-  const unbilledSummary = useMemo(() => deliveryNotes.reduce((summary, note) => {
-    if (note.status === 'UNBILLED') {
-      summary.total += Number(note.total || 0);
-      summary.count += 1;
-    }
-    return summary;
-  }, { total: 0, count: 0 }), [deliveryNotes]);
+  const reconciliation = useMemo(() => {
+    const invoiceByNote = new Map();
+    invoiceRows.forEach(invoice => (invoice.deliveryNoteIds || []).forEach(noteId => {
+      const key = String(noteId);
+      const current = invoiceByNote.get(key);
+      if (!current || (!current.isOfficial && invoice.isOfficial)) invoiceByNote.set(key, invoice);
+    }));
+    return deliveryNotes.reduce((summary, note) => {
+      const amount = Number(note.total || 0);
+      const invoice = invoiceByNote.get(String(note.id));
+      summary.sold += amount;
+      if (!invoice) {
+        summary.unbilled += amount;
+        summary.unbilledCount += 1;
+      } else if (invoice.isOfficial) {
+        summary.official += amount;
+        summary.officialCount += 1;
+        if (invoice.isPaid) summary.officialPaid += amount;
+        else summary.officialPending += amount;
+      } else {
+        summary.summaries += amount;
+        summary.summaryCount += 1;
+        if (invoice.isPaid) summary.summaryPaid += amount;
+        else summary.summaryPending += amount;
+      }
+      return summary;
+    }, {
+      sold: 0, official: 0, officialPaid: 0, officialPending: 0, officialCount: 0,
+      summaries: 0, summaryPaid: 0, summaryPending: 0, summaryCount: 0,
+      unbilled: 0, unbilledCount: 0
+    });
+  }, [deliveryNotes, invoiceRows]);
 
   const clearFilters = () => {
     setFilterStatus('PENDING');
@@ -443,12 +467,15 @@ export default function Invoices() {
       </div>
 
       <section className="billing-kpis">
-        <article><WalletCards /><div><span>Total facturado · sin IVA</span><strong>{money(collectionSummary.invoiced)}</strong><small>{collectionSummary.pendingCount + (invoiceRows.filter(item => item.isCollectible && item.isPaid).length)} facturas oficiales</small></div></article>
-        <article className="is-positive"><CheckCircle2 /><div><span>Total cobrado · sin IVA</span><strong>{money(collectionSummary.collected)}</strong><small>Base imponible cobrada</small></div></article>
-        <article className="is-warning"><Banknote /><div><span>Pendiente · sin IVA</span><strong>{money(collectionSummary.pending)}</strong><small>{collectionSummary.pendingCount} facturas pendientes</small></div></article>
+        <article><WalletCards /><div><span>Total vendido · sin IVA</span><strong>{money(reconciliation.sold)}</strong><small>{deliveryNotes.length} albaranes entregados</small></div></article>
+        <article><WalletCards /><div><span>Facturas oficiales · sin IVA</span><strong>{money(reconciliation.official)}</strong><small>{money(reconciliation.officialPaid)} cobrado · {money(reconciliation.officialPending)} pendiente</small></div></article>
+        <article className="is-purple"><CalendarClock /><div><span>Albaranes resumen · sin IVA</span><strong>{money(reconciliation.summaries)}</strong><small>{money(reconciliation.summaryPaid)} cobrado · {money(reconciliation.summaryPending)} pendiente</small></div></article>
+        <article className="is-positive"><CheckCircle2 /><div><span>Total cobrado · sin IVA</span><strong>{money(reconciliation.officialPaid + reconciliation.summaryPaid)}</strong><small>Facturas + albaranes resumen</small></div></article>
+        <article className="is-warning"><Banknote /><div><span>Pendiente · sin IVA</span><strong>{money(reconciliation.officialPending + reconciliation.summaryPending)}</strong><small>Facturas + albaranes resumen</small></div></article>
         <article className="is-danger"><CircleAlert /><div><span>Vencido · sin IVA</span><strong>{money(collectionSummary.overdue)}</strong><small>{collectionSummary.overdueCount} facturas fuera de plazo</small></div></article>
-        <article className="is-purple"><CalendarClock /><div><span>Sin facturar · sin IVA</span><strong>{money(unbilledSummary.total)}</strong><small>{unbilledSummary.count} albaranes entregados</small></div></article>
+        <article className="is-purple"><CalendarClock /><div><span>Sin facturar · sin IVA</span><strong>{money(reconciliation.unbilled)}</strong><small>{reconciliation.unbilledCount} albaranes entregados</small></div></article>
       </section>
+      <div className="billing-reconciliation"><strong>Conciliación:</strong> {money(reconciliation.official)} en facturas + {money(reconciliation.summaries)} en albaranes resumen + {money(reconciliation.unbilled)} sin facturar = <strong>{money(reconciliation.sold)} vendidos</strong></div>
 
       <section className="billing-debtors">
         <header><div><span>CUENTAS POR COBRAR</span><h3>Clientes con saldo pendiente</h3></div><strong>{debtorClients.length} clientes</strong></header>
@@ -668,12 +695,10 @@ export default function Invoices() {
                       <td>{new Date(inv.date).toLocaleDateString()}</td>
                       <td className="font-medium">{client ? (client.commercialName || client.name) : 'Desconocido'}</td>
                       <td className="font-bold">{money(invoiceNetAmount(inv))}</td>
-                      <td><span className={inv.isOverdue ? 'billing-due overdue' : 'billing-due'}>{!inv.isCollectible || inv.isPaid ? '—' : <>{inv.dueDate.toLocaleDateString('es-ES')}<small>{Number(inv.paymentTermsDays ?? 15)} días</small></>}</span></td>
+                      <td><span className={inv.isOverdue ? 'billing-due overdue' : 'billing-due'}>{!inv.isOfficial || inv.isPaid ? '—' : <>{inv.dueDate.toLocaleDateString('es-ES')}<small>{Number(inv.paymentTermsDays ?? 15)} días</small></>}</span></td>
                       <td>{inv.emailSendHistory?.length ? <div className="billing-send-history"><strong>{inv.emailSendHistory.length === 1 ? 'Enviada' : `${inv.emailSendHistory.length} envíos`}</strong><small>{inv.emailSendHistory.map((send, index) => `${index ? 'Reenvío' : 'Envío'}: ${new Date(send.sentAt).toLocaleString('es-ES', { dateStyle: 'short', timeStyle: 'short' })}`).join(' · ')}</small></div> : inv.emailSentAt ? <div className="billing-send-history"><strong>Enviada</strong><small>{new Date(inv.emailSentAt).toLocaleString('es-ES', { dateStyle: 'short', timeStyle: 'short' })}</small></div> : <span className="billing-not-sent">Sin enviar</span>}</td>
                       <td>
-                        {!inv.isCollectible ? (
-                          <span className="billing-state informative">Informativo</span>
-                        ) : inv.isPaid ? (
+                        {inv.isPaid ? (
                           <span className="billing-state paid">Cobrado</span>
                         ) : inv.isOverdue ? (
                           <span className="billing-state overdue">Vencida</span>
@@ -682,7 +707,7 @@ export default function Invoices() {
                         )}
                       </td>
                       <td className="flex gap-2 items-center flex-wrap">
-                        {!inv.isCollectible ? null : !inv.isPaid ? (
+                        {!inv.isPaid ? (
                           <button 
                             className="btn btn-outline" 
                             style={{ padding: '0.3rem 0.6rem', fontSize: '0.8rem', color: 'green', borderColor: 'green' }}

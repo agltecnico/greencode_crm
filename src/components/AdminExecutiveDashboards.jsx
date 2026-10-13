@@ -25,9 +25,16 @@ export default function AdminExecutiveDashboards({ data, view, onViewChange, ope
       <header><div><span>VENTAS</span><h2>Resumen comercial</h2><p>Todos los importes son sin IVA y corresponden al periodo seleccionado.</p></div><button onClick={openOrders}>Abrir pedidos</button></header>
 
       <div className="sales-summary-grid">
-        <article><span>Venta entregada · sin IVA</span><strong>{money(data.monthSales)}</strong><small>{data.orderCount} pedidos entregados</small></article>
+        <article><span>Total vendido · sin IVA</span><strong>{money(data.monthSales)}</strong><small>{data.orderCount} albaranes entregados</small></article>
         <article><span>Unidades vendidas</span><strong>{data.units}</strong><small>Mixes y variedades entregados</small></article>
         <article><span>Total de pedidos · sin IVA</span><strong>{money(data.requestedOrderValue)}</strong><small>{data.requestedOrderCount} pedidos · {data.requestedUnits} unidades</small></article>
+      </div>
+
+      <div className="sales-reconciliation-grid">
+        <article><span>Facturas oficiales</span><strong>{money(data.officialInvoiced)}</strong><small>{money(data.officialCollected)} cobrado · {money(data.officialPending)} pendiente</small></article>
+        <article><span>Albaranes resumen</span><strong>{money(data.summaryInvoiced)}</strong><small>{money(data.summaryCollected)} cobrado · {money(data.summaryPending)} pendiente</small></article>
+        <article><span>Sin facturar</span><strong>{money(data.unbilledSales)}</strong><small>{data.unbilledOrderCount} albaranes</small></article>
+        <article className="is-total"><span>Comprobación</span><strong>{money(data.officialInvoiced + data.summaryInvoiced + data.unbilledSales)}</strong><small>Debe coincidir con el total vendido</small></article>
       </div>
 
       <article className="executive-chart chart-green sales-evolution-chart">
