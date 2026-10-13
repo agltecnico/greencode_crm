@@ -149,13 +149,18 @@ export default function Dashboard() {
       });
     });
     const productDemand = [...productDemandMap.values()].sort((a, b) => b.totalUnits - a.totalUnits || a.name.localeCompare(b.name, 'es'));
-    const periodInvoices = (invoices || []).filter(invoice => inPeriod(invoice.date));
+    const periodInvoices = (invoices || []).filter(invoice => invoice.type !== 'SUMMARY' && inPeriod(invoice.date));
     const collectedInvoices = periodInvoices.filter(invoice => invoice.isPaid === true);
     const pendingInvoices = periodInvoices.filter(invoice => invoice.isPaid !== true);
-    const collected = collectedInvoices.reduce((sum, invoice) => sum + Number(invoice.total || 0), 0);
-    const pendingCollection = pendingInvoices.reduce((sum, invoice) => sum + Number(invoice.total || 0), 0);
+    const invoiceNetAmount = invoice => {
+      if (invoice.subtotal !== undefined && invoice.subtotal !== null) return Number(invoice.subtotal || 0);
+      const vatRate = Number(invoice.ivaPercentage || 0) / 100;
+      return vatRate > 0 ? Number(invoice.total || 0) / (1 + vatRate) : Number(invoice.total || 0);
+    };
+    const collected = collectedInvoices.reduce((sum, invoice) => sum + invoiceNetAmount(invoice), 0);
+    const pendingCollection = pendingInvoices.reduce((sum, invoice) => sum + invoiceNetAmount(invoice), 0);
     const invoicedNoteIds = new Set(
-      (invoices || []).flatMap(invoice => invoice.deliveryNoteIds || []).map(String)
+      (invoices || []).filter(invoice => invoice.type !== 'SUMMARY').flatMap(invoice => invoice.deliveryNoteIds || []).map(String)
     );
     const unbilledOrders = periodOrders.filter(order => {
       const note = noteByOrder.get(order.id);
@@ -779,7 +784,7 @@ export default function Dashboard() {
 
       {dashboardView === 'legacy' && <>
       <section className="admin-metrics">
-        <Metric icon={<CircleDollarSign />} label="Ventas del periodo" value={money(data.monthSales)} detail={`${data.orderCount} entregas · ${data.units} unidades`} tone="green" onClick={() => openFinancial('orders')} />
+        <Metric icon={<CircleDollarSign />} label="Ventas del periodo · sin IVA" value={money(data.monthSales)} detail={`${data.orderCount} entregas · ${data.units} unidades`} tone="green" onClick={() => openFinancial('orders')} />
         <Metric icon={<PackageCheck />} label="Coste de lo vendido" value={money(data.totalCost)} detail={`${data.costCoverage.toFixed(1)} % de las ventas con coste trazado`} tone="blue" onClick={() => openFinancial('profit-products')} />
         <Metric icon={<TrendingUp />} label="Margen bruto trazado" value={money(data.margin)} detail={`${data.marginPercent.toFixed(1)} % · Venta trazada menos coste vendido`} tone="green" onClick={() => openFinancial('profit-products')} />
         <Metric icon={<ShoppingBag />} label="Pedidos del periodo" value={`${data.orderCount} / ${data.pendingOrders}`} detail={`${data.orderCount} entregados · ${data.pendingOrders} abiertos (${money(data.pendingOrderValue)})`} tone="purple" onClick={() => navigate('/admin/orders')} />
@@ -794,13 +799,13 @@ export default function Dashboard() {
         </header>
         <div className="admin-financial-cards">
           <button type="button" onClick={() => openFinancial('receivables')}>
-            <CircleDollarSign /><span>Facturas cobradas</span><strong>{money(data.collected)}</strong><small>{data.collectedInvoiceCount} facturas</small>
+            <CircleDollarSign /><span>Facturas cobradas · sin IVA</span><strong>{money(data.collected)}</strong><small>{data.collectedInvoiceCount} facturas</small>
           </button>
           <button type="button" className="is-pending" onClick={() => openFinancial('receivables')}>
-            <Clock3 /><span>Pendiente de cobro</span><strong>{money(data.pendingCollection)}</strong><small>{data.pendingInvoiceCount} facturas</small>
+            <Clock3 /><span>Pendiente de cobro · sin IVA</span><strong>{money(data.pendingCollection)}</strong><small>{data.pendingInvoiceCount} facturas</small>
           </button>
           <button type="button" className="is-unbilled" onClick={() => openFinancial('receivables')}>
-            <ReceiptText /><span>Pedidos entregados sin facturar</span><strong>{money(data.unbilledSales)}</strong><small>{data.unbilledOrderCount} pedidos</small>
+            <ReceiptText /><span>Entregado sin facturar · sin IVA</span><strong>{money(data.unbilledSales)}</strong><small>{data.unbilledOrderCount} pedidos</small>
           </button>
           <button type="button" className="is-expense" onClick={() => openFinancial('expenses')}>
             <WalletCards /><span>Gastos</span><strong>{money(data.paidExpenses + data.pendingExpenses)}</strong><small>{money(data.paidExpenses)} pagado · {money(data.pendingExpenses)} pendiente</small>
@@ -918,7 +923,7 @@ export default function Dashboard() {
               <button aria-label="Cerrar informe" onClick={() => setDetailsOpen(false)}>×</button>
             </header>
             <div className="admin-report-summary">
-              <div><span>Ventas</span><strong>{money(data.monthSales)}</strong></div>
+              <div><span>Ventas · sin IVA</span><strong>{money(data.monthSales)}</strong></div>
               <div><span>Coste trazado</span><strong>{money(data.totalCost)}</strong></div>
               <div><span>Margen trazado</span><strong>{money(data.margin)}</strong></div>
               <div><span>Ticket medio</span><strong>{money(data.averageTicket)}</strong></div>

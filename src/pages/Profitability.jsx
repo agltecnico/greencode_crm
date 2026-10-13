@@ -368,11 +368,17 @@ export default function Profitability({
       .sort((a, b) => b.date.localeCompare(a.date));
 
     const periodNotes = (deliveryNotes || []).filter(note => inPeriod(note.date || note.createdAt));
-    const periodInvoices = (invoices || []).filter(invoice => inPeriod(invoice.date || invoice.createdAt));
-    const invoicedNoteIds = new Set((invoices || []).flatMap(invoice => invoice.deliveryNoteIds || []).map(String));
+    const officialInvoices = (invoices || []).filter(invoice => invoice.type !== 'SUMMARY');
+    const periodInvoices = officialInvoices.filter(invoice => inPeriod(invoice.date || invoice.createdAt));
+    const invoicedNoteIds = new Set(officialInvoices.flatMap(invoice => invoice.deliveryNoteIds || []).map(String));
     const unbilledNotes = periodNotes.filter(note => !invoicedNoteIds.has(String(note.id)));
-    const collected = periodInvoices.filter(invoice => invoice.isPaid === true).reduce((sum, invoice) => sum + Number(invoice.total || 0), 0);
-    const pendingCollection = periodInvoices.filter(invoice => invoice.isPaid !== true).reduce((sum, invoice) => sum + Number(invoice.total || 0), 0);
+    const invoiceNetAmount = invoice => {
+      if (invoice.subtotal !== undefined && invoice.subtotal !== null) return Number(invoice.subtotal || 0);
+      const vatRate = Number(invoice.ivaPercentage || 0) / 100;
+      return vatRate > 0 ? Number(invoice.total || 0) / (1 + vatRate) : Number(invoice.total || 0);
+    };
+    const collected = periodInvoices.filter(invoice => invoice.isPaid === true).reduce((sum, invoice) => sum + invoiceNetAmount(invoice), 0);
+    const pendingCollection = periodInvoices.filter(invoice => invoice.isPaid !== true).reduce((sum, invoice) => sum + invoiceNetAmount(invoice), 0);
     const unbilledSales = unbilledNotes.reduce((sum, note) => sum + Number(note.total || 0), 0);
     const billingClientMap = new Map();
     const ensureBillingClient = (clientId, fallbackName) => {
@@ -384,7 +390,7 @@ export default function Profitability({
     };
     periodInvoices.forEach(invoice => {
       const row = ensureBillingClient(invoice.clientId);
-      const total = Number(invoice.total || 0);
+      const total = invoiceNetAmount(invoice);
       row.invoiced += total; row.documents += 1;
       if (invoice.isPaid === true) row.paid += total;
       else row.pending += total;
@@ -942,8 +948,8 @@ export default function Profitability({
         body: rows.map(row => [row.date, row.provider, row.number, money(row.total)])
       },
       receivables: {
-        title: 'Cobros y facturación por cliente',
-        head: [['Cliente', 'Facturado', 'Pagado', 'Pendiente', 'Sin facturar', 'Documentos']],
+        title: 'Cobros y facturación por cliente (sin IVA)',
+        head: [['Cliente', 'Facturado sin IVA', 'Pagado sin IVA', 'Pendiente sin IVA', 'Sin facturar', 'Documentos']],
         body: rows.map(row => [row.name, money(row.invoiced), money(row.paid), money(row.pending), money(row.unbilled), row.documents])
       },
       stockvalue: {
@@ -1018,7 +1024,7 @@ export default function Profitability({
           <StatCard icon={<CircleDollarSign size={22} />} label="Ventas" value={money(report.revenue)} detail={`${report.units} unidades entregadas`} />
           <StatCard icon={<PackageCheck size={22} />} label="Costes totales" value={money(report.cost + financialControl.generalExpensesTotal)} detail="Coste vendido + gastos generales" tone="blue" />
           <StatCard icon={<BarChart3 size={22} />} label="Beneficio operativo" value={money(financialControl.operatingProfit)} detail="Resultado real del periodo" tone="purple" />
-          <StatCard icon={<WalletCards size={22} />} label="Tesorería estimada" value={money(financialControl.cashBalance)} detail={`${money(financialControl.pendingCollection)} por cobrar`} tone="green" />
+          <StatCard icon={<WalletCards size={22} />} label="Tesorería estimada · sin IVA" value={money(financialControl.cashBalance)} detail={`${money(financialControl.pendingCollection)} por cobrar · sin IVA`} tone="green" />
         </>}
         {section === 'sales' && <>
           <StatCard icon={<CircleDollarSign size={22} />} label="Ventas netas" value={money(report.revenue)} detail={`${report.units} unidades entregadas`} />
@@ -1045,8 +1051,8 @@ export default function Profitability({
           <StatCard icon={<Percent size={22} />} label="Margen" value={`${report.marginPercent.toFixed(1)} %`} detail={`${report.coverage.toFixed(1)} % con coste conocido`} tone="amber" />
         </>}
         {section === 'treasury' && <>
-          <StatCard icon={<CircleDollarSign size={22} />} label="Facturas cobradas" value={money(financialControl.collected)} detail="Marcadas como pagadas" />
-          <StatCard icon={<ReceiptText size={22} />} label="Facturas pendientes" value={money(financialControl.pendingCollection)} detail={`${money(financialControl.unbilledSales)} entregado sin facturar`} tone="amber" />
+          <StatCard icon={<CircleDollarSign size={22} />} label="Facturas cobradas · sin IVA" value={money(financialControl.collected)} detail="Base imponible marcada como pagada" />
+          <StatCard icon={<ReceiptText size={22} />} label="Facturas pendientes · sin IVA" value={money(financialControl.pendingCollection)} detail={`${money(financialControl.unbilledSales)} entregado sin facturar · sin IVA`} tone="amber" />
           <StatCard icon={<WalletCards size={22} />} label="Saldo estimado" value={money(financialControl.cashBalance)} detail={`Salidas registradas ${money(financialControl.cashOut)}`} tone="purple" />
           <StatCard icon={<PackageCheck size={22} />} label="Valor total del stock" value={money(financialControl.totalStockValue)} detail={`Materiales ${money(financialControl.materialStockValue)}`} tone="blue" />
         </>}
@@ -1073,7 +1079,7 @@ export default function Profitability({
           <span>Producción frente a ventas</span><strong>{money(financialControl.productionCost)} / {money(report.revenue)}</strong><small>{financialControl.unsoldUnits} unidades sin vender</small>
         </button>
         <button type="button" onClick={() => { setView('treasury'); setDisplayMode('detail'); }}>
-          <span>Cobrado frente a pendiente</span><strong>{money(financialControl.collected)} / {money(financialControl.pendingCollection)}</strong><small>Situación de cobros</small>
+          <span>Cobrado frente a pendiente · sin IVA</span><strong>{money(financialControl.collected)} / {money(financialControl.pendingCollection)}</strong><small>Base imponible de las facturas oficiales</small>
         </button>
         <button type="button" onClick={() => { setView('treasury'); setDisplayMode('detail'); }}>
           <span>Stock materiales + terminado</span><strong>{money(financialControl.totalStockValue)}</strong><small>Valor actual a coste</small>
@@ -1265,7 +1271,7 @@ export default function Profitability({
               {view === 'harvests' && <tr><th>Fecha</th><th>Producto / lote</th><th>Bandejas</th><th>Producido</th><th>Vendido</th><th>Sin vender</th><th>Semilla</th><th>Sustrato</th><th>Envases</th><th>Etiquetas</th><th>Coste total</th><th>Coste/ud.</th></tr>}
               {view === 'expenses' && <tr><th>Fecha</th><th>Categoría</th><th>Concepto</th><th>Importe</th><th>Estado</th><th>Forma de pago</th></tr>}
               {view === 'treasury' && <tr><th>Fecha</th><th>Proveedor</th><th>Documento</th><th>Compra de stock</th></tr>}
-              {view === 'receivables' && <tr><th>Cliente</th><th>Facturado</th><th>Pagado</th><th>Pendiente</th><th>Entregado sin facturar</th><th>Documentos</th></tr>}
+              {view === 'receivables' && <tr><th>Cliente</th><th>Facturado sin IVA</th><th>Pagado sin IVA</th><th>Pendiente sin IVA</th><th>Entregado sin facturar</th><th>Documentos</th></tr>}
               {view === 'stockvalue' && <tr><th>Tipo</th><th>Artículo</th><th>Stock actual</th><th>Coste unitario</th><th>Valor total</th></tr>}
               {view === 'packaging' && <tr><th>Formato de venta</th><th>Último coste unitario</th><th>Stock actual</th></tr>}
             </thead>

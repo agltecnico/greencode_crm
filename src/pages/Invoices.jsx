@@ -7,6 +7,11 @@ import { supabase } from '../config/supabase';
 
 const money = value => Number(value || 0).toLocaleString('es-ES', { style: 'currency', currency: 'EUR' });
 const toLocalISODate = date => [date.getFullYear(), String(date.getMonth() + 1).padStart(2, '0'), String(date.getDate()).padStart(2, '0')].join('-');
+const invoiceNetAmount = invoice => {
+  if (invoice.subtotal !== undefined && invoice.subtotal !== null) return Number(invoice.subtotal || 0);
+  const vatRate = Number(invoice.ivaPercentage || 0) / 100;
+  return vatRate > 0 ? Number(invoice.total || 0) / (1 + vatRate) : Number(invoice.total || 0);
+};
 
 const buildInvoiceEmailHtml = invoice => `
   <div style="margin:0;background:#f3f7f2;padding:28px 12px;font-family:Arial,Helvetica,sans-serif;color:#26352b">
@@ -305,13 +310,13 @@ export default function Invoices() {
     return true;
   }), [filterClientId, filterEndDate, filterQuery, filterStartDate, filterStatus, invoiceRows]);
   const filteredInvoiceTotal = useMemo(
-    () => filteredInvoices.reduce((sum, invoice) => sum + Number(invoice.total || 0), 0),
+    () => filteredInvoices.reduce((sum, invoice) => sum + invoiceNetAmount(invoice), 0),
     [filteredInvoices]
   );
 
   const collectionSummary = useMemo(() => invoiceRows.reduce((summary, invoice) => {
     if (!invoice.isCollectible) return summary;
-    const total = Number(invoice.total || 0);
+    const total = invoiceNetAmount(invoice);
     summary.invoiced += total;
     if (invoice.isPaid) summary.collected += total;
     else {
@@ -337,22 +342,27 @@ export default function Invoices() {
         documents: 0,
         oldest: invoice.date
       };
-      current.pending += Number(invoice.total || 0);
+      current.pending += invoiceNetAmount(invoice);
       current.documents += 1;
-      if (invoice.isOverdue) current.overdue += Number(invoice.total || 0);
+      if (invoice.isOverdue) current.overdue += invoiceNetAmount(invoice);
       if (new Date(invoice.date) < new Date(current.oldest)) current.oldest = invoice.date;
       grouped.set(key, current);
     });
     return Array.from(grouped.values()).sort((a, b) => b.pending - a.pending);
   }, [invoiceRows]);
 
-  const unbilledSummary = useMemo(() => deliveryNotes.reduce((summary, note) => {
-    if (note.status !== 'BILLED') {
+  const unbilledSummary = useMemo(() => {
+    const officiallyInvoicedNoteIds = new Set(
+      invoiceRows.filter(invoice => invoice.isCollectible).flatMap(invoice => invoice.deliveryNoteIds || []).map(String)
+    );
+    return deliveryNotes.reduce((summary, note) => {
+      if (!officiallyInvoicedNoteIds.has(String(note.id))) {
       summary.total += Number(note.total || 0);
       summary.count += 1;
-    }
-    return summary;
-  }, { total: 0, count: 0 }), [deliveryNotes]);
+      }
+      return summary;
+    }, { total: 0, count: 0 });
+  }, [deliveryNotes, invoiceRows]);
 
   const clearFilters = () => {
     setFilterStatus('PENDING');
@@ -366,7 +376,7 @@ export default function Invoices() {
     const result = await Swal.fire({
       title: isPaid ? 'Confirmar cobro' : 'Reabrir factura',
       text: isPaid
-        ? `Se marcará ${invoice.invoiceNumber} por ${money(invoice.total)} como cobrada.`
+        ? `Se marcará ${invoice.invoiceNumber} (${money(invoiceNetAmount(invoice))} sin IVA) como cobrada.`
         : `La factura ${invoice.invoiceNumber} volverá a figurar como pendiente.`,
       icon: isPaid ? 'question' : 'warning',
       showCancelButton: true,
@@ -430,7 +440,7 @@ export default function Invoices() {
         <div>
           <span>ADMINISTRACIÓN DE VENTAS</span>
           <h2>Facturación y cobros</h2>
-          <p>Controla lo facturado, quién debe dinero y los albaranes que todavía faltan por facturar.</p>
+          <p>Controla lo facturado, quién debe dinero y los albaranes pendientes. Todos los importes del panel son sin IVA.</p>
         </div>
         <button className="billing-primary-action" onClick={() => setIsAdding(true)}>
           + Crear factura
@@ -438,11 +448,11 @@ export default function Invoices() {
       </div>
 
       <section className="billing-kpis">
-        <article><WalletCards /><div><span>Total facturado</span><strong>{money(collectionSummary.invoiced)}</strong><small>{invoiceRows.length} documentos emitidos</small></div></article>
-        <article className="is-positive"><CheckCircle2 /><div><span>Total cobrado</span><strong>{money(collectionSummary.collected)}</strong><small>Ingresos confirmados</small></div></article>
-        <article className="is-warning"><Banknote /><div><span>Pendiente de cobro</span><strong>{money(collectionSummary.pending)}</strong><small>{collectionSummary.pendingCount} facturas pendientes</small></div></article>
-        <article className="is-danger"><CircleAlert /><div><span>Vencido</span><strong>{money(collectionSummary.overdue)}</strong><small>{collectionSummary.overdueCount} facturas fuera de plazo</small></div></article>
-        <article className="is-purple"><CalendarClock /><div><span>Sin facturar</span><strong>{money(unbilledSummary.total)}</strong><small>{unbilledSummary.count} albaranes entregados</small></div></article>
+        <article><WalletCards /><div><span>Total facturado · sin IVA</span><strong>{money(collectionSummary.invoiced)}</strong><small>{collectionSummary.pendingCount + (invoiceRows.filter(item => item.isCollectible && item.isPaid).length)} facturas oficiales</small></div></article>
+        <article className="is-positive"><CheckCircle2 /><div><span>Total cobrado · sin IVA</span><strong>{money(collectionSummary.collected)}</strong><small>Base imponible cobrada</small></div></article>
+        <article className="is-warning"><Banknote /><div><span>Pendiente · sin IVA</span><strong>{money(collectionSummary.pending)}</strong><small>{collectionSummary.pendingCount} facturas pendientes</small></div></article>
+        <article className="is-danger"><CircleAlert /><div><span>Vencido · sin IVA</span><strong>{money(collectionSummary.overdue)}</strong><small>{collectionSummary.overdueCount} facturas fuera de plazo</small></div></article>
+        <article className="is-purple"><CalendarClock /><div><span>Sin facturar · sin IVA</span><strong>{money(unbilledSummary.total)}</strong><small>{unbilledSummary.count} albaranes entregados</small></div></article>
       </section>
 
       <section className="billing-debtors">
@@ -612,7 +622,7 @@ export default function Invoices() {
 
       <div>
         <section className="billing-register">
-          <header><div><span>REGISTRO DE FACTURAS</span><h3>Documentos y situación de cobro</h3></div><div className="billing-list-total"><span>Total del listado</span><strong>{money(filteredInvoiceTotal)}</strong><small>{filteredInvoices.length} documentos</small></div></header>
+          <header><div><span>REGISTRO DE FACTURAS</span><h3>Documentos y situación de cobro · importes sin IVA</h3></div><div className="billing-list-total"><span>Base del listado · sin IVA</span><strong>{money(filteredInvoiceTotal)}</strong><small>{filteredInvoices.length} documentos</small></div></header>
           <div className="billing-filters">
             <label className="billing-search"><Search size={17} /><input value={filterQuery} onChange={event => setFilterQuery(event.target.value)} placeholder="Buscar factura o cliente" /></label>
             <select value={filterClientId} onChange={event => setFilterClientId(event.target.value)}>
@@ -641,7 +651,7 @@ export default function Invoices() {
                   <th>Tipo</th>
                   <th>Fecha</th>
                   <th>Cliente</th>
-                  <th>Total</th>
+                  <th>Base · sin IVA</th>
                   <th>Vencimiento</th>
                   <th>Envíos</th>
                   <th>Estado</th>
@@ -662,7 +672,7 @@ export default function Invoices() {
                       </td>
                       <td>{new Date(inv.date).toLocaleDateString()}</td>
                       <td className="font-medium">{client ? (client.commercialName || client.name) : 'Desconocido'}</td>
-                      <td className="font-bold">{money(inv.total)}</td>
+                      <td className="font-bold">{money(invoiceNetAmount(inv))}</td>
                       <td><span className={inv.isOverdue ? 'billing-due overdue' : 'billing-due'}>{!inv.isCollectible || inv.isPaid ? '—' : <>{inv.dueDate.toLocaleDateString('es-ES')}<small>{Number(inv.paymentTermsDays ?? 15)} días</small></>}</span></td>
                       <td>{inv.emailSendHistory?.length ? <div className="billing-send-history"><strong>{inv.emailSendHistory.length === 1 ? 'Enviada' : `${inv.emailSendHistory.length} envíos`}</strong><small>{inv.emailSendHistory.map((send, index) => `${index ? 'Reenvío' : 'Envío'}: ${new Date(send.sentAt).toLocaleString('es-ES', { dateStyle: 'short', timeStyle: 'short' })}`).join(' · ')}</small></div> : inv.emailSentAt ? <div className="billing-send-history"><strong>Enviada</strong><small>{new Date(inv.emailSentAt).toLocaleString('es-ES', { dateStyle: 'short', timeStyle: 'short' })}</small></div> : <span className="billing-not-sent">Sin enviar</span>}</td>
                       <td>
@@ -742,7 +752,7 @@ export default function Invoices() {
                   );
                 })}
               </tbody>
-              <tfoot><tr className="billing-total-row"><td colSpan="4">TOTAL DEL LISTADO</td><td>{money(filteredInvoiceTotal)}</td><td colSpan="4">{filteredInvoices.length} documentos</td></tr></tfoot>
+              <tfoot><tr className="billing-total-row"><td colSpan="4">TOTAL SIN IVA</td><td>{money(filteredInvoiceTotal)}</td><td colSpan="4">{filteredInvoices.length} documentos</td></tr></tfoot>
             </table>
           </div>
         )}

@@ -22,16 +22,16 @@ export default function AdminExecutiveDashboards({ data, view, onViewChange, ope
     </nav>
 
     {view === 'sales' && <section className="executive-dashboard-view sales-dashboard-clean">
-      <header><div><span>VENTAS</span><h2>Resumen comercial</h2><p>Todos los datos corresponden al periodo seleccionado.</p></div><button onClick={openOrders}>Abrir pedidos</button></header>
+      <header><div><span>VENTAS</span><h2>Resumen comercial</h2><p>Todos los importes son sin IVA y corresponden al periodo seleccionado.</p></div><button onClick={openOrders}>Abrir pedidos</button></header>
 
       <div className="sales-summary-grid">
-        <article><span>Venta entregada</span><strong>{money(data.monthSales)}</strong><small>{data.orderCount} pedidos entregados</small></article>
+        <article><span>Venta entregada · sin IVA</span><strong>{money(data.monthSales)}</strong><small>{data.orderCount} pedidos entregados</small></article>
         <article><span>Unidades vendidas</span><strong>{data.units}</strong><small>Mixes y variedades entregados</small></article>
-        <article><span>Total de pedidos</span><strong>{money(data.requestedOrderValue)}</strong><small>{data.requestedOrderCount} pedidos · {data.requestedUnits} unidades</small></article>
+        <article><span>Total de pedidos · sin IVA</span><strong>{money(data.requestedOrderValue)}</strong><small>{data.requestedOrderCount} pedidos · {data.requestedUnits} unidades</small></article>
       </div>
 
       <article className="executive-chart chart-green sales-evolution-chart">
-        <header><div><h3>Ventas del periodo</h3><p>{data.periodLabel}</p></div><strong>{money(data.monthSales)}</strong></header>
+        <header><div><h3>Ventas del periodo · sin IVA</h3><p>{data.periodLabel}</p></div><strong>{money(data.monthSales)}</strong></header>
         <div>{data.chart.some(row => row.Ventas > 0) ? <ResponsiveContainer><BarChart data={data.chart} margin={{ top: 8, right: 14, left: -8, bottom: 0 }}>
           <CartesianGrid strokeDasharray="3 3" vertical={false}/><XAxis dataKey="name"/><YAxis tickFormatter={value => `${value} €`}/><Tooltip formatter={money}/><Bar dataKey="Ventas" fill="#10b981" radius={[7,7,0,0]} maxBarSize={44}/>
         </BarChart></ResponsiveContainer> : <Empty>No hay ventas entregadas en estas fechas.</Empty>}</div>
@@ -72,7 +72,7 @@ export default function AdminExecutiveDashboards({ data, view, onViewChange, ope
     {view === 'profitability' && <section className="executive-dashboard-view profitability-dashboard-clean">
       <header><div><span>RENTABILIDAD</span><h2>Resultado de las ventas del periodo</h2><p>Los costes proceden de los lotes vendidos; no de las siembras realizadas en las mismas fechas.</p></div></header>
       <div className="profitability-summary-grid">
-        <article><span>Ventas entregadas</span><strong>{money(data.monthSales)}</strong><small>{data.units} unidades</small></article>
+        <article><span>Ventas entregadas · sin IVA</span><strong>{money(data.monthSales)}</strong><small>{data.units} unidades</small></article>
         <article><span>Coste de lo vendido</span><strong>{money(data.totalCost)}</strong><small>Producción, táperes y etiquetas</small></article>
         <article className={data.margin >= 0 ? 'is-positive' : 'is-negative'}><span>Beneficio bruto trazado</span><strong>{money(data.margin)}</strong><small>{data.marginPercent.toFixed(1)} % de margen</small></article>
         <article><span>Cobertura del cálculo</span><strong>{data.costCoverage.toFixed(1)} %</strong><small>{data.exactCostedUnits} uds. exactas · {data.estimatedCostUnits} estimadas</small></article>
