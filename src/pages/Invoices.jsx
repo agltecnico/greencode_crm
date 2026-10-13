@@ -3,7 +3,7 @@ import JSZip from 'jszip';
 import { useMemo, useState } from 'react';
 import { Banknote, CalendarClock, CheckCircle2, CircleAlert, Search, UsersRound, WalletCards } from 'lucide-react';
 import { useData } from '../context/DataContext';
-import { generateInvoicePDF, generateInvoiceBlob, generateDeliveryNoteBlob } from '../utils/pdf';
+import { generateInvoiceBlob, generateDeliveryNoteBlob } from '../utils/pdf';
 import { supabase } from '../config/supabase';
 
 const money = value => Number(value || 0).toLocaleString('es-ES', { style: 'currency', currency: 'EUR' });
@@ -98,11 +98,6 @@ export default function Invoices() {
   const [activeDraftId, setActiveDraftId] = useState(null);
   const [selectedInvoiceIds, setSelectedInvoiceIds] = useState([]);
   const [downloadingInvoices, setDownloadingInvoices] = useState(false);
-
-  // Sharing state
-  const [sharingInvoice, setSharingInvoice] = useState(null);
-  const [sharePhone, setSharePhone] = useState('');
-  const [shareEmail, setShareEmail] = useState('');
 
   const clientUnbilledNotes = deliveryNotes.filter(
     dn => dn.clientId === selectedClientId && dn.status === 'UNBILLED'
@@ -238,21 +233,10 @@ export default function Invoices() {
     if (!createdInvoice) return;
     if (activeDraftId) await deleteBillingDraft(activeDraftId);
 
-    // Auto download PDF is disabled per user request
-    // await generateInvoicePDF(newInvoice, client, notesToPrint);
-
     setIsAdding(false);
     setSelectedClientId('');
     setSelectedNotes([]);
     setActiveDraftId(null);
-  };
-
-  const handleDownloadOldInvoice = async (invoice) => {
-    const client = clients.find(c => c.id === invoice.clientId);
-    const notesToPrint = deliveryNotes.filter(dn => invoice.deliveryNoteIds.includes(dn.id));
-    if (client) {
-      await generateInvoicePDF(invoice, client, notesToPrint);
-    }
   };
 
   const handleViewOldInvoice = async (invoice) => {
@@ -262,57 +246,6 @@ export default function Invoices() {
       const blob = await generateInvoiceBlob(invoice, client, notesToPrint);
       const url = URL.createObjectURL(blob);
       window.open(url, '_blank');
-    }
-  };
-
-  const openShareModal = (invoice) => {
-    const client = clients.find(c => c.id === invoice.clientId);
-    setSharingInvoice(invoice);
-    setSharePhone(client?.phone || '');
-    setShareEmail(client?.email || '');
-  };
-
-  const handleSendWhatsApp = () => {
-    if (!sharePhone) return;
-    const client = clients.find(c => c.id === sharingInvoice.clientId);
-    let formattedPhone = sharePhone.replace(/\D/g, '');
-    if (formattedPhone.length === 9) formattedPhone = '34' + formattedPhone;
-    
-    const text = `🌱 Hola ${client?.name}, adjunto le enviamos la factura ${sharingInvoice.invoiceNumber} por un total de ${sharingInvoice.total.toFixed(2)} €. ¡Muchas gracias por seguir confiando en nuestros microgreens! 🥙`;
-    const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
-    if (isMobile) { window.location.href = `whatsapp://send?phone=${formattedPhone}&text=${encodeURIComponent(text)}`; } else { window.open(`https://web.whatsapp.com/send?phone=${formattedPhone}&text=${encodeURIComponent(text)}`, '_blank'); }
-  };
-
-  const handleSendEmail = () => {
-    if (!shareEmail) return;
-    const client = clients.find(c => c.id === sharingInvoice.clientId);
-    const subject = `Factura ${sharingInvoice.invoiceNumber} - GreenCode`;
-    const body = `🌱 Hola ${client?.name},\n\nAdjunto le enviamos la factura correspondiente a sus últimos pedidos por un total de ${sharingInvoice.total.toFixed(2)} €.\n\n¡Muchas gracias por confiar en nosotros!\n\nUn saludo,\nEquipo GreenCode 🥙`;
-    window.open(`mailto:${shareEmail}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`, '_blank');
-  };
-
-  const handleNativeShare = async () => {
-    const client = clients.find(c => c.id === sharingInvoice.clientId);
-    if (!client) return;
-    const notesToPrint = deliveryNotes.filter(dn => sharingInvoice.deliveryNoteIds.includes(dn.id));
-    
-    try {
-      const blob = await generateInvoiceBlob(sharingInvoice, client, notesToPrint);
-      const file = new File([blob], `Factura_${sharingInvoice.invoiceNumber}_${client.name}.pdf`, { type: 'application/pdf' });
-      
-      const text = `🌱 Hola ${client.name}, adjunto le enviamos la factura ${sharingInvoice.invoiceNumber}. ¡Muchas gracias por seguir confiando en nuestros microgreens! 🥙`;
-      
-      if (navigator.canShare && navigator.canShare({ files: [file] })) {
-        await navigator.share({
-          files: [file],
-          title: `Factura ${sharingInvoice.invoiceNumber}`,
-          text: text
-        });
-      } else {
-        alert("Tu dispositivo o navegador no soporta enviar archivos directamente adjuntos (común en PC). \n\nPor favor, descarga el PDF primero usando el botón de la lista y adjúntalo manualmente en WhatsApp Web o en tu correo.");
-      }
-    } catch (e) {
-      console.error("Error sharing file:", e);
     }
   };
 
@@ -786,6 +719,7 @@ export default function Invoices() {
                 {[...filteredInvoices].reverse().map(inv => {
                   const client = inv.client;
                   const isSummary = inv.type === 'SUMMARY';
+                  const hasBeenSent = inv.emailStatus === 'SENT' || Boolean(inv.emailSentAt) || Boolean(inv.emailSendHistory?.length);
                   return (
                     <tr key={inv.id} className={inv.isOverdue ? 'is-overdue' : ''}>
                       <td>{inv.isOfficial ? <input aria-label={`Seleccionar ${inv.invoiceNumber}`} type="checkbox" checked={selectedInvoiceIds.includes(inv.id)} onChange={() => setSelectedInvoiceIds(current => current.includes(inv.id) ? current.filter(id => id !== inv.id) : [...current, inv.id])} /> : '—'}</td>
@@ -837,30 +771,14 @@ export default function Invoices() {
                         >
                           Ver
                         </button>
-                        <button 
-                          className="btn btn-secondary" 
-                          style={{ padding: '0.3rem 0.6rem', fontSize: '0.8rem' }}
-                          onClick={() => handleDownloadOldInvoice(inv)}
-                          title="Descargar PDF"
-                        >
-                          PDF
-                        </button>
-                        <button 
-                          className="btn btn-primary" 
-                          style={{ padding: '0.3rem 0.6rem', fontSize: '0.8rem', backgroundColor: '#10b981' }}
-                          onClick={() => openShareModal(inv)}
-                          title="Enviar a cliente"
-                        >
-                          Enviar
-                        </button>
                         {inv.type !== 'SUMMARY' && <button
                           className="btn btn-primary"
-                          style={{ padding: '0.3rem 0.6rem', fontSize: '0.8rem', backgroundColor: inv.emailStatus === 'SENT' ? '#64748b' : '#0f766e' }}
+                          style={{ padding: '0.3rem 0.6rem', fontSize: '0.8rem', backgroundColor: hasBeenSent ? '#64748b' : '#0f766e' }}
                           onClick={() => openEmailReview(inv)}
                           disabled={sendingInvoiceId === inv.id}
-                          title={inv.emailStatus === 'SENT' ? `Enviada a ${inv.emailRecipient || 'cliente'}` : 'Enviar factura y albaranes firmados por correo'}
+                          title={hasBeenSent ? `Reenviar a ${inv.emailRecipient || 'cliente'}` : 'Enviar factura y albaranes firmados por correo'}
                         >
-                          {sendingInvoiceId === inv.id ? 'Enviando…' : inv.emailStatus === 'SENT' ? 'Reenviar correo' : 'Enviar correo'}
+                          {sendingInvoiceId === inv.id ? 'Enviando…' : hasBeenSent ? 'Reenviar' : 'Enviar'}
                         </button>}
                         <button 
                           className="btn btn-secondary" 
@@ -875,7 +793,7 @@ export default function Invoices() {
                   );
                 })}
               </tbody>
-              <tfoot><tr className="billing-total-row"><td colSpan="4">TOTAL SIN IVA</td><td>{money(filteredInvoiceTotal)}</td><td colSpan="4">{filteredInvoices.length} documentos</td></tr></tfoot>
+              <tfoot><tr className="billing-total-row"><td colSpan="5">TOTAL SIN IVA</td><td>{money(filteredInvoiceTotal)}</td><td colSpan="4">{filteredInvoices.length} documentos</td></tr></tfoot>
             </table>
           </div>
         )}
@@ -897,48 +815,6 @@ export default function Invoices() {
         </div>;
       })()}
 
-      {sharingInvoice && (
-        <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 50 }}>
-          <div className="card" style={{ width: '100%', maxWidth: '450px', margin: '20px' }}>
-            <h3 className="text-xl font-bold mb-4">Enviar Factura {sharingInvoice.invoiceNumber}</h3>
-            <p className="text-muted mb-4 text-sm">Verifica los datos de contacto antes de elegir por dónde enviar. <b>Nota:</b> Recuerda descargar primero el PDF para poder adjuntarlo manualmente si no usas móvil o navegador compatible.</p>
-            
-            <div className="form-group">
-              <label className="form-label">Teléfono (WhatsApp)</label>
-              <input type="text" className="form-control" value={sharePhone} onChange={e => setSharePhone(e.target.value)} placeholder="Ej: +34 600 000 000" />
-            </div>
-            
-            <div className="form-group mb-6">
-              <label className="form-label">Correo Electrónico (Email)</label>
-              <input type="email" className="form-control" value={shareEmail} onChange={e => setShareEmail(e.target.value)} placeholder="Ej: cliente@empresa.com" />
-            </div>
-
-            <div className="flex flex-col gap-3">
-              <button className="btn w-full flex justify-center items-center gap-2" style={{ backgroundColor: '#000', color: 'white' }} onClick={handleNativeShare}>
-                <svg viewBox="0 0 24 24" width="20" height="20" stroke="currentColor" strokeWidth="2" fill="none" strokeLinecap="round" strokeLinejoin="round"><path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8"></path><polyline points="16 6 12 2 8 6"></polyline><line x1="12" y1="2" x2="12" y2="15"></line></svg>
-                Compartir Documento con PDF adjunto
-              </button>
-            
-              <hr className="my-2 border-color-border" />
-              <p className="text-xs text-center text-muted">Links manuales (sin archivo PDF adjunto):</p>
-              
-              <button className="btn w-full flex justify-center items-center gap-2" style={{ backgroundColor: '#25D366', color: 'white' }} onClick={handleSendWhatsApp}>
-                <svg viewBox="0 0 24 24" width="20" height="20" stroke="currentColor" strokeWidth="2" fill="none" strokeLinecap="round" strokeLinejoin="round"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"></path></svg>
-                Abrir WhatsApp con mensaje
-              </button>
-              
-              <button className="btn btn-primary w-full flex justify-center items-center gap-2" onClick={handleSendEmail}>
-                <svg viewBox="0 0 24 24" width="20" height="20" stroke="currentColor" strokeWidth="2" fill="none" strokeLinecap="round" strokeLinejoin="round"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"></path><polyline points="22,6 12,13 2,6"></polyline></svg>
-                Abrir Email con mensaje
-              </button>
-              
-              <button className="btn btn-secondary w-full mt-2" onClick={() => setSharingInvoice(null)}>
-                Cancelar y cerrar
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 }
