@@ -8,6 +8,9 @@ import { supabase } from '../config/supabase';
 
 const money = value => Number(value || 0).toLocaleString('es-ES', { style: 'currency', currency: 'EUR' });
 const toLocalISODate = date => [date.getFullYear(), String(date.getMonth() + 1).padStart(2, '0'), String(date.getDate()).padStart(2, '0')].join('-');
+const formatSendDate = value => new Date(value).toLocaleString('es-ES', {
+  day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit', hour12: false
+}).replace(',', ' ·');
 const invoiceNetAmount = invoice => {
   if (invoice.subtotal !== undefined && invoice.subtotal !== null) return Number(invoice.subtotal || 0);
   const vatRate = Number(invoice.ivaPercentage || 0) / 100;
@@ -733,7 +736,7 @@ export default function Invoices() {
                       <td className="font-medium">{client ? (client.commercialName || client.name) : 'Desconocido'}</td>
                       <td className="font-bold">{money(invoiceNetAmount(inv))}</td>
                       <td><span className={inv.isOverdue ? 'billing-due overdue' : 'billing-due'}>{!inv.isOfficial || inv.isPaid ? '—' : <>{inv.dueDate.toLocaleDateString('es-ES')}<small>{Number(inv.paymentTermsDays ?? 15)} días</small></>}</span></td>
-                      <td>{inv.emailSendHistory?.length ? <div className="billing-send-history"><strong>{inv.emailSendHistory.length === 1 ? 'Enviada' : `${inv.emailSendHistory.length} envíos`}</strong>{inv.emailSendHistory.map((send, index) => <small key={`${send.sentAt}-${index}`}>{index ? `Reenvío ${index}:` : 'Envío inicial:'} {new Date(send.sentAt).toLocaleString('es-ES', { dateStyle: 'medium', timeStyle: 'short' })}</small>)}</div> : inv.emailSentAt ? <div className="billing-send-history"><strong>Enviada</strong><small>Envío inicial: {new Date(inv.emailSentAt).toLocaleString('es-ES', { dateStyle: 'medium', timeStyle: 'short' })}</small></div> : <span className="billing-not-sent">Sin enviar</span>}</td>
+                      <td>{inv.emailSendHistory?.length ? <div className="billing-send-history"><strong>{inv.emailSendHistory.length === 1 ? 'Enviada' : `${inv.emailSendHistory.length} envíos`}</strong>{inv.emailSendHistory.map((send, index) => <small key={`${send.sentAt}-${index}`}>{index ? `Reenvío ${index}:` : 'Envío inicial:'} {formatSendDate(send.sentAt)}</small>)}</div> : inv.emailSentAt ? <div className="billing-send-history"><strong>Enviada</strong><small>Envío inicial: {formatSendDate(inv.emailSentAt)}</small></div> : <span className="billing-not-sent">Sin enviar</span>}</td>
                       <td>
                         {inv.isPaid ? (
                           <span className="billing-state paid">Cobrado</span>
