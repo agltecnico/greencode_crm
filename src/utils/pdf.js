@@ -575,7 +575,6 @@ const drawCompanyCard = (doc, profile, y) => {
   doc.setTextColor(...PDF_COLORS.dark);
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(9);
-  doc.text('DATOS FISCALES', 21, y + 8);
   const commercialName = profile.commercialName || 'GREENCODE';
   const fiscalName = [profile.fiscalName, profile.ownerName].find(name =>
     name && String(name).trim().toLocaleLowerCase('es') !== String(commercialName).trim().toLocaleLowerCase('es')
@@ -589,7 +588,7 @@ const drawCompanyCard = (doc, profile, y) => {
   ].filter(Boolean);
   lines.slice(0, 5).forEach((line, index) => {
     doc.setFont('helvetica', index === 0 ? 'bold' : 'normal');
-    doc.text(String(line), 21, y + 17 + index * 5, { maxWidth: 77 });
+    doc.text(String(line), 21, y + 10 + index * 6, { maxWidth: 77 });
   });
 };
 

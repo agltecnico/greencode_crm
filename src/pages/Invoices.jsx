@@ -535,14 +535,14 @@ export default function Invoices() {
               <input type="radio" name="docType" value="INVOICE" disabled={Boolean(activeDraftId)} checked={documentType === 'INVOICE'} onChange={() => handleDocumentTypeChange('INVOICE')} />
               <div>
                 <div className="font-bold text-sm">📄 Factura Oficial</div>
-                <div className="text-xs text-muted">Aplica IVA, serie F- y Datos Fiscales</div>
+                <div className="text-xs text-muted">Aplica IVA y utiliza la serie F-</div>
               </div>
             </label>
             <label className="flex items-center gap-2 cursor-pointer p-3 border rounded-md" style={{ borderColor: documentType === 'SUMMARY' ? 'var(--color-primary)' : 'var(--color-border)', backgroundColor: documentType === 'SUMMARY' ? 'rgba(99,102,241,0.05)' : 'transparent' }}>
               <input type="radio" name="docType" value="SUMMARY" disabled={Boolean(activeDraftId)} checked={documentType === 'SUMMARY'} onChange={() => handleDocumentTypeChange('SUMMARY')} />
               <div>
                 <div className="font-bold text-sm">📝 Albarán Resumen</div>
-                <div className="text-xs text-muted">Sin IVA, serie ALB- y sin Datos Fiscales</div>
+                <div className="text-xs text-muted">Sin IVA y utiliza la serie ALB-</div>
               </div>
             </label>
           </div>
