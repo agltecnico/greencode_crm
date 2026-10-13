@@ -1,4 +1,5 @@
 import Swal from 'sweetalert2';
+import JSZip from 'jszip';
 import { useMemo, useState } from 'react';
 import { Banknote, CalendarClock, CheckCircle2, CircleAlert, Search, UsersRound, WalletCards } from 'lucide-react';
 import { useData } from '../context/DataContext';
@@ -76,7 +77,7 @@ const getDueDate = invoice => {
 };
 
 export default function Invoices() {
-  const { clients, deliveryNotes, invoices, addInvoice, deleteInvoice, markInvoiceAsPaid, refreshData } = useData();
+  const { clients, deliveryNotes, invoices, billingDrafts, addInvoice, deleteInvoice, deleteBillingDraft, markInvoiceAsPaid, refreshData } = useData();
   const [isAdding, setIsAdding] = useState(false);
   const [selectedClientId, setSelectedClientId] = useState('');
   const [selectedNotes, setSelectedNotes] = useState([]);
@@ -94,6 +95,9 @@ export default function Invoices() {
   const [emailReviewInvoice, setEmailReviewInvoice] = useState(null);
   const [emailRecipient, setEmailRecipient] = useState('');
   const [emailNoteIds, setEmailNoteIds] = useState([]);
+  const [activeDraftId, setActiveDraftId] = useState(null);
+  const [selectedInvoiceIds, setSelectedInvoiceIds] = useState([]);
+  const [downloadingInvoices, setDownloadingInvoices] = useState(false);
 
   // Sharing state
   const [sharingInvoice, setSharingInvoice] = useState(null);
@@ -103,6 +107,7 @@ export default function Invoices() {
   const clientUnbilledNotes = deliveryNotes.filter(
     dn => dn.clientId === selectedClientId && dn.status === 'UNBILLED'
   );
+  const eligibleClients = clients.filter(client => (client.billingMode || 'INVOICE') === documentType);
 
   const modalOverlayStyle = { position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 50 };
   const modalCardStyle = { width: '100%', maxWidth: '900px', margin: '20px', maxHeight: '90vh', overflowY: 'auto', backgroundColor: '#fff', padding: '2rem', borderRadius: '8px', border: '1px solid var(--color-border)' };
@@ -126,12 +131,31 @@ export default function Invoices() {
 
   const handleDocumentTypeChange = (type) => {
     setDocumentType(type);
+    setSelectedNotes([]);
+    const selectedClient = clients.find(client => client.id === selectedClientId);
+    if (selectedClient && (selectedClient.billingMode || 'INVOICE') !== type) setSelectedClientId('');
     if (type === 'SUMMARY') {
       setPaymentMethod('Contado');
     } else {
       const client = clients.find(c => c.id === selectedClientId);
       setPaymentMethod(client ? (client.paymentMethod || 'Transferencia') : 'Transferencia');
     }
+  };
+
+  const openBillingDraft = draft => {
+    const client = clients.find(item => item.id === draft.clientId);
+    const type = draft.billingMode || client?.billingMode || 'INVOICE';
+    setActiveDraftId(draft.id);
+    setDocumentType(type);
+    setSelectedClientId(draft.clientId);
+    setSelectedNotes((draft.deliveryNoteIds || []).filter(noteId =>
+      deliveryNotes.some(note => note.id === noteId && note.status === 'UNBILLED')
+    ));
+    setInvoiceDate(toLocalISODate(new Date()));
+    setPaymentTermsDays(Number(client?.paymentTermsDays ?? 15));
+    setPaymentMethod(type === 'SUMMARY' ? 'Contado' : (client?.paymentMethod || 'Transferencia'));
+    setIvaPercentage(4);
+    setIsAdding(true);
   };
 
   const handleToggleNote = (noteId) => {
@@ -172,7 +196,7 @@ export default function Invoices() {
     if (!client) return;
 
     // Generate Invoice Number format: YYYY-NNNN
-    const year = new Date().getFullYear();
+    const year = new Date(`${invoiceDate}T00:00:00`).getFullYear();
     
     // Find how many invoices exist globally this year of the selected type
     const typedInvoicesThisYear = invoices.filter(inv => {
@@ -210,7 +234,9 @@ export default function Invoices() {
     };
 
     // Use context to add and update status
-    addInvoice(newInvoice, selectedNotes);
+    const createdInvoice = await addInvoice(newInvoice, selectedNotes);
+    if (!createdInvoice) return;
+    if (activeDraftId) await deleteBillingDraft(activeDraftId);
 
     // Auto download PDF is disabled per user request
     // await generateInvoicePDF(newInvoice, client, notesToPrint);
@@ -218,6 +244,7 @@ export default function Invoices() {
     setIsAdding(false);
     setSelectedClientId('');
     setSelectedNotes([]);
+    setActiveDraftId(null);
   };
 
   const handleDownloadOldInvoice = async (invoice) => {
@@ -391,6 +418,55 @@ export default function Invoices() {
     setFilterEndDate('');
   };
 
+  const selectVisibleOfficialInvoices = () => {
+    setSelectedInvoiceIds(filteredInvoices.filter(invoice => invoice.isOfficial).map(invoice => invoice.id));
+  };
+
+  const selectCurrentQuarterInvoices = () => {
+    const today = new Date();
+    const quarterStartMonth = Math.floor(today.getMonth() / 3) * 3;
+    const start = new Date(today.getFullYear(), quarterStartMonth, 1);
+    const end = new Date(today.getFullYear(), quarterStartMonth + 3, 0);
+    const startValue = toLocalISODate(start);
+    const endValue = toLocalISODate(end);
+    setFilterStatus('ALL');
+    setFilterStartDate(startValue);
+    setFilterEndDate(endValue);
+    setSelectedInvoiceIds(invoiceRows.filter(invoice => {
+      const date = String(invoice.date || '').slice(0, 10);
+      return invoice.isOfficial && date >= startValue && date <= endValue;
+    }).map(invoice => invoice.id));
+  };
+
+  const downloadSelectedInvoices = async () => {
+    const selected = invoiceRows.filter(invoice => invoice.isOfficial && selectedInvoiceIds.includes(invoice.id));
+    if (!selected.length) return;
+    setDownloadingInvoices(true);
+    try {
+      const zip = new JSZip();
+      for (const invoice of selected) {
+        const client = invoice.client || clients.find(item => item.id === invoice.clientId);
+        const notes = deliveryNotes.filter(note => (invoice.deliveryNoteIds || []).includes(note.id));
+        const blob = await generateInvoiceBlob(invoice, client, notes);
+        const clientName = String(client?.commercialName || client?.name || 'Cliente').replace(/[\\/:*?"<>|]/g, '-');
+        zip.file(`${invoice.invoiceNumber}_${clientName}.pdf`, blob);
+      }
+      const archive = await zip.generateAsync({ type: 'blob' });
+      const url = URL.createObjectURL(archive);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `Facturas_GreenCode_${toLocalISODate(new Date())}.zip`;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      URL.revokeObjectURL(url);
+    } catch (error) {
+      await Swal.fire('No se pudo preparar el ZIP', error.message || 'Revisa las facturas seleccionadas.', 'error');
+    } finally {
+      setDownloadingInvoices(false);
+    }
+  };
+
   const handlePaymentStatusChange = async (invoice, isPaid) => {
     const result = await Swal.fire({
       title: isPaid ? 'Confirmar cobro' : 'Reabrir factura',
@@ -461,7 +537,7 @@ export default function Invoices() {
           <h2>Facturación y cobros</h2>
           <p>Controla lo facturado, quién debe dinero y los albaranes pendientes. Todos los importes del panel son sin IVA.</p>
         </div>
-        <button className="billing-primary-action" onClick={() => setIsAdding(true)}>
+        <button className="billing-primary-action" onClick={() => { setActiveDraftId(null); setIsAdding(true); }}>
           + Crear factura
         </button>
       </div>
@@ -480,6 +556,20 @@ export default function Invoices() {
         <article className="billing-unbilled-card"><CalendarClock /><div><span>Pendiente de facturar · sin IVA</span><strong>{money(reconciliation.unbilled)}</strong><small>{reconciliation.unbilledCount} albaranes entregados todavía sin factura ni resumen</small></div></article>
       </section>
       <div className="billing-reconciliation"><strong>Conciliación:</strong> {money(reconciliation.official)} en facturas + {money(reconciliation.summaries)} en albaranes resumen + {money(reconciliation.unbilled)} sin facturar = <strong>{money(reconciliation.sold)} vendidos</strong></div>
+
+      <section className="billing-drafts">
+        <header><div><span>PREFACTURAS AUTOMÁTICAS</span><h3>Pendientes de revisar y confirmar</h3><p>Preparadas el día 1 con los albaranes del mes anterior. El número definitivo se asigna al confirmar.</p></div><strong>{billingDrafts.length}</strong></header>
+        {billingDrafts.length ? <div className="billing-draft-list">
+          {billingDrafts.map(draft => {
+            const client = clients.find(item => item.id === draft.clientId);
+            return <article key={draft.id}>
+              <div><strong>{client?.commercialName || client?.name || 'Cliente desconocido'}</strong><small>{draft.billingMode === 'SUMMARY' ? 'Albarán resumen' : 'Factura oficial'} · {new Date(`${draft.periodStart}T12:00:00`).toLocaleDateString('es-ES', { month: 'long', year: 'numeric' })}</small></div>
+              <div className="billing-draft-amount"><strong>{money(draft.subtotal)}</strong><small>{draft.noteCount} albarán{draft.noteCount === 1 ? '' : 'es'} · sin IVA</small></div>
+              <button type="button" onClick={() => openBillingDraft(draft)}>Revisar y confirmar</button>
+            </article>;
+          })}
+        </div> : <div className="billing-all-clear"><CheckCircle2 /><span><strong>Sin prefacturas pendientes</strong><small>Las nuevas aparecerán automáticamente cada día 1.</small></span></div>}
+      </section>
 
       <section className="billing-debtors">
         <header><div><span>CUENTAS POR COBRAR</span><h3>Clientes con saldo pendiente</h3></div><strong>{debtorClients.length} clientes</strong></header>
@@ -500,20 +590,20 @@ export default function Invoices() {
         <div style={modalOverlayStyle}>
           <div style={modalCardStyle}>
             <div className="flex justify-between items-center mb-4">
-              <h3 className="font-bold text-xl">Generar Factura / Albarán Resumen</h3>
-              <button className="btn btn-secondary" style={{ padding: '0.2rem 0.6rem' }} onClick={() => setIsAdding(false)}>Cerrar</button>
+              <h3 className="font-bold text-xl">{activeDraftId ? 'Revisar prefactura' : 'Generar Factura / Albarán Resumen'}</h3>
+              <button className="btn btn-secondary" style={{ padding: '0.2rem 0.6rem' }} onClick={() => { setIsAdding(false); setActiveDraftId(null); }}>Cerrar</button>
             </div>
           
           <div className="flex gap-4 mb-4">
             <label className="flex items-center gap-2 cursor-pointer p-3 border rounded-md" style={{ borderColor: documentType === 'INVOICE' ? 'var(--color-primary)' : 'var(--color-border)', backgroundColor: documentType === 'INVOICE' ? 'rgba(99,102,241,0.05)' : 'transparent' }}>
-              <input type="radio" name="docType" value="INVOICE" checked={documentType === 'INVOICE'} onChange={() => handleDocumentTypeChange('INVOICE')} />
+              <input type="radio" name="docType" value="INVOICE" disabled={Boolean(activeDraftId)} checked={documentType === 'INVOICE'} onChange={() => handleDocumentTypeChange('INVOICE')} />
               <div>
                 <div className="font-bold text-sm">📄 Factura Oficial</div>
                 <div className="text-xs text-muted">Aplica IVA, serie F- y Datos Fiscales</div>
               </div>
             </label>
             <label className="flex items-center gap-2 cursor-pointer p-3 border rounded-md" style={{ borderColor: documentType === 'SUMMARY' ? 'var(--color-primary)' : 'var(--color-border)', backgroundColor: documentType === 'SUMMARY' ? 'rgba(99,102,241,0.05)' : 'transparent' }}>
-              <input type="radio" name="docType" value="SUMMARY" checked={documentType === 'SUMMARY'} onChange={() => handleDocumentTypeChange('SUMMARY')} />
+              <input type="radio" name="docType" value="SUMMARY" disabled={Boolean(activeDraftId)} checked={documentType === 'SUMMARY'} onChange={() => handleDocumentTypeChange('SUMMARY')} />
               <div>
                 <div className="font-bold text-sm">📝 Albarán Resumen</div>
                 <div className="text-xs text-muted">Sin IVA, serie ALB- y sin Datos Fiscales</div>
@@ -526,7 +616,7 @@ export default function Invoices() {
               <label className="form-label">Seleccionar Cliente</label>
               <select className="form-control" value={selectedClientId} onChange={handleSelectClient}>
                 <option value="">-- Elige un cliente --</option>
-                {clients.map(c => <option key={c.id} value={c.id}>{c.commercialName || c.name} ({c.clientNumber})</option>)}
+                {eligibleClients.map(c => <option key={c.id} value={c.id}>{c.commercialName || c.name} ({c.clientNumber})</option>)}
               </select>
             </div>
             {selectedClientId && (
@@ -631,13 +721,13 @@ export default function Invoices() {
               )}
 
               <div className="flex justify-end gap-3">
-                <button className="btn btn-secondary" onClick={() => setIsAdding(false)}>Cancelar</button>
+                <button className="btn btn-secondary" onClick={() => { setIsAdding(false); setActiveDraftId(null); }}>Cancelar</button>
                 <button 
                   className="btn btn-primary" 
                   disabled={selectedNotes.length === 0}
                   onClick={handleGenerateInvoice}
                 >
-                  Generar {documentType === 'SUMMARY' ? 'Resumen' : 'Factura'}
+                  {activeDraftId ? 'Confirmar y crear documento definitivo' : `Generar ${documentType === 'SUMMARY' ? 'Resumen' : 'Factura'}`}
                 </button>
               </div>
             </div>
@@ -649,6 +739,13 @@ export default function Invoices() {
       <div>
         <section className="billing-register">
           <header><div><span>REGISTRO DE FACTURAS</span><h3>Documentos y situación de cobro · importes sin IVA</h3></div><div className="billing-list-total"><span>Base del listado · sin IVA</span><strong>{money(filteredInvoiceTotal)}</strong><small>{filteredInvoices.length} documentos</small></div></header>
+          <div className="billing-bulk-actions">
+            <div><strong>Facturas para el gestor</strong><small>Selecciona facturas oficiales y descárgalas juntas en un ZIP.</small></div>
+            <button type="button" onClick={selectCurrentQuarterInvoices}>Seleccionar trimestre actual</button>
+            <button type="button" onClick={selectVisibleOfficialInvoices}>Seleccionar facturas visibles</button>
+            <button type="button" onClick={() => setSelectedInvoiceIds([])} disabled={!selectedInvoiceIds.length}>Limpiar selección</button>
+            <button type="button" className="primary" onClick={downloadSelectedInvoices} disabled={!selectedInvoiceIds.length || downloadingInvoices}>{downloadingInvoices ? 'Preparando ZIP…' : `Descargar ZIP (${selectedInvoiceIds.length})`}</button>
+          </div>
           <div className="billing-filters">
             <label className="billing-search"><Search size={17} /><input value={filterQuery} onChange={event => setFilterQuery(event.target.value)} placeholder="Buscar factura o cliente" /></label>
             <select value={filterClientId} onChange={event => setFilterClientId(event.target.value)}>
@@ -673,6 +770,7 @@ export default function Invoices() {
             <table className="table billing-table">
               <thead>
                 <tr>
+                  <th><input aria-label="Seleccionar todas las facturas visibles" type="checkbox" checked={filteredInvoices.some(invoice => invoice.isOfficial) && filteredInvoices.filter(invoice => invoice.isOfficial).every(invoice => selectedInvoiceIds.includes(invoice.id))} onChange={event => event.target.checked ? selectVisibleOfficialInvoices() : setSelectedInvoiceIds([])} /></th>
                   <th>Referencia</th>
                   <th>Tipo</th>
                   <th>Fecha</th>
@@ -690,6 +788,7 @@ export default function Invoices() {
                   const isSummary = inv.type === 'SUMMARY';
                   return (
                     <tr key={inv.id} className={inv.isOverdue ? 'is-overdue' : ''}>
+                      <td>{inv.isOfficial ? <input aria-label={`Seleccionar ${inv.invoiceNumber}`} type="checkbox" checked={selectedInvoiceIds.includes(inv.id)} onChange={() => setSelectedInvoiceIds(current => current.includes(inv.id) ? current.filter(id => id !== inv.id) : [...current, inv.id])} /> : '—'}</td>
                       <td className="font-mono font-bold text-secondary">{inv.invoiceNumber}</td>
                       <td>
                         <span style={{ padding: '0.2rem 0.6rem', borderRadius: '4px', fontSize: '0.75rem', fontWeight: 'bold', backgroundColor: isSummary ? '#e0e7ff' : '#dcfce7', color: isSummary ? '#4338ca' : '#166534' }}>

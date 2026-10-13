@@ -30,6 +30,7 @@ export const DataProvider = ({ children, mode = 'full' }) => {
   const [orders, setOrders] = useState([]);
   const [deliveryNotes, setDeliveryNotes] = useState([]);
   const [invoices, setInvoices] = useState([]);
+  const [billingDrafts, setBillingDrafts] = useState([]);
   const [expenses, setExpenses] = useState([]);
   const [salesForecasts, setSalesForecasts] = useState([]);
   const [companyProfile, setCompanyProfile] = useState(() => {
@@ -116,6 +117,7 @@ export const DataProvider = ({ children, mode = 'full' }) => {
           supabase.from('products').select('*').order('createdAt', { ascending: true }),
           supabase.from('delivery_notes').select('*').order('createdAt', { ascending: true }),
           supabase.from('invoices').select('*').order('createdAt', { ascending: true }),
+          supabase.from('billing_drafts').select('*').eq('status', 'PENDING').order('periodStart', { ascending: false }),
           supabase.from('expenses').select('*').order('createdAt', { ascending: true }),
           supabase.from('sales_forecasts').select('*').order('weekStart', { ascending: false }),
           supabase.from('company_profile').select('*').limit(1),
@@ -165,6 +167,7 @@ export const DataProvider = ({ children, mode = 'full' }) => {
           { data: productsData },
           { data: notesData },
           { data: invoicesData },
+          { data: billingDraftsData },
           { data: expensesData },
           { data: salesForecastsData },
           { data: profileData },
@@ -188,6 +191,7 @@ export const DataProvider = ({ children, mode = 'full' }) => {
         if (productsData) setProducts(productsData);
         if (notesData) setDeliveryNotes(notesData);
         if (invoicesData) setInvoices(invoicesData);
+        if (billingDraftsData) setBillingDrafts(billingDraftsData);
         if (expensesData) {
             const mappedExpenses = expensesData.map(exp => {
               let concept = exp.concept || '';
@@ -1548,6 +1552,14 @@ export const DataProvider = ({ children, mode = 'full' }) => {
     if (data) setInvoices(prev => prev.map(i => i.id === tempId ? data[0] : i));
     return data?.[0] || newInvoice;
   };
+
+  const deleteBillingDraft = async (id) => {
+    setBillingDrafts(previous => previous.filter(draft => draft.id !== id));
+    return persistOrReload(
+      () => supabase.from('billing_drafts').delete().eq('id', id),
+      'eliminar la prefactura'
+    );
+  };
   
   const deleteInvoice = async (id) => {
     const invoiceToDelete = invoices.find(i => i.id === id);
@@ -1768,7 +1780,7 @@ export const DataProvider = ({ children, mode = 'full' }) => {
         products: sortedProducts, addProduct, updateProduct, deleteProduct,
       orders, addOrder, updateOrderList, deleteOrder, markOrderAsDelivered, saveSignedDeliveryNote,
       deliveryNotes, updateDeliveryNote, deleteDeliveryNote,
-      invoices, addInvoice, deleteInvoice, importData, markInvoiceAsPaid,
+      invoices, billingDrafts, addInvoice, deleteInvoice, deleteBillingDraft, importData, markInvoiceAsPaid,
       expenses, addExpense, updateExpense, deleteExpense, markExpenseAsPaid,
       salesForecasts, saveSalesForecasts,
       refreshData, initialDataLoading, driverActionsReady,

@@ -8,7 +8,7 @@ export default function Clients() {
   const [formData, setFormData] = useState({
     name: '', commercialName: '', email: '', phone: '', address: '', 
     postalCode: '', city: '', province: '', nif: '', defaultDiscount: 0,
-    paymentMethod: 'Transferencia', paymentTermsDays: 15
+    paymentMethod: 'Transferencia', paymentTermsDays: 15, billingMode: 'INVOICE'
   });
 
   const modalOverlayStyle = { position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 50 };
@@ -22,7 +22,7 @@ export default function Clients() {
       } else {
         addClient(formData);
       }
-      setFormData({ name: '', commercialName: '', email: '', phone: '', address: '', postalCode: '', city: '', province: '', nif: '', defaultDiscount: 0, paymentMethod: 'Transferencia', paymentTermsDays: 15 });
+      setFormData({ name: '', commercialName: '', email: '', phone: '', address: '', postalCode: '', city: '', province: '', nif: '', defaultDiscount: 0, paymentMethod: 'Transferencia', paymentTermsDays: 15, billingMode: 'INVOICE' });
       setIsFormOpen(false);
       setEditingId(null);
     }
@@ -41,7 +41,8 @@ export default function Clients() {
       nif: client.nif || '',
       defaultDiscount: client.defaultDiscount || 0,
       paymentMethod: client.paymentMethod || 'Transferencia',
-      paymentTermsDays: Number(client.paymentTermsDays ?? 15)
+      paymentTermsDays: Number(client.paymentTermsDays ?? 15),
+      billingMode: client.billingMode || 'INVOICE'
     });
     setEditingId(client.id);
     setIsFormOpen(true);
@@ -53,7 +54,7 @@ export default function Clients() {
   const cancelForm = () => {
     setIsFormOpen(false);
     setEditingId(null);
-    setFormData({ name: '', commercialName: '', email: '', phone: '', address: '', postalCode: '', city: '', province: '', nif: '', defaultDiscount: 0, paymentMethod: 'Transferencia', paymentTermsDays: 15 });
+    setFormData({ name: '', commercialName: '', email: '', phone: '', address: '', postalCode: '', city: '', province: '', nif: '', defaultDiscount: 0, paymentMethod: 'Transferencia', paymentTermsDays: 15, billingMode: 'INVOICE' });
   };
 
   return (
@@ -122,6 +123,14 @@ export default function Clients() {
               </select>
             </div>
             <div className="form-group mb-0">
+              <label className="form-label">Modo de facturación</label>
+              <select className="form-control" value={formData.billingMode} onChange={e => setFormData({...formData, billingMode: e.target.value})}>
+                <option value="INVOICE">Factura oficial</option>
+                <option value="SUMMARY">Albarán resumen</option>
+              </select>
+              <small className="text-muted">Determina la prefactura mensual y el filtro al crear documentos.</small>
+            </div>
+            <div className="form-group mb-0">
               <label className="form-label">Plazo de pago (días)</label>
               <input type="number" min="0" max="365" className="form-control" value={formData.paymentTermsDays} onChange={e => setFormData({...formData, paymentTermsDays: Number(e.target.value)})} />
               <small className="text-muted">Se aplicará a las nuevas facturas. Por defecto: 15 días.</small>
@@ -149,6 +158,7 @@ export default function Clients() {
                   <th>Nombre Comercial / Fiscal</th>
                   <th>NIF/CIF</th>
                   <th>Email</th>
+                  <th>Facturación</th>
                   <th>Teléfono</th>
                   <th>Acciones</th>
                 </tr>
@@ -173,6 +183,7 @@ export default function Clients() {
                         <p className="font-semibold mb-1">Plazo de pago: <span className="font-normal">{Number(client.paymentTermsDays ?? 15)} días</span></p>
                       </div>
                     </td>
+                    <td><span className={client.billingMode === 'SUMMARY' ? 'client-billing-mode summary' : 'client-billing-mode invoice'}>{client.billingMode === 'SUMMARY' ? 'Albarán' : 'Factura'}</span></td>
                     <td>{client.phone || '-'}</td>
                     <td className="flex gap-2">
                       <button className="btn btn-secondary" style={{ padding: '0.25rem 0.5rem', fontSize: '0.75rem' }} onClick={() => handleEditClick(client)}>
