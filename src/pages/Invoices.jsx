@@ -6,6 +6,7 @@ import { generateInvoicePDF, generateInvoiceBlob, generateDeliveryNoteBlob } fro
 import { supabase } from '../config/supabase';
 
 const money = value => Number(value || 0).toLocaleString('es-ES', { style: 'currency', currency: 'EUR' });
+const toLocalISODate = date => [date.getFullYear(), String(date.getMonth() + 1).padStart(2, '0'), String(date.getDate()).padStart(2, '0')].join('-');
 
 const buildInvoiceEmailHtml = invoice => `
   <div style="margin:0;background:#f3f7f2;padding:28px 12px;font-family:Arial,Helvetica,sans-serif;color:#26352b">
@@ -27,6 +28,7 @@ const buildInvoiceEmailHtml = invoice => `
                 <div style="font-size:12px;letter-spacing:1.5px;text-transform:uppercase;color:#578065">Documentación adjunta</div>
                 <div style="margin-top:6px;font-size:21px;font-weight:700;color:#176b3a">Factura ${invoice.invoiceNumber}</div>
                 <div style="margin-top:7px;font-size:14px;line-height:1.5;color:#52705c">Incluye los albaranes correspondientes debidamente firmados.</div>
+                <div style="margin-top:7px;font-size:14px;line-height:1.5;color:#315f3e"><strong>Vencimiento:</strong> ${getDueDate(invoice).toLocaleDateString('es-ES')}.</div>
               </td>
             </tr>
           </table>
@@ -61,9 +63,9 @@ const buildInvoiceEmailHtml = invoice => `
   </div>`;
 
 const getDueDate = invoice => {
+  if (invoice.dueDate) return new Date(`${String(invoice.dueDate).slice(0, 10)}T00:00:00`);
   const date = new Date(invoice.date);
-  const termMatch = String(invoice.paymentMethod || '').match(/(\d+)/);
-  const days = termMatch ? Number(termMatch[1]) : 0;
+  const days = Number(invoice.paymentTermsDays ?? 15);
   date.setDate(date.getDate() + days);
   return date;
 };
@@ -77,7 +79,8 @@ export default function Invoices() {
   const [paymentMethod, setPaymentMethod] = useState('Transferencia');
   const [documentType, setDocumentType] = useState('INVOICE');
   const [invoiceDate, setInvoiceDate] = useState(new Date().toISOString().split('T')[0]);
-  const [filterStatus, setFilterStatus] = useState('ALL');
+  const [paymentTermsDays, setPaymentTermsDays] = useState(15);
+  const [filterStatus, setFilterStatus] = useState('PENDING');
   const [filterClientId, setFilterClientId] = useState('');
   const [filterQuery, setFilterQuery] = useState('');
   const [filterStartDate, setFilterStartDate] = useState('');
@@ -104,6 +107,7 @@ export default function Invoices() {
     setSelectedNotes([]); // Reset selection on client change
     const client = clients.find(c => c.id === e.target.value);
     if (client) {
+      setPaymentTermsDays(Number(client.paymentTermsDays ?? 15));
       if (documentType === 'SUMMARY') {
         setPaymentMethod('Contado');
       } else {
@@ -111,6 +115,7 @@ export default function Invoices() {
       }
     } else {
       setPaymentMethod('Transferencia');
+      setPaymentTermsDays(15);
     }
   };
 
@@ -190,7 +195,13 @@ export default function Invoices() {
       ivaPercentage: finalIva,
       total,
       date: new Date(invoiceDate).toISOString(),
-      paymentMethod
+      paymentMethod,
+      paymentTermsDays: documentType === 'SUMMARY' ? 0 : paymentTermsDays,
+      dueDate: documentType === 'SUMMARY' ? null : (() => {
+        const due = new Date(`${invoiceDate}T00:00:00`);
+        due.setDate(due.getDate() + paymentTermsDays);
+        return toLocalISODate(due);
+      })()
     };
 
     // Use context to add and update status
@@ -276,13 +287,14 @@ export default function Invoices() {
   const invoiceRows = useMemo(() => invoices.map(invoice => {
     const client = clients.find(item => item.id === invoice.clientId);
     const dueDate = getDueDate(invoice);
-    const isOverdue = invoice.isPaid !== true && dueDate.getTime() < new Date().setHours(0, 0, 0, 0);
-    return { ...invoice, client, dueDate, isOverdue };
+    const isCollectible = invoice.type !== 'SUMMARY';
+    const isOverdue = isCollectible && invoice.isPaid !== true && dueDate.getTime() < new Date().setHours(0, 0, 0, 0);
+    return { ...invoice, client, dueDate, isOverdue, isCollectible };
   }), [clients, invoices]);
 
   const filteredInvoices = useMemo(() => invoiceRows.filter(invoice => {
-    if (filterStatus === 'PENDING' && invoice.isPaid) return false;
-    if (filterStatus === 'PAID' && !invoice.isPaid) return false;
+    if (filterStatus === 'PENDING' && (!invoice.isCollectible || invoice.isPaid)) return false;
+    if (filterStatus === 'PAID' && (!invoice.isCollectible || !invoice.isPaid)) return false;
     if (filterStatus === 'OVERDUE' && !invoice.isOverdue) return false;
     if (filterClientId && invoice.clientId !== filterClientId) return false;
     const invoiceTime = new Date(invoice.date).getTime();
@@ -298,6 +310,7 @@ export default function Invoices() {
   );
 
   const collectionSummary = useMemo(() => invoiceRows.reduce((summary, invoice) => {
+    if (!invoice.isCollectible) return summary;
     const total = Number(invoice.total || 0);
     summary.invoiced += total;
     if (invoice.isPaid) summary.collected += total;
@@ -314,7 +327,7 @@ export default function Invoices() {
 
   const debtorClients = useMemo(() => {
     const grouped = new Map();
-    invoiceRows.filter(invoice => !invoice.isPaid).forEach(invoice => {
+    invoiceRows.filter(invoice => invoice.isCollectible && !invoice.isPaid).forEach(invoice => {
       const key = invoice.clientId || 'unknown';
       const current = grouped.get(key) || {
         id: key,
@@ -342,7 +355,7 @@ export default function Invoices() {
   }, { total: 0, count: 0 }), [deliveryNotes]);
 
   const clearFilters = () => {
-    setFilterStatus('ALL');
+    setFilterStatus('PENDING');
     setFilterClientId('');
     setFilterQuery('');
     setFilterStartDate('');
@@ -494,6 +507,11 @@ export default function Invoices() {
                     <option value="Contado">Contado</option>
                   </select>
                 </div>
+                {documentType === 'INVOICE' && <div className="mb-6 max-w-xs w-full">
+                  <label className="form-label">Plazo de pago</label>
+                  <div className="billing-payment-term"><input type="number" min="0" max="365" className="form-control" value={paymentTermsDays} onChange={e => setPaymentTermsDays(Math.max(0, Math.min(365, Number(e.target.value))))} /><span>días</span></div>
+                  <small className="text-muted">Vence el {(() => { const due = new Date(`${invoiceDate}T00:00:00`); due.setDate(due.getDate() + paymentTermsDays); return due.toLocaleDateString('es-ES'); })()}</small>
+                </div>}
               </>
             )}
           </div>
@@ -625,6 +643,7 @@ export default function Invoices() {
                   <th>Cliente</th>
                   <th>Total</th>
                   <th>Vencimiento</th>
+                  <th>Envíos</th>
                   <th>Estado</th>
                   <th>Acciones</th>
                 </tr>
@@ -644,9 +663,12 @@ export default function Invoices() {
                       <td>{new Date(inv.date).toLocaleDateString()}</td>
                       <td className="font-medium">{client ? (client.commercialName || client.name) : 'Desconocido'}</td>
                       <td className="font-bold">{money(inv.total)}</td>
-                      <td><span className={inv.isOverdue ? 'billing-due overdue' : 'billing-due'}>{inv.isPaid ? '—' : inv.dueDate.toLocaleDateString('es-ES')}</span></td>
+                      <td><span className={inv.isOverdue ? 'billing-due overdue' : 'billing-due'}>{!inv.isCollectible || inv.isPaid ? '—' : <>{inv.dueDate.toLocaleDateString('es-ES')}<small>{Number(inv.paymentTermsDays ?? 15)} días</small></>}</span></td>
+                      <td>{inv.emailSendHistory?.length ? <div className="billing-send-history"><strong>{inv.emailSendHistory.length === 1 ? 'Enviada' : `${inv.emailSendHistory.length} envíos`}</strong><small>{inv.emailSendHistory.map((send, index) => `${index ? 'Reenvío' : 'Envío'}: ${new Date(send.sentAt).toLocaleString('es-ES', { dateStyle: 'short', timeStyle: 'short' })}`).join(' · ')}</small></div> : inv.emailSentAt ? <div className="billing-send-history"><strong>Enviada</strong><small>{new Date(inv.emailSentAt).toLocaleString('es-ES', { dateStyle: 'short', timeStyle: 'short' })}</small></div> : <span className="billing-not-sent">Sin enviar</span>}</td>
                       <td>
-                        {inv.isPaid ? (
+                        {!inv.isCollectible ? (
+                          <span className="billing-state informative">Informativo</span>
+                        ) : inv.isPaid ? (
                           <span className="billing-state paid">Cobrado</span>
                         ) : inv.isOverdue ? (
                           <span className="billing-state overdue">Vencida</span>
@@ -655,7 +677,7 @@ export default function Invoices() {
                         )}
                       </td>
                       <td className="flex gap-2 items-center flex-wrap">
-                        {!inv.isPaid ? (
+                        {!inv.isCollectible ? null : !inv.isPaid ? (
                           <button 
                             className="btn btn-outline" 
                             style={{ padding: '0.3rem 0.6rem', fontSize: '0.8rem', color: 'green', borderColor: 'green' }}
@@ -720,7 +742,7 @@ export default function Invoices() {
                   );
                 })}
               </tbody>
-              <tfoot><tr className="billing-total-row"><td colSpan="4">TOTAL DEL LISTADO</td><td>{money(filteredInvoiceTotal)}</td><td colSpan="3">{filteredInvoices.length} documentos</td></tr></tfoot>
+              <tfoot><tr className="billing-total-row"><td colSpan="4">TOTAL DEL LISTADO</td><td>{money(filteredInvoiceTotal)}</td><td colSpan="4">{filteredInvoices.length} documentos</td></tr></tfoot>
             </table>
           </div>
         )}

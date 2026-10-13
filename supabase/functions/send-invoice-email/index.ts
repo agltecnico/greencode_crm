@@ -66,7 +66,17 @@ Deno.serve(async (req) => {
       console.error("Invoice email was sent but could not be archived in Sent", archiveError);
     }
     const admin = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
-    await admin.from("invoices").update({ emailStatus: "SENT", emailSentAt: new Date().toISOString(), emailRecipient: body.to, emailError: null }).eq("id", body.invoiceId);
+    const sentAt = new Date().toISOString();
+    const { data: invoice } = await admin.from("invoices").select("emailSendHistory,emailAttempts").eq("id", body.invoiceId).single();
+    const history = Array.isArray(invoice?.emailSendHistory) ? invoice.emailSendHistory : [];
+    await admin.from("invoices").update({
+      emailStatus: "SENT",
+      emailSentAt: sentAt,
+      emailRecipient: body.to,
+      emailError: null,
+      emailAttempts: Number(invoice?.emailAttempts || 0) + 1,
+      emailSendHistory: [...history, { sentAt, recipient: body.to, messageId: info.messageId, archived }]
+    }).eq("id", body.invoiceId);
     return new Response(JSON.stringify({ ok: true, messageId: info.messageId, archived }), { headers: { ...cors, "Content-Type": "application/json" } });
   } catch (error) {
     console.error("send-invoice-email failed", error);

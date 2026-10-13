@@ -8,7 +8,7 @@ export default function Clients() {
   const [formData, setFormData] = useState({
     name: '', commercialName: '', email: '', phone: '', address: '', 
     postalCode: '', city: '', province: '', nif: '', defaultDiscount: 0,
-    paymentMethod: 'Transferencia'
+    paymentMethod: 'Transferencia', paymentTermsDays: 15
   });
 
   const modalOverlayStyle = { position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 50 };
@@ -22,7 +22,7 @@ export default function Clients() {
       } else {
         addClient(formData);
       }
-      setFormData({ name: '', commercialName: '', email: '', phone: '', address: '', postalCode: '', city: '', province: '', nif: '', defaultDiscount: 0, paymentMethod: 'Transferencia' });
+      setFormData({ name: '', commercialName: '', email: '', phone: '', address: '', postalCode: '', city: '', province: '', nif: '', defaultDiscount: 0, paymentMethod: 'Transferencia', paymentTermsDays: 15 });
       setIsFormOpen(false);
       setEditingId(null);
     }
@@ -40,7 +40,8 @@ export default function Clients() {
       province: client.province || '',
       nif: client.nif || '',
       defaultDiscount: client.defaultDiscount || 0,
-      paymentMethod: client.paymentMethod || 'Transferencia'
+      paymentMethod: client.paymentMethod || 'Transferencia',
+      paymentTermsDays: Number(client.paymentTermsDays ?? 15)
     });
     setEditingId(client.id);
     setIsFormOpen(true);
@@ -52,7 +53,7 @@ export default function Clients() {
   const cancelForm = () => {
     setIsFormOpen(false);
     setEditingId(null);
-    setFormData({ name: '', commercialName: '', email: '', phone: '', address: '', postalCode: '', city: '', province: '', nif: '', defaultDiscount: 0, paymentMethod: 'Transferencia' });
+    setFormData({ name: '', commercialName: '', email: '', phone: '', address: '', postalCode: '', city: '', province: '', nif: '', defaultDiscount: 0, paymentMethod: 'Transferencia', paymentTermsDays: 15 });
   };
 
   return (
@@ -120,6 +121,11 @@ export default function Clients() {
                 <option value="Contado">Contado</option>
               </select>
             </div>
+            <div className="form-group mb-0">
+              <label className="form-label">Plazo de pago (días)</label>
+              <input type="number" min="0" max="365" className="form-control" value={formData.paymentTermsDays} onChange={e => setFormData({...formData, paymentTermsDays: Number(e.target.value)})} />
+              <small className="text-muted">Se aplicará a las nuevas facturas. Por defecto: 15 días.</small>
+            </div>
             <div style={{ gridColumn: 'span 2', display: 'flex', justifyContent: 'flex-end', gap: '0.75rem', marginTop: '1rem' }}>
               <button type="button" className="btn btn-secondary" onClick={cancelForm}>Cancelar</button>
               <button type="submit" className="btn btn-primary">
@@ -164,6 +170,7 @@ export default function Clients() {
                           <p className="font-semibold mb-1">C.P. / Pobl.: <span className="font-normal">{`${client.postalCode || ''} ${client.city || ''} ${client.province ? '('+client.province+')' : ''}`.trim()}</span></p>
                         )}
                         {client.defaultDiscount > 0 && <p className="font-semibold text-primary mb-1">Descuento por defecto: <span className="font-normal">{client.defaultDiscount}%</span></p>}
+                        <p className="font-semibold mb-1">Plazo de pago: <span className="font-normal">{Number(client.paymentTermsDays ?? 15)} días</span></p>
                       </div>
                     </td>
                     <td>{client.phone || '-'}</td>

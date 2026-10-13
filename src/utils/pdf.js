@@ -445,7 +445,8 @@ const PDF_COLORS = {
 };
 
 const DEFAULT_COMPANY_PROFILE = {
-  fiscalName: 'GREENCODE',
+  commercialName: 'GREENCODE',
+  fiscalName: 'ANTONIO JOSÉ GÓMEZ LÓPEZ',
   ownerName: 'ANTONIO JOSÉ GÓMEZ LÓPEZ',
   nif: '48351348N',
   address: 'CALLE SANTA FAZ 41',
@@ -575,9 +576,13 @@ const drawCompanyCard = (doc, profile, y) => {
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(9);
   doc.text('DATOS FISCALES', 21, y + 8);
+  const commercialName = profile.commercialName || 'GREENCODE';
+  const fiscalName = [profile.fiscalName, profile.ownerName].find(name =>
+    name && String(name).trim().toLocaleLowerCase('es') !== String(commercialName).trim().toLocaleLowerCase('es')
+  );
   const lines = [
-    profile.fiscalName || 'GREENCODE',
-    profile.ownerName,
+    commercialName,
+    fiscalName,
     profile.nif ? `NIF/CIF: ${profile.nif}` : '',
     profile.address,
     [profile.postalCode, profile.city, profile.province].filter(Boolean).join(' ')
@@ -728,9 +733,19 @@ const buildInvoiceDoc = async (invoice, client, deliveryNotes) => {
     doc.text('FORMA DE PAGO', 21, y + 10);
     doc.setFont('helvetica', 'normal');
     doc.text(invoice.paymentMethod, 52, y + 10);
+    if (!isSummary) {
+      const terms = Number(invoice.paymentTermsDays ?? 15);
+      const dueDate = invoice.dueDate
+        ? new Date(`${String(invoice.dueDate).slice(0, 10)}T00:00:00`)
+        : new Date(new Date(invoice.date).setDate(new Date(invoice.date).getDate() + terms));
+      doc.setFontSize(8.5);
+      doc.setFont('helvetica', 'bold');
+      doc.text(`VENCIMIENTO: ${formatDate(dueDate)}`, 21, y + 20);
+    }
     if (!isSummary && invoice.paymentMethod === 'Transferencia' && profile.bankAccount) {
       doc.setFontSize(8.5);
-      doc.text(`IBAN: ${profile.bankAccount}`, 21, y + 21, { maxWidth: 72 });
+      doc.setFont('helvetica', 'normal');
+      doc.text(`IBAN: ${profile.bankAccount}`, 21, y + 27, { maxWidth: 72 });
     }
   }
 
