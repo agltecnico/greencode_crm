@@ -1,7 +1,7 @@
 import Swal from 'sweetalert2';
 import JSZip from 'jszip';
 import { useMemo, useState } from 'react';
-import { Banknote, CalendarClock, CheckCircle2, CircleAlert, Search, UsersRound, WalletCards } from 'lucide-react';
+import { Banknote, CalendarClock, CheckCircle2, CircleAlert, Pencil, Search, UsersRound, WalletCards } from 'lucide-react';
 import { useData } from '../context/DataContext';
 import { generateInvoiceBlob, generateDeliveryNoteBlob } from '../utils/pdf';
 import { supabase } from '../config/supabase';
@@ -80,7 +80,7 @@ const getDueDate = invoice => {
 };
 
 export default function Invoices() {
-  const { clients, deliveryNotes, invoices, billingDrafts, addInvoice, deleteInvoice, deleteBillingDraft, markInvoiceAsPaid, refreshData } = useData();
+  const { clients, deliveryNotes, invoices, billingDrafts, addInvoice, updateInvoice, finalizeMonthlyBilling, deleteInvoice, deleteBillingDraft, markInvoiceAsPaid, refreshData } = useData();
   const [isAdding, setIsAdding] = useState(false);
   const [selectedClientId, setSelectedClientId] = useState('');
   const [selectedNotes, setSelectedNotes] = useState([]);
@@ -99,11 +99,16 @@ export default function Invoices() {
   const [emailRecipient, setEmailRecipient] = useState('');
   const [emailNoteIds, setEmailNoteIds] = useState([]);
   const [activeDraftId, setActiveDraftId] = useState(null);
+  const [editingInvoiceId, setEditingInvoiceId] = useState(null);
+  const [runningMonthlyBilling, setRunningMonthlyBilling] = useState(false);
   const [selectedInvoiceIds, setSelectedInvoiceIds] = useState([]);
   const [downloadingInvoices, setDownloadingInvoices] = useState(false);
 
-  const clientUnbilledNotes = deliveryNotes.filter(
-    dn => dn.clientId === selectedClientId && dn.status === 'UNBILLED'
+  const editingInvoice = invoices.find(invoice => invoice.id === editingInvoiceId);
+  const clientUnbilledNotes = deliveryNotes.filter(dn =>
+    dn.clientId === selectedClientId && (
+      dn.status === 'UNBILLED' || (editingInvoice?.deliveryNoteIds || []).includes(dn.id)
+    )
   );
   const eligibleClients = clients.filter(client => (client.billingMode || 'INVOICE') === documentType);
 
@@ -156,6 +161,79 @@ export default function Invoices() {
     setIsAdding(true);
   };
 
+  const openInvoiceEditor = async invoice => {
+    const hasBeenSent = invoice.emailStatus === 'SENT' || Boolean(invoice.emailSentAt) || Boolean(invoice.emailSendHistory?.length);
+    if (hasBeenSent || invoice.isPaid) {
+      const warning = await Swal.fire({
+        title: 'Documento ya utilizado',
+        text: `${hasBeenSent ? 'Esta factura ya se envió. ' : ''}${invoice.isPaid ? 'También figura como cobrada. ' : ''}Los cambios quedarán registrados, pero no se reenviará automáticamente.`,
+        icon: 'warning',
+        showCancelButton: true,
+        confirmButtonText: 'Continuar y editar',
+        cancelButtonText: 'Cancelar'
+      });
+      if (!warning.isConfirmed) return;
+    }
+    setActiveDraftId(null);
+    setEditingInvoiceId(invoice.id);
+    setDocumentType(invoice.type === 'SUMMARY' ? 'SUMMARY' : 'INVOICE');
+    setSelectedClientId(invoice.clientId);
+    setSelectedNotes([...(invoice.deliveryNoteIds || [])]);
+    setInvoiceDate(toLocalISODate(new Date(invoice.date)));
+    setPaymentTermsDays(Number(invoice.paymentTermsDays ?? 15));
+    setPaymentMethod(invoice.paymentMethod || 'Transferencia');
+    setIvaPercentage(Number(invoice.ivaPercentage ?? 4));
+    setIsAdding(true);
+  };
+
+  const closeInvoiceModal = () => {
+    setIsAdding(false);
+    setActiveDraftId(null);
+    setEditingInvoiceId(null);
+  };
+
+  const handleMonthlyBilling = async () => {
+    const now = new Date();
+    const periodStart = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-01`;
+    const invoiceDateValue = new Date(now.getFullYear(), now.getMonth() + 1, 1);
+    const periodLabel = now.toLocaleDateString('es-ES', { month: 'long', year: 'numeric' });
+    const unbilledCount = deliveryNotes.filter(note => {
+      const noteDate = new Date(note.date);
+      return note.status === 'UNBILLED' && noteDate.getFullYear() === now.getFullYear() && noteDate.getMonth() === now.getMonth();
+    }).length;
+
+    if (!unbilledCount) {
+      await Swal.fire('Nada que facturar', `No hay albaranes pendientes de ${periodLabel}.`, 'info');
+      return;
+    }
+
+    const result = await Swal.fire({
+      title: `Facturar ${periodLabel}`,
+      html: `Se crearán las facturas y resúmenes definitivos con fecha <b>${invoiceDateValue.toLocaleDateString('es-ES')}</b>.<br><br>Hay <b>${unbilledCount} albaranes</b> pendientes este mes. Al terminar, la facturación automática no repetirá este periodo.`,
+      icon: 'question',
+      showCancelButton: true,
+      confirmButtonText: 'Sí, hacer facturación',
+      cancelButtonText: 'Cancelar',
+      confirmButtonColor: '#4f46e5'
+    });
+    if (!result.isConfirmed) return;
+
+    setRunningMonthlyBilling(true);
+    const billingResult = await finalizeMonthlyBilling(periodStart);
+    setRunningMonthlyBilling(false);
+    if (!billingResult) return;
+
+    if (billingResult.alreadyProcessed) {
+      await Swal.fire('Mes ya facturado', 'Este mes ya se había procesado y no se ha creado ningún duplicado.', 'info');
+      return;
+    }
+    if (billingResult.empty) {
+      await Swal.fire('Nada que facturar', 'No se ha creado ningún documento y la facturación automática sigue disponible.', 'info');
+      return;
+    }
+    await Swal.fire('Facturación terminada', `Se han creado ${billingResult.documentCount} documentos definitivos con ${billingResult.noteCount} albaranes.`, 'success');
+  };
+
   const handleToggleNote = (noteId) => {
     if (selectedNotes.includes(noteId)) {
       setSelectedNotes(selectedNotes.filter(id => id !== noteId));
@@ -192,6 +270,20 @@ export default function Invoices() {
 
     const client = clients.find(c => c.id === selectedClientId);
     if (!client) return;
+
+    if (editingInvoiceId) {
+      const updated = await updateInvoice(editingInvoiceId, {
+        deliveryNoteIds: selectedNotes,
+        date: invoiceDate,
+        ivaPercentage: documentType === 'SUMMARY' ? 0 : ivaPercentage,
+        paymentMethod,
+        paymentTermsDays: documentType === 'SUMMARY' ? 0 : paymentTermsDays
+      });
+      if (!updated) return;
+      closeInvoiceModal();
+      await Swal.fire('Factura actualizada', 'Los cambios se han guardado y los totales se han recalculado.', 'success');
+      return;
+    }
 
     // Generate Invoice Number format: YYYY-NNNN
     const year = new Date(`${invoiceDate}T00:00:00`).getFullYear();
@@ -473,7 +565,7 @@ export default function Invoices() {
           <h2>Facturación y cobros</h2>
           <p>Controla lo facturado, quién debe dinero y los albaranes pendientes. Todos los importes del panel son sin IVA.</p>
         </div>
-        <button className="billing-primary-action" onClick={() => { setActiveDraftId(null); setIsAdding(true); }}>
+        <button className="billing-primary-action" onClick={() => { setActiveDraftId(null); setEditingInvoiceId(null); setIsAdding(true); }}>
           + Crear factura
         </button>
       </div>
@@ -494,7 +586,7 @@ export default function Invoices() {
       <div className="billing-reconciliation"><strong>Conciliación:</strong> {money(reconciliation.official)} en facturas + {money(reconciliation.summaries)} en albaranes resumen + {money(reconciliation.unbilled)} sin facturar = <strong>{money(reconciliation.sold)} vendidos</strong></div>
 
       <section className="billing-drafts">
-        <header><div><span>PREFACTURAS AUTOMÁTICAS</span><h3>Pendientes de revisar y confirmar</h3><p>Preparadas el día 1 con los albaranes del mes anterior. El número definitivo se asigna al confirmar.</p></div><strong>{billingDrafts.length}</strong></header>
+        <header><div><span>FACTURACIÓN AUTOMÁTICA</span><h3>Facturas definitivas del mes</h3><p>Se harán el día 1 del mes siguiente. También puedes adelantarlas ahora sin que luego se dupliquen.</p></div><div className="billing-draft-header-actions"><button type="button" onClick={handleMonthlyBilling} disabled={runningMonthlyBilling}>{runningMonthlyBilling ? 'Facturando…' : 'Hacer facturación'}</button><strong>{billingDrafts.length}</strong></div></header>
         {billingDrafts.length ? <div className="billing-draft-list">
           {billingDrafts.map(draft => {
             const client = clients.find(item => item.id === draft.clientId);
@@ -504,7 +596,7 @@ export default function Invoices() {
               <button type="button" onClick={() => openBillingDraft(draft)}>Revisar y confirmar</button>
             </article>;
           })}
-        </div> : <div className="billing-all-clear"><CheckCircle2 /><span><strong>Sin prefacturas pendientes</strong><small>Las nuevas aparecerán automáticamente cada día 1.</small></span></div>}
+        </div> : <div className="billing-all-clear"><CheckCircle2 /><span><strong>Sin revisiones pendientes</strong><small>Las facturas definitivas se crearán automáticamente cada día 1.</small></span></div>}
       </section>
 
       <section className="billing-debtors">
@@ -526,20 +618,20 @@ export default function Invoices() {
         <div style={modalOverlayStyle}>
           <div style={modalCardStyle}>
             <div className="flex justify-between items-center mb-4">
-              <h3 className="font-bold text-xl">{activeDraftId ? 'Revisar prefactura' : 'Generar Factura / Albarán Resumen'}</h3>
-              <button className="btn btn-secondary" style={{ padding: '0.2rem 0.6rem' }} onClick={() => { setIsAdding(false); setActiveDraftId(null); }}>Cerrar</button>
+              <h3 className="font-bold text-xl">{editingInvoiceId ? `Editar ${editingInvoice?.invoiceNumber}` : activeDraftId ? 'Revisar prefactura' : 'Generar Factura / Albarán Resumen'}</h3>
+              <button className="btn btn-secondary" style={{ padding: '0.2rem 0.6rem' }} onClick={closeInvoiceModal}>Cerrar</button>
             </div>
           
           <div className="flex gap-4 mb-4">
             <label className="flex items-center gap-2 cursor-pointer p-3 border rounded-md" style={{ borderColor: documentType === 'INVOICE' ? 'var(--color-primary)' : 'var(--color-border)', backgroundColor: documentType === 'INVOICE' ? 'rgba(99,102,241,0.05)' : 'transparent' }}>
-              <input type="radio" name="docType" value="INVOICE" disabled={Boolean(activeDraftId)} checked={documentType === 'INVOICE'} onChange={() => handleDocumentTypeChange('INVOICE')} />
+              <input type="radio" name="docType" value="INVOICE" disabled={Boolean(activeDraftId || editingInvoiceId)} checked={documentType === 'INVOICE'} onChange={() => handleDocumentTypeChange('INVOICE')} />
               <div>
                 <div className="font-bold text-sm">📄 Factura Oficial</div>
                 <div className="text-xs text-muted">Aplica IVA y utiliza la serie F-</div>
               </div>
             </label>
             <label className="flex items-center gap-2 cursor-pointer p-3 border rounded-md" style={{ borderColor: documentType === 'SUMMARY' ? 'var(--color-primary)' : 'var(--color-border)', backgroundColor: documentType === 'SUMMARY' ? 'rgba(99,102,241,0.05)' : 'transparent' }}>
-              <input type="radio" name="docType" value="SUMMARY" disabled={Boolean(activeDraftId)} checked={documentType === 'SUMMARY'} onChange={() => handleDocumentTypeChange('SUMMARY')} />
+              <input type="radio" name="docType" value="SUMMARY" disabled={Boolean(activeDraftId || editingInvoiceId)} checked={documentType === 'SUMMARY'} onChange={() => handleDocumentTypeChange('SUMMARY')} />
               <div>
                 <div className="font-bold text-sm">📝 Albarán Resumen</div>
                 <div className="text-xs text-muted">Sin IVA y utiliza la serie ALB-</div>
@@ -550,7 +642,7 @@ export default function Invoices() {
           <div className="flex gap-4">
             <div className="mb-6 max-w-md w-full">
               <label className="form-label">Seleccionar Cliente</label>
-              <select className="form-control" value={selectedClientId} onChange={handleSelectClient}>
+              <select className="form-control" value={selectedClientId} onChange={handleSelectClient} disabled={Boolean(editingInvoiceId)}>
                 <option value="">-- Elige un cliente --</option>
                 {eligibleClients.map(c => <option key={c.id} value={c.id}>{c.commercialName || c.name} ({c.clientNumber})</option>)}
               </select>
@@ -580,7 +672,7 @@ export default function Invoices() {
 
           {selectedClientId && (
             <div>
-              <h4 className="font-semibold mb-3">Albaranes Pendientes de Facturar</h4>
+              <h4 className="font-semibold mb-3">{editingInvoiceId ? 'Albaranes incluidos en el documento' : 'Albaranes Pendientes de Facturar'}</h4>
               {clientUnbilledNotes.length === 0 ? (
                 <p className="text-muted mb-4 border border-color-border p-4 rounded-md">
                   El cliente seleccionado no tiene albaranes pendientes de facturar.
@@ -657,13 +749,13 @@ export default function Invoices() {
               )}
 
               <div className="flex justify-end gap-3">
-                <button className="btn btn-secondary" onClick={() => { setIsAdding(false); setActiveDraftId(null); }}>Cancelar</button>
+                <button className="btn btn-secondary" onClick={closeInvoiceModal}>Cancelar</button>
                 <button 
                   className="btn btn-primary" 
                   disabled={selectedNotes.length === 0}
                   onClick={handleGenerateInvoice}
                 >
-                  {activeDraftId ? 'Confirmar y crear documento definitivo' : `Generar ${documentType === 'SUMMARY' ? 'Resumen' : 'Factura'}`}
+                  {editingInvoiceId ? 'Guardar cambios' : activeDraftId ? 'Confirmar y crear documento definitivo' : `Generar ${documentType === 'SUMMARY' ? 'Resumen' : 'Factura'}`}
                 </button>
               </div>
             </div>
@@ -773,6 +865,14 @@ export default function Invoices() {
                           title="Ver PDF"
                         >
                           Ver
+                        </button>
+                        <button
+                          className="btn btn-secondary"
+                          style={{ padding: '0.3rem 0.6rem', fontSize: '0.8rem' }}
+                          onClick={() => openInvoiceEditor(inv)}
+                          title="Editar documento"
+                        >
+                          <Pencil size={13} /> Editar
                         </button>
                         {inv.type !== 'SUMMARY' && <button
                           className="btn btn-primary"

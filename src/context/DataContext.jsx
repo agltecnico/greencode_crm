@@ -1553,6 +1553,34 @@ export const DataProvider = ({ children, mode = 'full' }) => {
     return data?.[0] || newInvoice;
   };
 
+  const finalizeMonthlyBilling = async (periodStart) => {
+    const { data, error } = await persistOrReload(
+      () => supabase.rpc('finalize_monthly_billing', {
+        target_month: periodStart,
+        run_source: 'MANUAL'
+      }),
+      'hacer la facturación mensual'
+    );
+    if (!error) await refreshData();
+    return error ? null : data;
+  };
+
+  const updateInvoice = async (invoiceId, changes) => {
+    const { data, error } = await persistOrReload(
+      () => supabase.rpc('update_invoice_document', {
+        target_invoice_id: invoiceId,
+        target_note_ids: changes.deliveryNoteIds,
+        target_invoice_date: changes.date,
+        target_vat: changes.ivaPercentage,
+        target_payment_method: changes.paymentMethod,
+        target_payment_terms: changes.paymentTermsDays
+      }),
+      'editar la factura'
+    );
+    if (!error) await refreshData();
+    return error ? null : data;
+  };
+
   const deleteBillingDraft = async (id) => {
     setBillingDrafts(previous => previous.filter(draft => draft.id !== id));
     return persistOrReload(
@@ -1780,7 +1808,7 @@ export const DataProvider = ({ children, mode = 'full' }) => {
         products: sortedProducts, addProduct, updateProduct, deleteProduct,
       orders, addOrder, updateOrderList, deleteOrder, markOrderAsDelivered, saveSignedDeliveryNote,
       deliveryNotes, updateDeliveryNote, deleteDeliveryNote,
-      invoices, billingDrafts, addInvoice, deleteInvoice, deleteBillingDraft, importData, markInvoiceAsPaid,
+      invoices, billingDrafts, addInvoice, updateInvoice, finalizeMonthlyBilling, deleteInvoice, deleteBillingDraft, importData, markInvoiceAsPaid,
       expenses, addExpense, updateExpense, deleteExpense, markExpenseAsPaid,
       salesForecasts, saveSalesForecasts,
       refreshData, initialDataLoading, driverActionsReady,
