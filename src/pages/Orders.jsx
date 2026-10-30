@@ -164,17 +164,25 @@ export default function Orders() {
     }
   };
 
-  const handleAddItem = () => {
+  const handleAddItem = async () => {
     if (!selectedProductId) return;
     const product = products.find(p => p.id === selectedProductId);
     if (!product) return;
 
+    const numericQuantity = Number(quantity);
+    const numericPrice = isFree ? 0 : Number(customPrice !== '' ? customPrice : (product.salePrice ?? product.price ?? 0));
+    const numericDiscount = isFree ? 0 : Number(discount);
+    if (!Number.isFinite(numericQuantity) || numericQuantity < 1 || !Number.isFinite(numericPrice) || numericPrice < 0 || !Number.isFinite(numericDiscount) || numericDiscount < 0 || numericDiscount > 100) {
+      await Swal.fire('Revisa el artículo', 'La cantidad debe ser al menos 1 y el precio y descuento deben ser válidos.', 'warning');
+      return;
+    }
+
     const newItem = {
       productId: product.id,
       name: isFree ? `${product.name} (Sin cargo)` : product.name,
-      price: isFree ? 0 : (customPrice !== '' ? Number(customPrice) : product.price),
-      quantity: Number(quantity),
-      discount: isFree ? 0 : Number(discount)
+      price: numericPrice,
+      quantity: numericQuantity,
+      discount: numericDiscount
     };
     
     setOrderItems([...orderItems, newItem]);
@@ -371,7 +379,7 @@ export default function Orders() {
       </div>
 
       {isAdding && <div className="order-create-backdrop" onMouseDown={event => { if (event.target === event.currentTarget) closeCreateModal(); }}>
-        <form className="order-create-modal" onSubmit={handleSubmit} role="dialog" aria-modal="true" aria-label="Crear nuevo pedido">
+        <form className="order-create-modal" onSubmit={handleSubmit} noValidate role="dialog" aria-modal="true" aria-label="Crear nuevo pedido">
           <header className="order-create-header">
             <div className="order-create-title"><i><ShoppingBag/></i><div><span>NUEVO PEDIDO</span><h3>Crear pedido</h3><p>Selecciona el cliente y añade los productos.</p></div></div>
             <div className="order-create-head-fields">
