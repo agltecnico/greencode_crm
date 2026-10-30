@@ -11,6 +11,13 @@ const toLocalISODate = date => [date.getFullYear(), String(date.getMonth() + 1).
 const formatSendDate = value => new Date(value).toLocaleString('es-ES', {
   day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit', hour12: false
 }).replace(',', ' ·');
+const parseDocumentDate = value => {
+  if (value instanceof Date) return new Date(value.getTime());
+  const match = String(value || '').match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if (match) return new Date(Number(match[1]), Number(match[2]) - 1, Number(match[3]));
+  const parsed = new Date(value);
+  return Number.isNaN(parsed.getTime()) ? null : parsed;
+};
 const invoiceNetAmount = invoice => {
   if (invoice.subtotal !== undefined && invoice.subtotal !== null) return Number(invoice.subtotal || 0);
   const vatRate = Number(invoice.ivaPercentage || 0) / 100;
@@ -72,8 +79,9 @@ const buildInvoiceEmailHtml = invoice => `
   </div>`;
 
 const getDueDate = invoice => {
-  if (invoice.dueDate) return new Date(`${String(invoice.dueDate).slice(0, 10)}T00:00:00`);
-  const date = new Date(invoice.date);
+  const storedDueDate = parseDocumentDate(invoice.dueDate);
+  if (storedDueDate) return storedDueDate;
+  const date = parseDocumentDate(invoice.date) || new Date();
   const days = Number(invoice.paymentTermsDays ?? 15);
   date.setDate(date.getDate() + days);
   return date;

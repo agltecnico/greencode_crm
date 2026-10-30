@@ -1,6 +1,14 @@
 import { jsPDF } from 'jspdf';
 import autoTable from 'jspdf-autotable';
 
+const parseDocumentDate = value => {
+  if (value instanceof Date) return new Date(value.getTime());
+  const match = String(value || '').match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if (match) return new Date(Number(match[1]), Number(match[2]) - 1, Number(match[3]));
+  const parsed = new Date(value);
+  return Number.isNaN(parsed.getTime()) ? null : parsed;
+};
+
 export const getLogoBase64 = async () => {
   try {
     const cachedJpeg = localStorage.getItem('crm_company_logo_jpeg_v4');
@@ -734,9 +742,8 @@ const buildInvoiceDoc = async (invoice, client, deliveryNotes) => {
     doc.text(invoice.paymentMethod, 52, y + 10);
     if (!isSummary) {
       const terms = Number(invoice.paymentTermsDays ?? 15);
-      const dueDate = invoice.dueDate
-        ? new Date(`${String(invoice.dueDate).slice(0, 10)}T00:00:00`)
-        : new Date(new Date(invoice.date).setDate(new Date(invoice.date).getDate() + terms));
+      const dueDate = parseDocumentDate(invoice.dueDate) || parseDocumentDate(invoice.date) || new Date();
+      if (!invoice.dueDate) dueDate.setDate(dueDate.getDate() + terms);
       doc.setFontSize(8.5);
       doc.setFont('helvetica', 'bold');
       doc.text(`VENCIMIENTO: ${formatDate(dueDate)}`, 21, y + 20);
