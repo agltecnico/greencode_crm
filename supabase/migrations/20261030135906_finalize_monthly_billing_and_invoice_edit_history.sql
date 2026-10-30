@@ -34,10 +34,6 @@ alter table public.invoices
   add constraint invoices_edit_history_array_check
   check (jsonb_typeof("editHistory") = 'array');
 
-create unique index if not exists invoices_invoice_number_unique
-  on public.invoices ("invoiceNumber")
-  where "invoiceNumber" is not null;
-
 create or replace function public.finalize_monthly_billing(
   target_month date,
   run_source text default 'MANUAL'
