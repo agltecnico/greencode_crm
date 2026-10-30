@@ -1,15 +1,22 @@
 import { useState } from 'react';
 import { useData } from '../context/DataContext';
+import { Search, SlidersHorizontal, X } from 'lucide-react';
+import { sanitizeProductDiscounts } from '../utils/clientDiscounts';
+
+const emptyClient = () => ({
+  name: '', commercialName: '', email: '', phone: '', address: '',
+  postalCode: '', city: '', province: '', nif: '', defaultDiscount: 0,
+  productDiscounts: {}, paymentMethod: 'Transferencia', paymentTermsDays: 15,
+  billingMode: 'INVOICE'
+});
 
 export default function Clients() {
-  const { clients, addClient, updateClient, deleteClient } = useData();
+  const { clients, products, addClient, updateClient, deleteClient } = useData();
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [editingId, setEditingId] = useState(null);
-  const [formData, setFormData] = useState({
-    name: '', commercialName: '', email: '', phone: '', address: '', 
-    postalCode: '', city: '', province: '', nif: '', defaultDiscount: 0,
-    paymentMethod: 'Transferencia', paymentTermsDays: 15, billingMode: 'INVOICE'
-  });
+  const [formData, setFormData] = useState(emptyClient);
+  const [isDiscountModalOpen, setIsDiscountModalOpen] = useState(false);
+  const [productSearch, setProductSearch] = useState('');
 
   const modalOverlayStyle = { position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 50 };
   const modalCardStyle = { width: '100%', maxWidth: '700px', margin: '20px', maxHeight: '90vh', overflowY: 'auto', backgroundColor: '#fff', padding: '2rem', borderRadius: '8px', border: '1px solid var(--color-border)' };
@@ -22,7 +29,7 @@ export default function Clients() {
       } else {
         addClient(formData);
       }
-      setFormData({ name: '', commercialName: '', email: '', phone: '', address: '', postalCode: '', city: '', province: '', nif: '', defaultDiscount: 0, paymentMethod: 'Transferencia', paymentTermsDays: 15, billingMode: 'INVOICE' });
+      setFormData(emptyClient());
       setIsFormOpen(false);
       setEditingId(null);
     }
@@ -40,6 +47,7 @@ export default function Clients() {
       province: client.province || '',
       nif: client.nif || '',
       defaultDiscount: client.defaultDiscount || 0,
+      productDiscounts: client.productDiscounts || {},
       paymentMethod: client.paymentMethod || 'Transferencia',
       paymentTermsDays: Number(client.paymentTermsDays ?? 15),
       billingMode: client.billingMode || 'INVOICE'
@@ -54,8 +62,30 @@ export default function Clients() {
   const cancelForm = () => {
     setIsFormOpen(false);
     setEditingId(null);
-    setFormData({ name: '', commercialName: '', email: '', phone: '', address: '', postalCode: '', city: '', province: '', nif: '', defaultDiscount: 0, paymentMethod: 'Transferencia', paymentTermsDays: 15, billingMode: 'INVOICE' });
+    setFormData(emptyClient());
+    setIsDiscountModalOpen(false);
+    setProductSearch('');
   };
+
+  const setProductDiscount = (productId, value) => {
+    setFormData(current => ({
+      ...current,
+      productDiscounts: sanitizeProductDiscounts({ ...current.productDiscounts, [productId]: value })
+    }));
+  };
+
+  const removeProductDiscount = (productId) => {
+    setFormData(current => {
+      const nextDiscounts = { ...current.productDiscounts };
+      delete nextDiscounts[productId];
+      return { ...current, productDiscounts: nextDiscounts };
+    });
+  };
+
+  const filteredProducts = products.filter(product =>
+    String(product.name || '').toLowerCase().includes(productSearch.trim().toLowerCase())
+  );
+  const customDiscountCount = Object.keys(formData.productDiscounts || {}).length;
 
   return (
     <div className="admin-container">
@@ -111,8 +141,11 @@ export default function Clients() {
               <input type="text" className="form-control" value={formData.province} onChange={e => setFormData({...formData, province: e.target.value})} />
             </div>
             <div className="form-group mb-0">
-              <label className="form-label">Descuento (%) Por Defecto</label>
-              <input type="number" min="0" max="100" className="form-control" value={formData.defaultDiscount} onChange={e => setFormData({...formData, defaultDiscount: Number(e.target.value)})} />
+              <label className="form-label">Descuentos</label>
+              <button type="button" className="btn btn-secondary" style={{ width: '100%', justifyContent: 'center', display: 'flex', gap: '0.5rem', alignItems: 'center' }} onClick={() => setIsDiscountModalOpen(true)}>
+                <SlidersHorizontal size={16} /> Configurar descuentos
+              </button>
+              <small className="text-muted">General: {formData.defaultDiscount || 0}%{customDiscountCount > 0 ? ` · ${customDiscountCount} producto${customDiscountCount === 1 ? '' : 's'} personalizado${customDiscountCount === 1 ? '' : 's'}` : ''}</small>
             </div>
             <div className="form-group mb-0">
               <label className="form-label">Forma de Pago (Por Defecto)</label>
@@ -143,6 +176,49 @@ export default function Clients() {
             </div>
           </form>
         </div>
+        </div>
+      )}
+
+      {isDiscountModalOpen && (
+        <div style={{ ...modalOverlayStyle, zIndex: 70 }}>
+          <div style={{ ...modalCardStyle, maxWidth: '820px' }} role="dialog" aria-modal="true" aria-labelledby="discount-modal-title">
+            <div style={{ display: 'flex', justifyContent: 'space-between', gap: '1rem', alignItems: 'flex-start', marginBottom: '1rem' }}>
+              <div>
+                <h3 id="discount-modal-title" className="font-bold text-xl">Descuentos del cliente</h3>
+                <p className="text-muted">El descuento general se aplica salvo que indiques otro para un producto.</p>
+              </div>
+              <button type="button" className="btn btn-secondary" aria-label="Cerrar descuentos" onClick={() => setIsDiscountModalOpen(false)}><X size={18} /></button>
+            </div>
+
+            <div className="form-group" style={{ maxWidth: '280px' }}>
+              <label className="form-label">Descuento general (%)</label>
+              <input type="number" min="0" max="100" className="form-control" value={formData.defaultDiscount} onChange={e => setFormData({...formData, defaultDiscount: Math.min(100, Math.max(0, Number(e.target.value) || 0))})} />
+            </div>
+
+            <div style={{ position: 'relative', marginBottom: '1rem' }}>
+              <Search size={17} style={{ position: 'absolute', left: '0.75rem', top: '50%', transform: 'translateY(-50%)', color: '#64748b' }} />
+              <input className="form-control" style={{ paddingLeft: '2.3rem' }} placeholder="Buscar producto..." value={productSearch} onChange={e => setProductSearch(e.target.value)} />
+            </div>
+
+            <div style={{ border: '1px solid var(--color-border)', borderRadius: '8px', overflow: 'hidden' }}>
+              {filteredProducts.length === 0 ? <p className="text-muted text-center py-4">No hay productos que coincidan.</p> : filteredProducts.map(product => {
+                const hasCustomDiscount = Object.prototype.hasOwnProperty.call(formData.productDiscounts || {}, product.id);
+                return (
+                  <div key={product.id} style={{ display: 'grid', gridTemplateColumns: 'minmax(180px, 1fr) 180px 110px', gap: '0.75rem', alignItems: 'center', padding: '0.75rem 1rem', borderBottom: '1px solid var(--color-border)' }}>
+                    <strong>{product.name}</strong>
+                    <select className="form-control" value={hasCustomDiscount ? 'CUSTOM' : 'DEFAULT'} onChange={e => e.target.value === 'DEFAULT' ? removeProductDiscount(product.id) : setProductDiscount(product.id, formData.defaultDiscount)}>
+                      <option value="DEFAULT">General ({formData.defaultDiscount || 0}%)</option>
+                      <option value="CUSTOM">Personalizado</option>
+                    </select>
+                    <input type="number" min="0" max="100" className="form-control" aria-label={`Descuento para ${product.name}`} disabled={!hasCustomDiscount} value={hasCustomDiscount ? formData.productDiscounts[product.id] : formData.defaultDiscount} onChange={e => setProductDiscount(product.id, e.target.value)} />
+                  </div>
+                );
+              })}
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '1rem' }}>
+              <button type="button" className="btn btn-primary" onClick={() => setIsDiscountModalOpen(false)}>Aceptar</button>
+            </div>
+          </div>
         </div>
       )}
 
@@ -180,6 +256,7 @@ export default function Clients() {
                           <p className="font-semibold mb-1">C.P. / Pobl.: <span className="font-normal">{`${client.postalCode || ''} ${client.city || ''} ${client.province ? '('+client.province+')' : ''}`.trim()}</span></p>
                         )}
                         {client.defaultDiscount > 0 && <p className="font-semibold text-primary mb-1">Descuento por defecto: <span className="font-normal">{client.defaultDiscount}%</span></p>}
+                        {Object.keys(client.productDiscounts || {}).length > 0 && <p className="font-semibold text-primary mb-1">Descuentos personalizados: <span className="font-normal">{Object.keys(client.productDiscounts).length} productos</span></p>}
                         <p className="font-semibold mb-1">Plazo de pago: <span className="font-normal">{Number(client.paymentTermsDays ?? 15)} días</span></p>
                       </div>
                     </td>

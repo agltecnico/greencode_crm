@@ -3,6 +3,7 @@ import { useState, Fragment } from 'react';
 import { CalendarDays, Plus, Search, ShoppingBag, Trash2, UserRound, X } from 'lucide-react';
 import { useData } from '../context/DataContext';
 import { usePagination } from '../hooks/usePagination';
+import { getClientProductDiscount } from '../utils/clientDiscounts';
 
 export default function Orders() {
   const {
@@ -79,9 +80,14 @@ export default function Orders() {
     setEditNewItemProduct(pId);
     if (pId) {
       const prod = products.find(p => p.id === pId);
-      if (prod) setEditNewItemPrice(prod.salePrice ?? prod.price ?? 0);
+      if (prod) {
+        setEditNewItemPrice(prod.salePrice ?? prod.price ?? 0);
+        const client = clients.find(c => c.id === editFormData?.clientId);
+        setEditNewItemDiscount(getClientProductDiscount(client, prod.id));
+      }
     } else {
       setEditNewItemPrice('');
+      setEditNewItemDiscount(0);
     }
   };
 
@@ -152,7 +158,7 @@ export default function Orders() {
     setClientId(newClientId);
     if (newClientId) {
       const client = clients.find(c => c.id === newClientId);
-      setDiscount(client ? (client.defaultDiscount || 0) : 0);
+      setDiscount(getClientProductDiscount(client, selectedProductId));
     } else {
       setDiscount(0);
     }
@@ -179,7 +185,7 @@ export default function Orders() {
     
     // Reset discount to client default for next item
     const client = clients.find(c => c.id === clientId);
-    setDiscount(client ? (client.defaultDiscount || 0) : 0);
+    setDiscount(getClientProductDiscount(client, ''));
   };
 
   const handleRemoveItem = (index) => {
@@ -191,9 +197,15 @@ export default function Orders() {
     setSelectedProductId(pId);
     if (pId) {
       const product = products.find(p => p.id === pId);
-      if (product) setCustomPrice(product.salePrice ?? product.price ?? 0);
+      if (product) {
+        setCustomPrice(product.salePrice ?? product.price ?? 0);
+        const client = clients.find(c => c.id === clientId);
+        setDiscount(getClientProductDiscount(client, product.id));
+      }
     } else {
       setCustomPrice('');
+      const client = clients.find(c => c.id === clientId);
+      setDiscount(getClientProductDiscount(client, ''));
     }
   };
 
