@@ -986,6 +986,49 @@
   gap: 0.75rem;
 }
 
+/* Compact order board for the TV screen */
+.tv-orders-screen { min-height: calc(100vh - 100px); }
+.tv-orders-heading { display: flex; align-items: center; justify-content: space-between; gap: 1rem; margin-bottom: 0.75rem; }
+.tv-orders-heading h2 { margin: 0.12rem 0 0; color: #f8fafc; font-size: 1.6rem; }
+.tv-order-tabs { display: inline-flex; gap: 0.35rem; padding: 0.3rem; border: 1px solid #334155; border-radius: 11px; background: rgba(15, 23, 42, 0.92); }
+.tv-order-tabs button { display: flex; align-items: center; gap: 0.55rem; padding: 0.55rem 0.8rem; border: 0; border-radius: 8px; background: transparent; color: #94a3b8; font-size: 0.78rem; font-weight: 900; cursor: pointer; }
+.tv-order-tabs button strong { min-width: 1.6rem; padding: 0.12rem 0.38rem; border-radius: 999px; background: #334155; color: #e2e8f0; text-align: center; }
+.tv-order-tabs button.active { background: rgba(245, 158, 11, 0.18); color: #fcd34d; }
+.tv-order-tabs button.active strong { background: #d97706; color: white; }
+.tv-order-tabs button.active.delivered { background: rgba(16, 185, 129, 0.16); color: #6ee7b7; }
+.tv-order-tabs button.active.delivered strong { background: #059669; }
+.tv-order-ticket-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(270px, 1fr)); align-content: start; gap: 0.55rem; }
+.tv-order-ticket { --order-accent: #f59e0b; min-width: 0; overflow: hidden; border: 1px solid #334155; border-top: 4px solid var(--order-accent); border-radius: 10px; background: linear-gradient(145deg, rgba(30, 41, 59, 0.98), rgba(15, 23, 42, 0.98)); color: #e2e8f0; box-shadow: 0 8px 18px rgba(2, 6, 23, 0.2); }
+.tv-order-ticket[data-status="PREPARED"] { --order-accent: #38bdf8; }
+.tv-order-ticket[data-status="IN_TRANSIT"] { --order-accent: #a78bfa; }
+.tv-order-ticket[data-status="DELIVERED"] { --order-accent: #10b981; }
+.tv-order-ticket > header { display: flex; align-items: flex-start; justify-content: space-between; gap: 0.65rem; padding: 0.58rem 0.7rem; border-bottom: 1px solid rgba(148, 163, 184, 0.16); }
+.tv-order-ticket > header span { color: #94a3b8; font-size: 0.62rem; font-weight: 900; }
+.tv-order-ticket > header h3 { margin: 0.12rem 0 0; overflow: hidden; color: #fff; font-size: 0.9rem; line-height: 1.1; text-overflow: ellipsis; white-space: nowrap; }
+.tv-order-ticket > header > div { min-width: 0; }
+.tv-order-ticket > header > strong { flex: 0 0 auto; padding: 0.2rem 0.42rem; border: 1px solid color-mix(in srgb, var(--order-accent) 45%, transparent); border-radius: 999px; background: color-mix(in srgb, var(--order-accent) 14%, transparent); color: var(--order-accent); font-size: 0.58rem; text-transform: uppercase; }
+.tv-order-ticket-items { padding: 0.38rem 0.7rem; }
+.tv-order-ticket-items > div { display: grid; grid-template-columns: 24px minmax(0, 1fr) auto; align-items: center; gap: 0.38rem; min-height: 25px; border-bottom: 1px solid rgba(148, 163, 184, 0.1); }
+.tv-order-ticket-items > div:last-child { border-bottom: 0; }
+.tv-order-ticket-items strong { color: var(--order-accent); font-size: 0.78rem; }
+.tv-order-ticket-items span { overflow: hidden; color: #e2e8f0; font-size: 0.7rem; font-weight: 750; text-overflow: ellipsis; white-space: nowrap; }
+.tv-order-ticket-items small { color: #6ee7b7; font-size: 0.52rem; font-weight: 900; text-transform: uppercase; }
+.tv-order-ticket > footer { display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; padding: 0.4rem 0.7rem; border-top: 1px solid rgba(148, 163, 184, 0.16); background: rgba(2, 6, 23, 0.28); }
+.tv-order-ticket > footer span { color: #64748b; font-size: 0.58rem; font-weight: 800; }
+.tv-order-ticket > footer strong { color: #fff; font-size: 0.78rem; }
+.tv-order-empty { grid-column: 1 / -1; padding: 5rem 1rem; color: #64748b; font-size: 1rem; font-weight: 800; text-align: center; }
+
+@media (min-width: 1600px) {
+  .tv-order-ticket-grid { grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); }
+}
+
+@media (max-width: 720px) {
+  .tv-orders-heading { align-items: stretch; flex-direction: column; }
+  .tv-order-tabs { align-self: stretch; }
+  .tv-order-tabs button { flex: 1; justify-content: center; }
+  .tv-order-ticket-grid { grid-template-columns: 1fr; }
+}
+
 .tv-stock-metrics > div {
   min-height: 105px;
   padding: 0.8rem 0.65rem;

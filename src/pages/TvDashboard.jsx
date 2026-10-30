@@ -3,6 +3,51 @@ import EmployeeTasks from '../components/EmployeeTasks';
 import { useData } from '../context/DataContext';
 import '../crops.css';
 
+const ORDER_STATUS_LABELS = {
+  PENDING: 'Pendiente',
+  PREPARED: 'Preparado',
+  IN_TRANSIT: 'En reparto',
+  DELIVERED: 'Entregado'
+};
+
+function TvOrderCard({ order, client, products }) {
+  const items = order.items || [];
+  const orderDate = new Date(order.date);
+  const totalUnits = items.reduce((sum, item) => sum + Number(item.quantity || 0), 0);
+  const total = Number(order.total ?? items.reduce((sum, item) => (
+    sum + Number(item.price || 0) * Number(item.quantity || 0) * (1 - Number(item.discount || 0) / 100)
+  ), 0));
+  const status = String(order.status || 'PENDING').toUpperCase();
+
+  return (
+    <article className="tv-order-ticket" data-status={status}>
+      <header>
+        <div>
+          <span>{Number.isNaN(orderDate.getTime()) ? 'Sin fecha' : orderDate.toLocaleDateString('es-ES', { day: '2-digit', month: '2-digit' })}</span>
+          <h3>{client?.commercialName || client?.name || 'Cliente desconocido'}</h3>
+        </div>
+        <strong>{ORDER_STATUS_LABELS[status] || status}</strong>
+      </header>
+      <div className="tv-order-ticket-items">
+        {items.map((item, index) => {
+          const productName = products?.find(product => product.id === item.productId)?.name || item.name || 'Producto';
+          return (
+            <div key={`${item.productId || productName}-${index}`}>
+              <strong>{Number(item.quantity || 0)}</strong>
+              <span>{productName}</span>
+              {Number(item.price || 0) === 0 && <small>Sin cargo</small>}
+            </div>
+          );
+        })}
+      </div>
+      <footer>
+        <span>{items.length} líneas · {totalUnits} uds.</span>
+        <strong>{total.toFixed(2)} €</strong>
+      </footer>
+    </article>
+  );
+}
+
 export default function TvDashboard() {
   const tvViews = ['tasks', 'greenhouse', 'climate', 'orders', 'stock'];
   const [screenMode, setScreenMode] = useState(() => {
@@ -15,6 +60,7 @@ export default function TvDashboard() {
   const [cropStatusFilter, setCropStatusFilter] = useState('ALL');
   const [cropPage, setCropPage] = useState(1);
   const [cropLabelSize, setCropLabelSize] = useState(() => localStorage.getItem('greencode_tv_crop_label_size') || 'medium');
+  const [orderStatusTab, setOrderStatusTab] = useState('pending');
   const { crops, cropTypes, seeds, refreshData, orders, clients, products, productMovements } = useData();
 
   const translateStatus = (status) => {
@@ -34,22 +80,19 @@ export default function TvDashboard() {
   };
 
   const activeCropsList = useMemo(() => crops?.filter(c => c.status !== 'HARVESTED' && c.status !== 'DISCARDED') || [], [crops]);
-  const cropStatusTone = {
-    SOAKING: 'blue',
-    SOWED: 'green',
-    GERMINATING: 'green',
-    DARKNESS: 'violet',
-    LIGHT: 'amber',
-    GROWING: 'green',
-    READY: 'green'
-  };
-
   const cropsPerPage = cropLabelSize === 'small' ? 48 : cropLabelSize === 'large' ? 20 : 32;
   const filteredCrops = useMemo(() => activeCropsList
     .filter(crop => cropStatusFilter === 'ALL' || String(crop.status || '').toUpperCase() === cropStatusFilter)
     .sort((a, b) => new Date(a.datePlanted || 0) - new Date(b.datePlanted || 0)), [activeCropsList, cropStatusFilter]);
   const cropPageCount = Math.max(1, Math.ceil(filteredCrops.length / cropsPerPage));
   const visibleCrops = filteredCrops.slice((cropPage - 1) * cropsPerPage, cropPage * cropsPerPage);
+  const pendingOrders = useMemo(() => (orders || [])
+    .filter(order => ['PENDING', 'PENDIENTE', 'PREPARED', 'IN_TRANSIT'].includes(String(order.status || '').toUpperCase()))
+    .sort((a, b) => new Date(a.date || 0) - new Date(b.date || 0)), [orders]);
+  const deliveredOrders = useMemo(() => (orders || [])
+    .filter(order => String(order.status || '').toUpperCase() === 'DELIVERED')
+    .sort((a, b) => new Date(b.date || 0) - new Date(a.date || 0)), [orders]);
+  const visibleOrders = orderStatusTab === 'pending' ? pendingOrders : deliveredOrders;
 
   useEffect(() => {
     localStorage.setItem('greencode_tv_screen_mode', screenMode);
@@ -61,7 +104,6 @@ export default function TvDashboard() {
 
   useEffect(() => {
     localStorage.setItem('greencode_tv_crop_label_size', cropLabelSize);
-    setCropPage(1);
   }, [cropLabelSize]);
 
   useEffect(() => {
@@ -218,7 +260,7 @@ export default function TvDashboard() {
               </nav>
               <div className="tv-crop-size-control"><span>Tamaño</span><div>
                 {[['small', 'S'], ['medium', 'M'], ['large', 'L']].map(([value, label]) => (
-                  <button key={value} className={cropLabelSize === value ? 'active' : ''} onClick={() => setCropLabelSize(value)}>{label}</button>
+                  <button key={value} className={cropLabelSize === value ? 'active' : ''} onClick={() => { setCropLabelSize(value); setCropPage(1); }}>{label}</button>
                 ))}
               </div></div>
             </aside>
@@ -287,63 +329,26 @@ export default function TvDashboard() {
       )}
 
       {tvTab === 'orders' && (
-        <div style={{ animation: 'fadeIn 0.4s ease' }}>
-          <div className="tv-panel-heading">
+        <div className="tv-orders-screen" style={{ animation: 'fadeIn 0.4s ease' }}>
+          <div className="tv-orders-heading">
             <div>
               <span className="tv-eyebrow">LOGÍSTICA EN TIEMPO REAL</span>
-              <h2>Estado de pedidos</h2>
+              <h2>Pedidos</h2>
             </div>
-            <span className="tv-summary-badge">{orders?.filter(order => ['PENDING', 'PREPARED', 'IN_TRANSIT'].includes(order.status)).length || 0} pedidos activos</span>
+            <nav className="tv-order-tabs" aria-label="Estado de los pedidos">
+              <button className={orderStatusTab === 'pending' ? 'active' : ''} onClick={() => setOrderStatusTab('pending')}>
+                Pendientes <strong>{pendingOrders.length}</strong>
+              </button>
+              <button className={orderStatusTab === 'delivered' ? 'active delivered' : ''} onClick={() => setOrderStatusTab('delivered')}>
+                Entregados <strong>{deliveredOrders.length}</strong>
+              </button>
+            </nav>
           </div>
-          
-          <div className="tv-order-grid">
-            <div className="tv-order-column">
-              <h3><span className="tv-label amber">Pendientes</span></h3>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-                {orders?.filter(o => o.status === 'PENDING').map(o => {
-                  const client = clients?.find(c => c.id === o.clientId);
-                  return (
-                    <div key={o.id} className="tv-info-card compact" data-tone="amber">
-                      <h4 style={{ color: 'white', fontSize: '1.3rem', margin: '0 0 0.5rem 0' }}>{client?.name || 'Desconocido'}</h4>
-                      <div className="tv-label-row"><span className="tv-label neutral">{o.items?.length || 0} productos</span><span className="tv-label amber">Por preparar</span></div>
-                    </div>
-                  );
-                })}
-                {(!orders || orders.filter(o => o.status === 'PENDING').length === 0) && <p style={{ textAlign: 'center', color: '#64748b' }}>No hay pedidos pendientes</p>}
-              </div>
-            </div>
-
-            <div className="tv-order-column">
-              <h3><span className="tv-label blue">Preparados</span></h3>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-                {orders?.filter(o => o.status === 'PREPARED').map(o => {
-                  const client = clients?.find(c => c.id === o.clientId);
-                  return (
-                    <div key={o.id} className="tv-info-card compact" data-tone="blue">
-                      <h4 style={{ color: 'white', fontSize: '1.3rem', margin: '0 0 0.5rem 0' }}>{client?.name || 'Desconocido'}</h4>
-                      <div className="tv-label-row"><span className="tv-label blue">Listo</span><span className="tv-label neutral">Para furgoneta</span></div>
-                    </div>
-                  );
-                })}
-                {(!orders || orders.filter(o => o.status === 'PREPARED').length === 0) && <p style={{ textAlign: 'center', color: '#64748b' }}>Nada preparado ahora mismo</p>}
-              </div>
-            </div>
-
-            <div className="tv-order-column">
-              <h3><span className="tv-label violet">En reparto</span></h3>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-                {orders?.filter(o => o.status === 'IN_TRANSIT').map(o => {
-                  const client = clients?.find(c => c.id === o.clientId);
-                  return (
-                    <div key={o.id} className="tv-info-card compact" data-tone="violet">
-                      <h4 style={{ color: 'white', fontSize: '1.3rem', margin: '0 0 0.5rem 0' }}>{client?.name || 'Desconocido'}</h4>
-                      <div className="tv-label-row"><span className="tv-label violet">En ruta</span><span className="tv-label neutral">Hacia el cliente</span></div>
-                    </div>
-                  );
-                })}
-                {(!orders || orders.filter(o => o.status === 'IN_TRANSIT').length === 0) && <p style={{ textAlign: 'center', color: '#64748b' }}>Ningún conductor en ruta</p>}
-              </div>
-            </div>
+          <div className="tv-order-ticket-grid">
+            {visibleOrders.map(order => (
+              <TvOrderCard key={order.id} order={order} client={clients?.find(client => client.id === order.clientId)} products={products} />
+            ))}
+            {visibleOrders.length === 0 && <div className="tv-order-empty">No hay pedidos {orderStatusTab === 'pending' ? 'pendientes' : 'entregados'}.</div>}
           </div>
         </div>
       )}
