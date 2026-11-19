@@ -1,6 +1,6 @@
 import Swal from 'sweetalert2';
 import { useState, Fragment } from 'react';
-import { CalendarDays, Plus, Search, ShoppingBag, Trash2, UserRound, X } from 'lucide-react';
+import { CalendarDays, Copy, Plus, Search, ShoppingBag, Trash2, UserRound, X } from 'lucide-react';
 import { useData } from '../context/DataContext';
 import { usePagination } from '../hooks/usePagination';
 import { getClientProductDiscount } from '../utils/clientDiscounts';
@@ -200,6 +200,49 @@ export default function Orders() {
     setOrderItems(orderItems.filter((_, i) => i !== index));
   };
 
+  const handleCreateItemChange = (index, field, value) => {
+    setOrderItems(currentItems => currentItems.map((item, itemIndex) => (
+      itemIndex === index ? { ...item, [field]: Number(value) } : item
+    )));
+  };
+
+  const previousOrder = clientId && orderDate
+    ? orders
+      .filter(order => order.clientId === clientId && String(order.date || '').slice(0, 10) < orderDate)
+      .sort((a, b) => new Date(b.date) - new Date(a.date))[0]
+    : null;
+
+  const usePreviousOrderAsBase = async () => {
+    if (!previousOrder) return;
+    const client = clients.find(candidate => candidate.id === clientId);
+    const unavailableProducts = [];
+    const copiedItems = (previousOrder.items || []).flatMap(item => {
+      const product = products.find(candidate => candidate.id === item.productId);
+      if (!product) {
+        unavailableProducts.push(item.name);
+        return [];
+      }
+      const wasFree = Number(item.price || 0) === 0 || String(item.name || '').includes('(Sin cargo)');
+      return [{
+        productId: product.id,
+        name: wasFree ? `${product.name} (Sin cargo)` : product.name,
+        price: wasFree ? 0 : Number(product.salePrice ?? product.price ?? item.price ?? 0),
+        quantity: Number(item.quantity || 1),
+        discount: wasFree ? 0 : Number(getClientProductDiscount(client, product.id))
+      }];
+    });
+
+    setOrderItems(copiedItems);
+    if (unavailableProducts.length) {
+      await Swal.fire({
+        title: 'Pedido cargado con avisos',
+        text: `No se han copiado productos que ya no están disponibles: ${unavailableProducts.join(', ')}.`,
+        icon: 'warning',
+        confirmButtonColor: '#059669'
+      });
+    }
+  };
+
   const handleProductChange = (e) => {
     const pId = e.target.value;
     setSelectedProductId(pId);
@@ -236,9 +279,18 @@ export default function Orders() {
     setOrderDate(new Date().toISOString().split('T')[0]);
   };
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
     if (!clientId || orderItems.length === 0) return;
+
+    const invalidItem = orderItems.some(item =>
+      !item.productId || Number(item.quantity) <= 0 || Number(item.price) < 0
+      || Number(item.discount) < 0 || Number(item.discount) > 100
+    );
+    if (invalidItem) {
+      await Swal.fire('Revisa las líneas', 'Las cantidades, precios o descuentos no son válidos.', 'warning');
+      return;
+    }
 
     const parsedDate = new Date(orderDate);
     const safeDate = Number.isNaN(parsedDate.getTime()) ? new Date().toISOString() : parsedDate.toISOString();
@@ -250,7 +302,8 @@ export default function Orders() {
       date: safeDate
     };
 
-    addOrder(newOrder);
+    const saved = await addOrder(newOrder);
+    if (!saved) return;
     closeCreateModal();
   };
 
@@ -390,6 +443,28 @@ export default function Orders() {
           </header>
 
           <main className="order-create-body">
+            {clientId && (
+              <section className="order-create-previous">
+                {previousOrder ? (
+                  <>
+                    <div className="order-create-previous-icon"><Copy size={20}/></div>
+                    <div className="order-create-previous-copy">
+                      <span>PEDIDO ANTERIOR</span>
+                      <strong>{new Date(previousOrder.date).toLocaleDateString('es-ES')}</strong>
+                      <small>{previousOrder.items?.length || 0} productos · {Number(previousOrder.total || 0).toFixed(2)} €</small>
+                    </div>
+                    <div className="order-create-previous-preview">
+                      {(previousOrder.items || []).slice(0, 4).map(item => <span key={item.productId}>{item.name} × {item.quantity}</span>)}
+                      {(previousOrder.items || []).length > 4 && <span>+{previousOrder.items.length - 4} más</span>}
+                    </div>
+                    <button type="button" onClick={usePreviousOrderAsBase}><Copy size={16}/> Usar como base</button>
+                  </>
+                ) : (
+                  <div className="order-create-previous-empty"><Copy size={18}/><span>Este cliente no tiene un pedido anterior a la fecha seleccionada.</span></div>
+                )}
+              </section>
+            )}
+
             <section className="order-create-add">
               <div className="order-create-section-title"><div><span>1</span><h4>Añadir artículo</h4></div><small>El precio se carga automáticamente y puedes modificarlo.</small></div>
               <div className="order-create-line-form">
@@ -406,7 +481,7 @@ export default function Orders() {
               <div className="order-create-section-title"><div><span>2</span><h4>Artículos del pedido</h4></div><small>{orderItems.length} líneas · {orderItems.reduce((sum, item) => sum + Number(item.quantity || 0), 0)} unidades</small></div>
               {orderItems.length ? <div className="table-container"><table><thead><tr><th>Producto</th><th>Precio</th><th>Cantidad</th><th>Descuento</th><th>Total</th><th/></tr></thead><tbody>{orderItems.map((item, index) => {
                 const lineTotal = Number(item.price) * Number(item.quantity) * (1 - Number(item.discount) / 100);
-                return <tr key={`${item.productId}-${index}`}><td><strong>{item.name}</strong></td><td>{Number(item.price).toFixed(2)} €</td><td>{item.quantity}</td><td>{item.discount || 0} %</td><td><strong>{lineTotal.toFixed(2)} €</strong></td><td><button type="button" onClick={() => handleRemoveItem(index)} aria-label={`Quitar ${item.name}`}><Trash2 size={16}/></button></td></tr>;
+                return <tr key={`${item.productId}-${index}`}><td><strong>{item.name}</strong></td><td><input aria-label={`Precio de ${item.name}`} type="number" min="0" step="0.01" value={item.price} onChange={event => handleCreateItemChange(index, 'price', event.target.value)}/></td><td><input aria-label={`Cantidad de ${item.name}`} type="number" min="1" step="1" value={item.quantity} onChange={event => handleCreateItemChange(index, 'quantity', event.target.value)}/></td><td><input aria-label={`Descuento de ${item.name}`} type="number" min="0" max="100" step="0.01" value={item.discount || 0} onChange={event => handleCreateItemChange(index, 'discount', event.target.value)}/></td><td><strong>{lineTotal.toFixed(2)} €</strong></td><td><button type="button" onClick={() => handleRemoveItem(index)} aria-label={`Quitar ${item.name}`}><Trash2 size={16}/></button></td></tr>;
               })}</tbody></table></div> : <div className="order-create-empty"><Search/><strong>El pedido está vacío</strong><span>Selecciona un producto arriba para empezar.</span></div>}
             </section>
           </main>

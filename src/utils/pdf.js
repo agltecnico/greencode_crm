@@ -559,21 +559,29 @@ const drawClientCard = (doc, client, y, invoiceDocument = false) => {
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(9);
   doc.text('CLIENTE', x + 7, y + 8);
-  const lines = [];
+  const rows = [];
   if (invoiceDocument) {
-    if (client.commercialName) lines.push(client.commercialName, client.name);
-    else lines.push(client.name);
-    if (client.nif) lines.push(`NIF/CIF: ${client.nif}`);
+    if (client.commercialName) rows.push(client.commercialName, client.name);
+    else rows.push(client.name);
+    if (client.nif) rows.push(`NIF/CIF: ${client.nif}`);
   } else {
-    lines.push(client.commercialName || client.name);
+    rows.push(client.commercialName || client.name);
   }
-  if (client.address) lines.push(client.address);
+  if (client.address) rows.push(client.address);
   const location = [client.postalCode, client.city, client.province].filter(Boolean).join(' ');
-  if (location) lines.push(location);
-  doc.setFontSize(9);
-  lines.slice(0, 5).forEach((line, index) => {
-    doc.setFont('helvetica', index === 0 ? 'bold' : 'normal');
-    doc.text(String(line), x + 7, y + 17 + index * 5, { maxWidth: width - 14 });
+  if (location) rows.push(location);
+
+  const maxTextWidth = width - 14;
+  rows.filter(Boolean).slice(0, 5).forEach((row, rowIndex) => {
+    const text = String(row);
+    doc.setFont('helvetica', rowIndex === 0 ? 'bold' : 'normal');
+    doc.setFontSize(9);
+    const naturalWidth = doc.getTextWidth(text);
+    const fittedFontSize = naturalWidth > maxTextWidth
+      ? Math.max(6.5, 9 * maxTextWidth / naturalWidth)
+      : 9;
+    doc.setFontSize(fittedFontSize);
+    doc.text(text, x + 7, y + 17 + rowIndex * 5);
   });
 };
 
